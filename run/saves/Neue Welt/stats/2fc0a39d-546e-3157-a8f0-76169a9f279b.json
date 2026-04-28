@@ -1,0 +1,24 @@
+{
+  "stats": {
+    "minecraft:used": {
+      "minecraft:acacia_planks": 31,
+      "minecraft:diamond_ore": 1,
+      "minecraft:deepslate_diamond_ore": 1
+    },
+    "minecraft:custom": {
+      "minecraft:sprint_one_cm": 6818,
+      "minecraft:time_since_rest": 6197,
+      "minecraft:fall_one_cm": 15897,
+      "minecraft:walk_one_cm": 11090,
+      "minecraft:total_world_time": 6394,
+      "minecraft:leave_game": 1,
+      "minecraft:fly_one_cm": 26945,
+      "minecraft:damage_taken": 150,
+      "minecraft:play_time": 6197,
+      "minecraft:damage_dealt": 14,
+      "minecraft:jump": 157,
+      "minecraft:time_since_death": 6197
+    }
+  },
+  "DataVersion": 4671
+}

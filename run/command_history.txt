@@ -1,0 +1,8 @@
+/gamemode survival
+/give Player920 minecraft:golden_apple
+/give @a minecraft:enchanted_golden_apple 64
+/give Player156 minecraft:totem_of_undying 4
+/give Player156 minecraft:totem_of_undying 7
+/give Player700 minecraft:totem_of_undying 20
+/give Player149 minecraft:enchanted_golden_apple 64
+/enchant Player647 minecraft:flame

@@ -1,0 +1,47 @@
+{
+  "stats": {
+    "minecraft:dropped": {
+      "minecraft:totem_of_undying": 3,
+      "minecraft:arrow": 2,
+      "minecraft:slime_ball": 2
+    },
+    "minecraft:picked_up": {
+      "minecraft:enchanted_golden_apple": 56,
+      "minecraft:totem_of_undying": 21,
+      "minecraft:slime_ball": 8,
+      "minecraft:arrow": 2
+    },
+    "minecraft:custom": {
+      "minecraft:damage_resisted": 91,
+      "minecraft:time_since_rest": 719,
+      "minecraft:walk_one_cm": 2681,
+      "minecraft:leave_game": 1,
+      "minecraft:mob_kills": 2,
+      "minecraft:damage_taken": 939,
+      "minecraft:damage_dealt": 50,
+      "minecraft:play_time": 2897,
+      "minecraft:damage_absorbed": 640,
+      "minecraft:jump": 28,
+      "minecraft:time_since_death": 693,
+      "minecraft:drop": 7,
+      "minecraft:sprint_one_cm": 9177,
+      "minecraft:fall_one_cm": 11043,
+      "minecraft:total_world_time": 3007,
+      "minecraft:fly_one_cm": 384571,
+      "minecraft:crouch_one_cm": 3009,
+      "minecraft:sneak_time": 23,
+      "minecraft:deaths": 2
+    },
+    "minecraft:killed": {
+      "minecraft:slime": 2
+    },
+    "minecraft:used": {
+      "minecraft:totem_of_undying": 6,
+      "minecraft:ender_pearl": 1
+    },
+    "minecraft:killed_by": {
+      "minecraft:iron_golem": 2
+    }
+  },
+  "DataVersion": 4671
+}

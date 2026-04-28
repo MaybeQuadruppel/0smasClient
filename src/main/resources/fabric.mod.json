@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "newbridge",
+  "version": "${version}",
+  "name": "NewBridge",
+  "description": "A Minecraft Bridge",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.qdrppl.newbridge.EntryPoint"
+    ]
+  },
+  "mixins": [
+    "newbridge.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
