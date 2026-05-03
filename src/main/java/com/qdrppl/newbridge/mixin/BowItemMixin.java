@@ -1,7 +1,7 @@
 package com.qdrppl.newbridge.mixin;
 
 import com.qdrppl.newbridge.Hacks.Combat.AutoCart;
-import com.qdrppl.newbridge.Hacks.Combat.Util.Util;
+import com.qdrppl.newbridge.Hacks.Combat.Util.AutoCartUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.BowItem;
@@ -34,7 +34,7 @@ public class BowItemMixin {
         if (power < 0.1f) return;
 
 
-        BlockPos landing = Util.predictLanding(livingUser, power * 3.0f);
+        BlockPos landing = AutoCartUtil.predictLanding(livingUser, power * 3.0f);
         if (landing != null) {
             AutoCart.setLanding(landing);
             module.performActions(landing);

@@ -9,7 +9,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
-public class Util {
+public class AutoCartUtil {
     private static final double GRAVITY = 0.05;
     private static final double DRAG = 0.99;
     private static final int MAX_TICKS = 1200;
