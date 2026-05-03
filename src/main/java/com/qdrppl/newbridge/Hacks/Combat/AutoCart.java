@@ -1,52 +1,64 @@
 package com.qdrppl.newbridge.Hacks.Combat;
 
+import com.qdrppl.newbridge.UI.components.Module;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.Level;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import java.util.function.Predicate;
 
-public class AutoCart {
-    private static final double GRAVITY = 0.05;
-    private static final double DRAG = 0.99;
-    private static final int MAX_TICKS = 1200;
+public class AutoCart extends Module {
+    public static AutoCart INSTANCE;
+    public static BlockPos lastLanding = null;
 
-    public static BlockPos predictLanding(LivingEntity entity, float speed) {
-        Level world = entity.level();
-        if (world == null) return null;
+    public AutoCart() {
+        super("InstaCart", "Platziert Schiene + TNT-Minecart an Pfeil-Landestelle", Category.COMBAT);
+        INSTANCE = this;
+    }
 
-        Vec3 pos = new Vec3(entity.getX(), entity.getEyeY() - 0.1, entity.getZ());
-        float pitch = entity.getXRot();
-        float yaw = entity.getYRot();
+    public static void setLanding(BlockPos pos) {
+        lastLanding = pos;
+    }
 
-        float vx = -Mth.sin(yaw * 0.017453292F) * Mth.cos(pitch * 0.017453292F);
-        float vy = -Mth.sin(pitch * 0.017453292F);
-        float vz =  Mth.cos(yaw * 0.017453292F) * Mth.cos(pitch * 0.017453292F);
+    @Override
+    public void onDisable() {
+        super.onDisable();
+        lastLanding = null;
+    }
 
-        Vec3 vel = new Vec3(vx, vy, vz).multiply(speed, speed, speed);
-        Vec3 shooterVel = entity.getDeltaMovement();
-        vel = vel.add(shooterVel.x, entity.onGround() ? 0.0 : shooterVel.y, shooterVel.z);
+    public void performActions(BlockPos landing) {
+        if (landing == null) return;
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.gameMode == null) return;
 
-        for (int tick = 0; tick < MAX_TICKS; tick++) {
-            Vec3 nextPos = pos.add(vel);
-            BlockHitResult hit = world.clip(new ClipContext(
-                    pos, nextPos,
-                    ClipContext.Block.COLLIDER,
-                    ClipContext.Fluid.NONE,
-                    entity
-            ));
+        int railSlot = findHotbarSlot(client.player.getInventory(), stack ->
+                stack.is(Items.RAIL) || stack.is(Items.POWERED_RAIL) || stack.is(Items.ACTIVATOR_RAIL)
+        );
 
-            if (hit.getType() == HitResult.Type.BLOCK) {
-                return hit.getBlockPos();
-            }
+        int cartSlot = findHotbarSlot(client.player.getInventory(), stack -> stack.is(Items.TNT_MINECART));
 
-            pos = nextPos;
-            vel = new Vec3(vel.x * DRAG, vel.y * DRAG - GRAVITY, vel.z * DRAG);
-            if (pos.y < world.getMinY() - 64) break;
+        if (railSlot == -1 || cartSlot == -1) return;
+
+        client.player.getInventory().setSelectedSlot(railSlot);
+        BlockHitResult railHit = new BlockHitResult(new Vec3(landing.getX() + 0.5, landing.getY() + 1.0, landing.getZ() + 0.5), Direction.UP, landing, false);
+        client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, railHit);
+
+
+        client.player.getInventory().setSelectedSlot(cartSlot);
+        BlockPos railPos = landing.above();
+        BlockHitResult cartHit = new BlockHitResult(new Vec3(railPos.getX() + 0.5, railPos.getY() + 0.5, railPos.getZ() + 0.5), Direction.UP, railPos, false);
+        client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, cartHit);
+    }
+
+    private int findHotbarSlot(Inventory inv, Predicate<ItemStack> predicate) {
+        for (int i = 0; i < 9; i++) {
+            if (predicate.test(inv.getItem(i))) return i;
         }
-        return null;
+        return -1;
     }
 }

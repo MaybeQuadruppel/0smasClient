@@ -20,7 +20,7 @@ public class ClientPacketListenerMixin {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || Velocity.INSTANCE == null || !Velocity.INSTANCE.enabled) return;
 
-        if (packet.getId() == mc.player.getId()) {
+        if (packet.id() == mc.player.getId()) {
             if (Velocity.INSTANCE.horizontal == 0 && Velocity.INSTANCE.vertical == 0) {
                 ci.cancel();
                 return;
@@ -29,7 +29,7 @@ public class ClientPacketListenerMixin {
             double hMult = Velocity.INSTANCE.horizontal / 100.0;
             double vMult = Velocity.INSTANCE.vertical / 100.0;
 
-            Vec3 originalMovement = packet.getMovement();
+            Vec3 originalMovement = packet.movement();
             Vec3 scaledMovement = new Vec3(
                     originalMovement.x * hMult,
                     originalMovement.y * vMult,

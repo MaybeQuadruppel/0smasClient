@@ -11,7 +11,7 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.entity.LivingEntity;
@@ -20,35 +20,35 @@ import org.lwjgl.glfw.GLFW;
 public class EntryPoint implements ClientModInitializer {
 
     public static KeyMapping guiKeyBind;
-
+    String CategoryName = "Client";
     @Override
     public void onInitializeClient() {
-        // Keybinding Initialisierung
+
+        Identifier catId = Identifier.parse("JSaGUI");
+        KeyMapping.Category myCategory = KeyMapping.Category.register(catId);
         guiKeyBind = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "GUI NewBridge",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
-                "FICKEN"
+                myCategory
+
+
         ));
 
         ModuleManager.init();
         RenderUtils.getInstance().init(Minecraft.getInstance());
         PlayerESP.getInstance().init(Minecraft.getInstance());
 
-        // Rendering Event für AimAssist (Smoothing/Visuals)
-        net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.START_MAIN.register(context -> {
+        net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.START_MAIN.register(context -> {
             Minecraft client = Minecraft.getInstance();
             if (client.player != null && AimAssist.INSTANCE != null && AimAssist.INSTANCE.enabled) {
-                float tickDelta = client.getFps(); // Für 1.21.1 / Fabric
+                float tickDelta = client.getFps();
                 AimAssist.INSTANCE.onRender(client, tickDelta);
             }
         });
 
-        // Haupt-Logik im START_CLIENT_TICK (Safe gegen Vulcan/Grim)
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
-
-            // GUI öffnen
             while (guiKeyBind.consumeClick()) {
                 client.setScreen(new ClickGuiScreen());
             }
@@ -65,8 +65,6 @@ public class EntryPoint implements ClientModInitializer {
                     }
                 }
             }
-
-            // Alle anderen Module ticken
             if (ModuleManager.modules != null) {
                 for (Module m : ModuleManager.modules) {
                     if (m.enabled) {

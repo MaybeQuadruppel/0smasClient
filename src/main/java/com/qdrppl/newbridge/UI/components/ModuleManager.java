@@ -1,6 +1,7 @@
 package com.qdrppl.newbridge.UI.components;
 
 import com.qdrppl.newbridge.Hacks.Combat.*;
+import com.qdrppl.newbridge.Hacks.Combat.Util.Util;
 import com.qdrppl.newbridge.Hacks.Movement.*;
 import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
 import com.qdrppl.newbridge.Hacks.Visual.Trajectories;

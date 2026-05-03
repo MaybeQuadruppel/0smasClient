@@ -4,7 +4,8 @@ import com.qdrppl.newbridge.UI.components.Module;
 import com.qdrppl.newbridge.UI.components.Slider;
 import com.qdrppl.newbridge.UI.components.ToggleButton;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.entity.player.Inventory;
 import java.util.concurrent.ThreadLocalRandom;
@@ -50,9 +51,9 @@ public class AutoTotem extends Module {
         int totemSlot = findTotemSlot(client.player.getInventory());
         if (totemSlot != -1) {
             int slot = totemSlot < 9 ? totemSlot + 36 : totemSlot;
-            client.gameMode.handleInventoryMouseClick(0, slot, 0, ClickType.PICKUP, client.player);
-            client.gameMode.handleInventoryMouseClick(0, 45, 0, ClickType.PICKUP, client.player);
-            client.gameMode.handleInventoryMouseClick(0, slot, 0, ClickType.PICKUP, client.player);
+            client.gameMode.handleContainerInput(0, slot, 0, ContainerInput.PICKUP, client.player);
+            client.gameMode.handleContainerInput(0, 45, 0, ContainerInput.PICKUP, client.player);
+            client.gameMode.handleContainerInput(0, slot, 0, ContainerInput.PICKUP, client.player);
         }
 
         timer = -1;

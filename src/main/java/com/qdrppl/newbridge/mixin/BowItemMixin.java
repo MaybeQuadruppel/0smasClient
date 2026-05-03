@@ -1,9 +1,8 @@
 package com.qdrppl.newbridge.mixin;
 
 import com.qdrppl.newbridge.Hacks.Combat.AutoCart;
-import com.qdrppl.newbridge.Hacks.Combat.InstaCartModule;
+import com.qdrppl.newbridge.Hacks.Combat.Util.Util;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.ItemStack;
@@ -11,7 +10,6 @@ import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(BowItem.class)
@@ -23,7 +21,7 @@ public class BowItemMixin {
         if (level == null || !level.isClientSide()) return;
 
 
-        InstaCartModule module = InstaCartModule.INSTANCE;
+        AutoCart module = AutoCart.INSTANCE;
         if (module == null || !module.enabled) return;
 
 
@@ -36,9 +34,9 @@ public class BowItemMixin {
         if (power < 0.1f) return;
 
 
-        BlockPos landing = AutoCart.predictLanding(livingUser, power * 3.0f);
+        BlockPos landing = Util.predictLanding(livingUser, power * 3.0f);
         if (landing != null) {
-            InstaCartModule.setLanding(landing);
+            AutoCart.setLanding(landing);
             module.performActions(landing);
         }
     }
