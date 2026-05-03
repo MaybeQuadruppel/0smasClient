@@ -3,19 +3,18 @@ package com.qdrppl.newbridge.Hacks.Visual.ESP;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext; // world -> level
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;  // world -> level
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.Identifier; // Bleibt Identifier laut deinem Setup
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -24,6 +23,7 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -45,7 +45,7 @@ public class RenderUtils {
     private static final RenderPipeline FILLED_THROUGH_WALLS = RenderPipelines.register(
             RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
                     .withLocation(Identifier.fromNamespaceAndPath("minecraft", "debug_filled_box"))
-                    .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+                    .withDepthStencilState(Optional.empty())
                     .build()
     );
 
@@ -63,10 +63,11 @@ public class RenderUtils {
     }
 
     public void init(Minecraft client) {
-        WorldRenderEvents.BEFORE_TRANSLUCENT.register(this::extractAndDrawESP);
+        // world -> level
+        LevelRenderEvents.BEFORE_TRANSLUCENT_TERRAIN.register(this::extractAndDrawESP);
     }
 
-    private void extractAndDrawESP(WorldRenderContext context) {
+    private void extractAndDrawESP(LevelRenderContext context) { // WorldRenderContext -> LevelRenderContext
         if (BLOCKS_TO_RENDER.isEmpty()) return;
 
         if (Minecraft.getInstance().level == null) return;
@@ -80,9 +81,12 @@ public class RenderUtils {
             buffer = null;
         }
     }
-    private void renderAllBlocks(WorldRenderContext context) {
-        PoseStack matrices = context.matrices();
-        Vec3 camera = context.worldState().cameraRenderState.pos;
+
+    private void renderAllBlocks(LevelRenderContext context) { // WorldRenderContext -> LevelRenderContext
+        PoseStack matrices = context.poseStack(); // context.matrices() -> context.poseStack()
+
+        // worldState() -> levelState() | cameraRenderState bleibt erhalten
+        Vec3 camera = context.levelState().cameraRenderState.pos;
         if (matrices == null || camera == null) return;
 
         if (buffer == null) {
@@ -138,6 +142,7 @@ public class RenderUtils {
 
         if (vertexBuffer == null || vertexBuffer.size() < vertexBufferSize) {
             if (vertexBuffer != null) vertexBuffer.close();
+            // Nutzt die gelernten USAGE-Konstanten
             vertexBuffer = new MappableRingBuffer(() -> MOD_ID + "_esp_buffer", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
         }
 

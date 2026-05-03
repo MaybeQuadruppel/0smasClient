@@ -2,7 +2,6 @@ package com.qdrppl.newbridge.Hacks.Visual.ESP;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -10,13 +9,13 @@ import com.mojang.blaze3d.vertex.*;
 import com.qdrppl.newbridge.UI.components.Module;
 import com.qdrppl.newbridge.UI.components.Slider;
 import com.qdrppl.newbridge.UI.components.ToggleButton;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.rendertype.RenderType; // Korrigierter Importpfad
+import net.minecraft.resources.Identifier; // Zurück zu Identifier wie gewünscht
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -26,6 +25,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -39,8 +39,9 @@ public class PlayerESP extends Module {
 
     private static final RenderPipeline FILLED_PIPELINE = RenderPipelines.register(
             RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
+
                     .withLocation(Identifier.fromNamespaceAndPath("newbridge", "esp_filled"))
-                    .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+                    .withDepthStencilState(Optional.empty())
                     .build()
     );
 
@@ -49,12 +50,12 @@ public class PlayerESP extends Module {
     private MappableRingBuffer vertexBuffer;
 
     public PlayerESP() {
-        super("EnitiyESP","(Lets you See Enitys by their Threadlevels)", Category.VISUAL);
+        super("EnitiyESP", "(Lets you See Enitys by their Threadlevels)", Category.VISUAL);
         INSTANCE = this;
 
-        this.settings.add(new ToggleButton("Show Players", showPlayers, val -> showPlayers = (boolean)val));
-        this.settings.add(new ToggleButton("Show Hostiles", showHostiles, val -> showHostiles = (boolean)val));
-        this.settings.add(new ToggleButton("Show Passives", showPassives, val -> showPassives = (boolean)val));
+        this.settings.add(new ToggleButton("Show Players", showPlayers, val -> showPlayers = (boolean) val));
+        this.settings.add(new ToggleButton("Show Hostiles", showHostiles, val -> showHostiles = (boolean) val));
+        this.settings.add(new ToggleButton("Show Passives", showPassives, val -> showPassives = (boolean) val));
         this.settings.add(new Slider("Alpha", 0.0, 1.0, (double) alphaValue, val -> alphaValue = val.floatValue()));
     }
 
@@ -63,28 +64,27 @@ public class PlayerESP extends Module {
         return INSTANCE;
     }
 
-
     public void init(Minecraft client) {
         INSTANCE = this;
-        WorldRenderEvents.BEFORE_TRANSLUCENT.register(this::render);
+        LevelRenderEvents.BEFORE_TRANSLUCENT_TERRAIN.register(this::render);
     }
 
-    private void render(WorldRenderContext context) {
+    private void render(LevelRenderContext context) {
         if (!this.enabled) return;
 
         Minecraft client = Minecraft.getInstance();
         if (client.level == null || client.player == null) return;
 
-        Vec3 camPos = context.worldState().cameraRenderState.pos;
-        PoseStack matrices = context.matrices();
-        float tickDelta = client.getDeltaTracker().getRealtimeDeltaTicks();
+        Vec3 camPos = context.levelState().cameraRenderState.pos;
+        PoseStack matrices = context.poseStack();
+        float tickDelta = client.getDeltaTracker().getGameTimeDeltaTicks();
 
         if (buffer == null) {
             buffer = new BufferBuilder(allocator, VertexFormat.Mode.QUADS, FILLED_PIPELINE.getVertexFormat());
         }
 
         matrices.pushPose();
-        matrices.translate((float)-camPos.x, (float)-camPos.y, (float)-camPos.z);
+        matrices.translate((float) -camPos.x, (float) -camPos.y, (float) -camPos.z);
 
         int entitiesFound = 0;
         for (Entity entity : client.level.entitiesForRendering()) {
@@ -103,12 +103,12 @@ public class PlayerESP extends Module {
 
             if (valid) {
                 entitiesFound++;
-                double x = Mth.lerp(tickDelta, entity.xo, entity.getX());
-                double y = Mth.lerp(tickDelta, entity.yo, entity.getY());
-                double z = Mth.lerp(tickDelta, entity.zo, entity.getZ());
+                double x = Mth.lerp(tickDelta, entity.xOld, entity.getX());
+                double y = Mth.lerp(tickDelta, entity.yOld, entity.getY());
+                double z = Mth.lerp(tickDelta, entity.zOld, entity.getZ());
                 float w = entity.getBbWidth() / 2f;
                 float h = entity.getBbHeight();
-                drawFilledBox(matrices.last().pose(), buffer, (float)x - w, (float)y, (float)z - w, (float)x + w, (float)y + h, (float)z + w, r, g, b, alphaValue);
+                drawFilledBox(matrices.last().pose(), buffer, (float) x - w, (float) y, (float) x + w, (float) y + h, (float) z - w, (float) z + w, r, g, b, alphaValue);
             }
         }
         matrices.popPose();
@@ -117,8 +117,7 @@ public class PlayerESP extends Module {
             submitDraw(client);
         }
     }
-
-    private void drawFilledBox(Matrix4f matrix, BufferBuilder buffer, float minX, float minY, float minZ, float maxX, float maxY, float maxZ, float r, float g, float b, float a) {
+    private void drawFilledBox(Matrix4f matrix, BufferBuilder buffer, float minX, float minY, float maxX, float maxY, float minZ, float maxZ, float r, float g, float b, float a) {
         buffer.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, a);
         buffer.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, a);
         buffer.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, a);
@@ -151,6 +150,7 @@ public class PlayerESP extends Module {
         int vertexBufferSize = builtBuffer.drawState().vertexCount() * builtBuffer.drawState().format().getVertexSize();
         if (vertexBuffer == null || vertexBuffer.size() < vertexBufferSize) {
             if (vertexBuffer != null) vertexBuffer.close();
+            // Zurück zu den Konstanten USAGE_VERTEX und USAGE_MAP_WRITE
             vertexBuffer = new MappableRingBuffer(() -> "esp_filled_render", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
         }
         CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();

@@ -43,8 +43,8 @@ public class BlockESP extends Module {
             try {
                 List<BlockPos> found = new ArrayList<>();
                 int radius = (int) rangeInChunks;
-                int pX = client.player.chunkPosition().x;
-                int pZ = client.player.chunkPosition().z;
+                int pX = client.player.chunkPosition().x();
+                int pZ = client.player.chunkPosition().z();
 
                 for (int x = -radius; x <= radius; x++) {
                     for (int z = -radius; z <= radius; z++) {

@@ -4,7 +4,7 @@ import com.qdrppl.newbridge.Hacks.Combat.*;
 import com.qdrppl.newbridge.Hacks.Movement.*;
 import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
 import com.qdrppl.newbridge.Hacks.Visual.Trajectories;
-import com.qdrppl.newbridge.UI.ModuleList;
+import com.qdrppl.newbridge.Hacks.Visual.ModuleList;
 import com.qdrppl.newbridge.Hacks.Misc.*;
 
 import java.util.ArrayList;

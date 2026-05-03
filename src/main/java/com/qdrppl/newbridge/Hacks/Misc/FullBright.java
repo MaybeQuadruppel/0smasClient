@@ -1,20 +1,15 @@
 package com.qdrppl.newbridge.Hacks.Misc;
 
 import com.qdrppl.newbridge.UI.components.Module;
-import net.minecraft.client.Minecraft;
+import com.qdrppl.newbridge.UI.components.Slider;
 
 public class FullBright extends Module {
+    public static FullBright instance;
+    public static double amount = 16.0;
+
     public FullBright() {
         super("FullBright", "(Makes your game Bright)", Category.MISC);
-    }
-
-    @Override
-    public void onTick(Minecraft client) {
-        client.options.gamma().set(100.0);
-    }
-
-    @Override
-    public void onDisable() {
-        Minecraft.getInstance().options.gamma().set(1.0);
+        instance = this;
+        this.settings.add(new Slider("amount", 0.1, 16.0, 16.0, val -> amount = val));
     }
 }

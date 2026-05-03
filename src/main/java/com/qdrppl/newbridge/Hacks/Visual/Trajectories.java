@@ -4,7 +4,8 @@ import com.qdrppl.newbridge.UI.components.Module;
 import com.qdrppl.newbridge.UI.components.ColorPicker;
 import com.qdrppl.newbridge.UI.components.ToggleButton;
 import com.qdrppl.newbridge.Utils.RenderBlock;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext; // world -> level
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;  // world -> level
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
@@ -25,13 +26,13 @@ public class Trajectories extends Module {
         this.settings.add(new ColorPicker("Color", trajColor, (newColor) -> this.trajColor = newColor));
         this.settings.add(new ToggleButton("Show Path", showPath, (val) -> this.showPath = val));
 
-        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
+        LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(context -> {
             if (!this.enabled) return;
             renderTrajectory(context);
         });
     }
 
-    private void renderTrajectory(net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext context) {
+    private void renderTrajectory(LevelRenderContext context) { // WorldRenderContext -> LevelRenderContext
         Minecraft client = Minecraft.getInstance();
         if (client.player == null || client.level == null) return;
 
@@ -57,11 +58,9 @@ public class Trajectories extends Module {
         for (int i = 0; i < 200; i++) {
             Vec3 nextPos = pos.add(motion);
 
-
             BlockHitResult blockHit = client.level.clip(new ClipContext(
                     pos, nextPos, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, client.player
             ));
-
 
             EntityHitResult entityHit = ProjectileUtil.getEntityHitResult(
                     client.player,
@@ -73,7 +72,6 @@ public class Trajectories extends Module {
             );
 
             if (entityHit != null) {
-
                 if (blockHit.getType() == HitResult.Type.MISS || pos.distanceTo(entityHit.getLocation()) < pos.distanceTo(blockHit.getLocation())) {
                     renderEntityIndicator(context, entityHit.getEntity(), r, g, b, 0.6f);
                     break;
@@ -90,6 +88,7 @@ public class Trajectories extends Module {
             }
 
             pos = nextPos;
+            // Die Physik-Werte bleiben identisch zu 1.21
             motion = motion.scale(0.99).subtract(0, 0.05, 0);
 
             if (pos.y < client.level.getMinY()) break;
@@ -98,15 +97,14 @@ public class Trajectories extends Module {
         RenderBlock.draw(client);
     }
 
-    private void renderEntityIndicator(net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext context, Entity target, float r, float g, float b, float a) {
-        AABB box = target.getBoundingBox();
+    private void renderEntityIndicator(LevelRenderContext context, Entity target, float r, float g, float b, float a) {
         RenderBlock.renderPoint(context, target.position().add(0, target.getBbHeight() / 2, 0),
                 target.getBbHeight(), r, g, b, a);
 
         RenderBlock.renderPoint(context, target.getEyePosition(), 0.15f, 1f, 0f, 0f, 1f);
     }
 
-    private void renderLandingBlock(net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext context, BlockHitResult hit, float r, float g, float b, float a) {
+    private void renderLandingBlock(LevelRenderContext context, BlockHitResult hit, float r, float g, float b, float a) {
         Direction side = hit.getDirection();
         Vec3 landingPos = Vec3.atLowerCornerOf(hit.getBlockPos()).add(side.getStepX(), side.getStepY(), side.getStepZ());
         RenderBlock.renderPoint(context, landingPos.add(0.5, 0.5, 0.5), 1.0f, r, g, b, a);

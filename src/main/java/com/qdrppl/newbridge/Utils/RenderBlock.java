@@ -3,12 +3,11 @@ package com.qdrppl.newbridge.Utils;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext; // world -> level
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -21,6 +20,7 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -30,7 +30,7 @@ public class RenderBlock {
     private static final RenderPipeline PIPELINE = RenderPipelines.register(
             RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
                     .withLocation(Identifier.fromNamespaceAndPath(MOD_ID, "trajectory_pipeline"))
-                    .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+                    .withDepthStencilState(Optional.empty())
                     .build()
     );
 
@@ -48,12 +48,17 @@ public class RenderBlock {
         }
     }
 
-
-    public static void renderPoint(WorldRenderContext context, Vec3 pos, float size, float r, float g, float b, float a) {
+    /**
+     * Aktualisiert auf LevelRenderContext für Minecraft 26.1.2
+     */
+    public static void renderPoint(LevelRenderContext context, Vec3 pos, float size, float r, float g, float b, float a) {
         if (buffer == null) begin();
 
-        PoseStack matrices = context.matrices();
-        Vec3 camera = context.worldState().cameraRenderState.pos;
+        // context.matrices() -> context.poseStack()
+        PoseStack matrices = context.poseStack();
+
+        // worldState() -> levelState()
+        Vec3 camera = context.levelState().cameraRenderState.pos;
         Matrix4fc matrix = matrices.last().pose();
 
         float x1 = (float) (pos.x - (size / 2) - camera.x);
@@ -63,6 +68,7 @@ public class RenderBlock {
         float y2 = (float) (pos.y + (size / 2) - camera.y);
         float z2 = (float) (pos.z + (size / 2) - camera.z);
 
+        // Die Vertex-Daten bleiben logisch gleich
         buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a);
         buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a);
         buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a);
@@ -107,6 +113,7 @@ public class RenderBlock {
 
         if (vertexBuffer == null || vertexBuffer.size() < vertexBufferSize) {
             if (vertexBuffer != null) vertexBuffer.close();
+            // Nutzt weiterhin die gelernten USAGE-Konstanten
             vertexBuffer = new MappableRingBuffer(() -> MOD_ID + "_traj_buffer", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
         }
 
