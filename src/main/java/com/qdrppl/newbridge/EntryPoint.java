@@ -1,6 +1,7 @@
 package com.qdrppl.newbridge;
 
 import com.qdrppl.newbridge.Hacks.Combat.AimAssist;
+import com.qdrppl.newbridge.Hacks.Combat.AutoDihhTap;
 import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
 import com.qdrppl.newbridge.UI.ClickGuiScreen;
 import com.qdrppl.newbridge.UI.components.Module;
@@ -62,12 +63,31 @@ public class EntryPoint implements ClientModInitializer {
                     if (m == null) return;
 
                     if (InputConstants.isKeyDown(client.getWindow(), boundKey)) {
-
                         if (!m.keyAlreadyPressed) {
-                            m.toggle();
+                            // Prüfen, ob es sich um das AutoDihhTap Modul handelt
+                            if (m instanceof AutoDihhTap tap) {
+
+                                if (tap.getMode().equals("Manual")) {
+                                    if (!tap.isEnabled()) {
+
+                                        tap.setEnabled(true);
+                                        tap.onEnable();
+                                    } else {
+                                        if (client.hitResult instanceof EntityHitResult entityHit &&
+                                                entityHit.getEntity() instanceof LivingEntity target) {
+                                            tap.triggerManual(target);
+                                        }
+                                    }
+                                } else {
+                                    tap.toggle();
+                                }
+
+                            } else {
+                                m.toggle();
+                            }
+
                             m.keyAlreadyPressed = true;
                         }
-
                     } else {
                         m.keyAlreadyPressed = false;
                     }

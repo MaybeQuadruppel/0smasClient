@@ -7,7 +7,7 @@ import net.minecraft.world.phys.Vec3;
 
 public class AirJump extends Module {
 
-    // Einstellungen
+
     public double maxJumps = 2.0;
     public double jumpHeight = 0.42;
 
