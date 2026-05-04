@@ -6,7 +6,10 @@
   "mixins": [
     "ClientPacketListenerMixin",
     "BowItemMixin",
-    "GuiMixin"
+    "GuiMixin",
+    "HealthIndicatorMixin",
+    "CameraMixin",
+    "MouseMixin"
   ],
   "injectors": {
     "defaultRequire": 1
