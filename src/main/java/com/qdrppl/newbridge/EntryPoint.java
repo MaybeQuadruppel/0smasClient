@@ -24,7 +24,7 @@ public class EntryPoint implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
 
-        Identifier catId = Identifier.parse("JSaGUI");
+        Identifier catId = Identifier.parse("client");
         KeyMapping.Category myCategory = KeyMapping.Category.register(catId);
         guiKeyBind = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "GUI NewBridge",
@@ -38,6 +38,7 @@ public class EntryPoint implements ClientModInitializer {
         ModuleManager.init();
         RenderUtils.getInstance().init(Minecraft.getInstance());
         PlayerESP.getInstance().init(Minecraft.getInstance());
+        Config.load();
 
         net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.START_MAIN.register(context -> {
             Minecraft client = Minecraft.getInstance();
@@ -49,11 +50,31 @@ public class EntryPoint implements ClientModInitializer {
 
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
+
+
             while (guiKeyBind.consumeClick()) {
                 client.setScreen(new ClickGuiScreen());
             }
 
-            // AimAssist Target Lock
+            if (client.screen == null) {
+                ClickGuiScreen.keybinds.forEach((moduleName, boundKey) -> {
+                    Module m = ModuleManager.getModuleByName(moduleName);
+                    if (m == null) return;
+
+                    if (InputConstants.isKeyDown(client.getWindow(), boundKey)) {
+
+                        if (!m.keyAlreadyPressed) {
+                            m.toggle();
+                            m.keyAlreadyPressed = true;
+                        }
+
+                    } else {
+                        m.keyAlreadyPressed = false;
+                    }
+                });
+            }
+
+
             if (client.options.keyAttack.isDown()) {
                 HitResult targetResult = client.hitResult;
                 if (targetResult != null && targetResult.getType() == HitResult.Type.ENTITY) {
@@ -65,6 +86,7 @@ public class EntryPoint implements ClientModInitializer {
                     }
                 }
             }
+
             if (ModuleManager.modules != null) {
                 for (Module m : ModuleManager.modules) {
                     if (m.enabled) {

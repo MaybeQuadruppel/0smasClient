@@ -1,4 +1,4 @@
-version:4671
+version:4790
 ao:true
 biomeBlendRadius:2
 chunkSectionFadeInTime:0.75
@@ -16,6 +16,7 @@ glintStrength:0.75
 graphicsPreset:"fancy"
 prioritizeChunkUpdates:1
 fullscreen:false
+exclusiveFullscreen:false
 gamma:0.5
 guiScale:0
 maxAnisotropyBit:1
@@ -165,8 +166,9 @@ key_key.debug.dumpVersion:key.keyboard.v
 key_key.debug.profilingChart:key.keyboard.1
 key_key.debug.fpsCharts:key.keyboard.2
 key_key.debug.networkCharts:key.keyboard.3
+key_key.debug.lightmapTexture:key.keyboard.4
 key_GUI NewBridge:key.keyboard.right.shift
-soundCategory_master:1.0
+soundCategory_master:0.19954340852649005
 soundCategory_music:1.0
 soundCategory_record:1.0
 soundCategory_weather:1.0

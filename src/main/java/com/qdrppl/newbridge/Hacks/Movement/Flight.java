@@ -21,7 +21,7 @@ public class Flight extends Module {
     public Mode flightMode = Mode.VELOCITY;
 
     public Flight() {
-        super("Flight","(Go like a Plane...)", Category.MOVEMENT);
+        super("Flight","Go like a Plane...", Category.MOVEMENT);
         this.settings.add(new Slider("Speed", 0.05, 1.0, speed, val -> speed = val));
         this.settings.add(new ToggleButton("V-Match", verticalSpeedMatch, val -> verticalSpeedMatch = val));
         this.settings.add(new ToggleButton("Anti-Kick", antiKick, val -> antiKick = val));

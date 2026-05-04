@@ -32,10 +32,18 @@ public class ModuleManager {
         modules.add(new FullBright());
         modules.add(new Trajectories());
         modules.add(new AutoCart());
+        modules.add(new AutoDihhTap());
 
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {
         return modules.stream().filter(m -> m.category == c).collect(Collectors.toList());
+    }
+
+    public static Module getModuleByName(String name) {
+        return modules.stream()
+                .filter(m -> m.name.equalsIgnoreCase(name))
+                .findFirst()
+                .orElse(null);
     }
 }

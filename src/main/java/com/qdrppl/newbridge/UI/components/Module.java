@@ -7,6 +7,7 @@ import java.util.List;
 public abstract class Module {
     public String name;
     public boolean enabled = false;
+    public boolean keyAlreadyPressed = false;
     public String description;
     public Category category;
 

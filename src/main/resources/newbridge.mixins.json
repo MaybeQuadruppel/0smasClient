@@ -6,7 +6,8 @@
   "mixins": [
     "ClientPacketListenerMixin",
     "FullBrightMixin",
-    "UIMixin"
+    "BowItemMixin",
+    "GuiMixin"
   ],
   "injectors": {
     "defaultRequire": 1

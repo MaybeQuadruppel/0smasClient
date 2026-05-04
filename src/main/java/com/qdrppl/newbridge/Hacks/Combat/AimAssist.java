@@ -27,7 +27,7 @@ public class AimAssist extends Module {
     private UUID lockedTargetUUID = null;
 
     public AimAssist() {
-        super("AimAssist","(Tweaks your Aim)", Category.COMBAT);
+        super("AimAssist","Tweaks your Aim", Category.COMBAT);
         INSTANCE = this;
 
         this.settings.add(new ModeButton("Logic", List.of("Always", "On Hit"), mode, val -> mode = val.equals("Always") ? 0 : 1));
@@ -69,13 +69,13 @@ public class AimAssist extends Module {
     }
 
     private void applySmoothAim(Minecraft client, LivingEntity target, float partialTicks) {
-
-        double x = Mth.lerp(partialTicks, target.xo, target.getX());
-        double y = Mth.lerp(partialTicks, target.yo, target.getY());
-        double z = Mth.lerp(partialTicks, target.zo, target.getZ());
+        double x = target.getX();
+        double y = target.getY();
+        double z = target.getZ();
 
         double dx = x - client.player.getX();
         double dz = z - client.player.getZ();
+
 
         double targetPosDirY = y + (target.getEyeHeight() * aimHeight);
         double playerPosDirY = client.player.getY() + client.player.getEyeHeight();
@@ -91,10 +91,10 @@ public class AimAssist extends Module {
 
         if (Math.abs(yawDiff) <= fov) {
 
-            float speed = smoothness * (partialTicks * 2.0f);
+            float pct = Math.min(1.0f, smoothness);
 
-            float nextYaw = client.player.getYRot() + (yawDiff * smoothness);
-            float nextPitch = client.player.getXRot() + (pitchDiff * smoothness);
+            float nextYaw = client.player.getYRot() + (yawDiff * pct);
+            float nextPitch = client.player.getXRot() + (pitchDiff * pct);
 
             client.player.setYRot(nextYaw);
             client.player.setXRot(Mth.clamp(nextPitch, -90, 90));

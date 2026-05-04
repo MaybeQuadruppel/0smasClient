@@ -1,30 +1,51 @@
 package com.qdrppl.newbridge.UI.components;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.CharacterEvent;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class BlockPicker extends Component {
+
     private final String label;
     public final Set<Block> selectedBlocks = new HashSet<>();
     private boolean open = false;
     private int scrollOffset = 0;
     private final int maxVisible = 12;
-    private final int itemHeight = 12;
+    private final int itemHeight = 13;
     private String searchQuery = "";
+
+    // Schwarz-Weiß Palette
+    private static final int C_BG         = 0xF20A0A0A;
+    private static final int C_BG_HOV     = 0xFF181818;
+    private static final int C_HEADER     = 0xFF181818;
+    private static final int C_SEPARATOR  = 0xFF2C2C2C;
+    private static final int C_ACCENT     = 0xFFFFFFFF;
+    private static final int C_TEXT       = 0xFFEEEEEE;
+    private static final int C_TEXT_DIM   = 0xFF666666;
+    private static final int C_SELECTED   = 0xFFFFFFFF;
+    private static final int C_SEL_BG     = 0x40FFFFFF;
+    private static final int C_SEARCH_BG  = 0xFF000000;
+    private static final int C_SCROLLBAR  = 0xFF2C2C2C;
+    private static final int C_SCROLLTHM  = 0xFF999999;
 
     public BlockPicker(String label) {
         this.label = label;
-        this.width = 100;
+        this.width  = 100;
         this.height = 14;
+    }
+
+    // --- Minimaler Getter für Config.java ---
+    public String getLabel() {
+        return this.label;
     }
 
     private List<Block> getFilteredBlocks() {
@@ -42,89 +63,91 @@ public class BlockPicker extends Component {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.drawString(Minecraft.getInstance().font, "§lBlocks:", x, y - 12, 0xFFA000FF, false);
+    public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, C_ACCENT, false);
 
-        guiGraphics.fill(x, y, x + width, y + height, 0x90202020);
-        guiGraphics.renderOutline(x, y, width, height, 0xFFA000FF);
-        guiGraphics.drawString(Minecraft.getInstance().font, label + (open ? " [^]" : " [v]"), x + 4, y + 3, 0xFFFFFFFF, true);
+        boolean hov = isHovered(mouseX, mouseY);
+        int btnBg  = lerpColor(C_BG, C_BG_HOV, hov ? 1f : 0f);
+        drawRoundedRect(   guiGraphics, x, y, width, height, btnBg);
+        drawRoundedOutline(guiGraphics, x, y, width, height, open ? C_ACCENT : C_SEPARATOR);
 
-        if (open) {
-            List<Block> blocks = getFilteredBlocks();
-            int currentY = y + height + 2;
-            int dropWidth = width + 40;
+        String arrow = open ? " \u25b2" : " \u25bc";
+        int selCount = selectedBlocks.size();
+        String btnLabel = selCount > 0 ? selCount + " selected" + arrow : "Choose blocks" + arrow;
+        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? C_ACCENT : C_TEXT, false);
 
-            // Suchfeld
-            guiGraphics.fill(x, currentY, x + dropWidth, currentY + 14, 0xFF000000);
-            guiGraphics.renderOutline(x, currentY, dropWidth, 14, 0xFFFFFFFF);
-            String display = searchQuery.isEmpty() ? "§8Suche..." : searchQuery + "_";
-            guiGraphics.drawString(Minecraft.getInstance().font, display, x + 4, currentY + 3, 0xFFFFFFFF, false);
+        if (!open) return;
 
-            int listY = currentY + 16;
-            guiGraphics.fill(x, listY, x + dropWidth, listY + (maxVisible * itemHeight), 0xCF080808);
-            guiGraphics.renderOutline(x, listY, dropWidth, maxVisible * itemHeight, 0xFFA000FF);
+        List<Block> blocks   = getFilteredBlocks();
+        int dropW = width + 50;
+        int searchH = 14;
+        int listH   = maxVisible * itemHeight;
+        int dropH   = searchH + 2 + listH;
+        int dropX   = x;
+        int dropY   = y + height + 3;
 
-            for (int i = 0; i < maxVisible; i++) {
-                int index = i + scrollOffset;
-                if (index >= blocks.size()) break;
+        drawShadow(guiGraphics, dropX, dropY, dropW, dropH);
+        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, C_BG);
+        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, C_ACCENT);
 
-                Block b = blocks.get(index);
-                boolean sel = selectedBlocks.contains(b);
-                int iy = listY + (i * itemHeight);
+        drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, C_SEARCH_BG);
+        guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, C_SEPARATOR);
 
-                if (sel) guiGraphics.fill(x + 1, iy, x + dropWidth - 1, iy + itemHeight, 0x60A000FF);
+        String cursor  = (System.currentTimeMillis() / 500) % 2 == 0 ? "|" : "";
+        String display = searchQuery.isEmpty() ? "\u26b2 Search..." : "\u26b2 " + searchQuery + cursor;
+        guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? C_TEXT_DIM : C_TEXT, false);
 
-                String name = b.getName().getString();
-                if (name.length() > 24) name = name.substring(0, 21) + "...";
-                guiGraphics.drawString(Minecraft.getInstance().font, name, x + 4, iy + 2, sel ? 0xFF55FF55 : 0xFFFFFFFF, false);
-            }
+        int listY = dropY + searchH + 2;
+        for (int i = 0; i < maxVisible; i++) {
+            int index = i + scrollOffset;
+            if (index >= blocks.size()) break;
+
+            Block block = blocks.get(index);
+            boolean selected = selectedBlocks.contains(block);
+            int itemY = listY + i * itemHeight;
+            boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= itemY && mouseY <= itemY + itemHeight;
+
+            if (selected) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, C_SEL_BG);
+            else if (itemHov) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, 0x1AFFFFFF);
+
+            if (selected) guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, itemY + (itemHeight / 2) - 4, C_SELECTED, false);
+
+            String name = block.getName().getString();
+            if (name.length() > 22) name = name.substring(0, 19) + "\u2026";
+            guiGraphics.text(Minecraft.getInstance().font, name, dropX + (selected ? 17 : 7), itemY + (itemHeight / 2) - 4, selected ? C_SELECTED : (itemHov ? C_TEXT : C_TEXT_DIM), false);
+        }
+
+        if (blocks.size() > maxVisible) {
+            int sbX = dropX + dropW - 4;
+            float tp = scrollOffset / (float)(blocks.size() - maxVisible);
+            int th = Math.max(16, (int)((maxVisible / (float) blocks.size()) * listH));
+            int ty = listY + (int)(tp * (listH - th));
+            guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, C_SCROLLBAR);
+            guiGraphics.fill(sbX, ty, sbX + 3, ty + th, C_SCROLLTHM);
         }
     }
 
     @Override
     public boolean charTyped(CharacterEvent event) {
         if (!open) return false;
-
         char c = (char) event.codepoint();
-
-        if (c >= 32 && c != 127) {
-            searchQuery += c;
-            scrollOffset = 0;
-            return true;
-        }
+        if (c >= 32 && c != 127) { searchQuery += c; scrollOffset = 0; return true; }
         return false;
     }
 
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (!open) return false;
-
-        int keyCode = event.key();
-
-        if (keyCode == 259) {
-            if (!searchQuery.isEmpty()) {
-                searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
-                scrollOffset = 0;
-            }
-            return true;
-        }
-
-        if (keyCode == 256) {
-            open = false;
-            return true;
-        }
-
+        if (event.key() == 259 && !searchQuery.isEmpty()) { searchQuery = searchQuery.substring(0, searchQuery.length() - 1); scrollOffset = 0; return true; }
+        if (event.key() == 256) { open = false; return true; }
         return false;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        if (open && mouseX >= x && mouseX <= x + width + 40) {
-            if (amount > 0 && scrollOffset > 0) {
-                scrollOffset--;
-            } else if (amount < 0 && scrollOffset < Math.max(0, getFilteredBlocks().size() - maxVisible)) {
-                scrollOffset++;
-            }
+        if (open && mouseX >= x && mouseX <= x + width + 50) {
+            if (amount > 0 && scrollOffset > 0) scrollOffset--;
+            else if (amount < 0 && scrollOffset < Math.max(0, getFilteredBlocks().size() - maxVisible)) scrollOffset++;
             return true;
         }
         return false;
@@ -132,17 +155,10 @@ public class BlockPicker extends Component {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY)) {
-            open = !open;
-            return true;
-        }
-
+        if (isHovered(mouseX, mouseY)) { open = !open; return true; }
         if (open) {
-            int currentY = y + height + 2;
-            int listY = currentY + 16;
-            int dropWidth = width + 40;
-
-            if (mouseX >= x && mouseX <= x + dropWidth && mouseY >= listY && mouseY <= listY + (maxVisible * itemHeight)) {
+            int dropX = x, dropW = width + 50, listY = y + height + 5 + 14;
+            if (mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= listY && mouseY <= listY + maxVisible * itemHeight) {
                 int idx = (int)((mouseY - listY) / itemHeight) + scrollOffset;
                 List<Block> blocks = getFilteredBlocks();
                 if (idx >= 0 && idx < blocks.size()) {
@@ -152,12 +168,10 @@ public class BlockPicker extends Component {
                 }
                 return true;
             }
+            if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) open = false;
         }
         return false;
     }
 
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        return false;
-    }
+    @Override public boolean mouseReleased(double mouseX, double mouseY, int button) { return false; }
 }

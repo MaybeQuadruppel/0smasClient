@@ -21,7 +21,7 @@ public class Trajectories extends Module {
     private boolean showPath = true;
 
     public Trajectories() {
-        super("Trajectories", "Predicts the flight path of arrows and targets.", Category.VISUAL);
+        super("Trajectories", "Predicts the flight path of arrows and targets", Category.VISUAL);
 
         this.settings.add(new ColorPicker("Color", trajColor, (newColor) -> this.trajColor = newColor));
         this.settings.add(new ToggleButton("Show Path", showPath, (val) -> this.showPath = val));

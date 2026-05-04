@@ -36,7 +36,7 @@ public class SwordBot extends Module {
     private long nextStrafeChange = 0;
 
     public SwordBot() {
-        super("ComboBot", "(A Prototype SwordBot) ", Category.COMBAT);
+        super("ComboBot", "A Prototype SwordBot", Category.COMBAT);
         this.settings.add(new Slider("Lock Range", 3.0, 12.0, lockRange, val -> lockRange = val));
         this.settings.add(new Slider("Lose Range", 5.0, 15.0, loseRange, val -> loseRange = val));
         this.settings.add(new Slider("W-Tap Range", 3.0, 6.0, wTapRange, val -> wTapRange = val));

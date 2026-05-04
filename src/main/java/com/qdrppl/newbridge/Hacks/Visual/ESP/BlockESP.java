@@ -18,7 +18,7 @@ public class BlockESP extends Module {
     private boolean isScanning = false;
 
     public BlockESP() {
-        super("BlockESP","(LookUP Blocks)", Category.VISUAL);
+        super("BlockESP","Look-Up Blocks", Category.VISUAL);
 
         this.blockPicker = new BlockPicker("Block List");
         this.settings.add(this.blockPicker);

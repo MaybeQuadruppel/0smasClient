@@ -5,7 +5,7 @@ import net.minecraft.client.Minecraft;
 
 public class AutoSprint extends Module {
     public AutoSprint() {
-        super("AutoSprint", "(Sprints automatically when moving forward)", Category.MOVEMENT);
+        super("AutoSprint", "Sprints automatically when moving forward", Category.MOVEMENT);
     }
 
     @Override

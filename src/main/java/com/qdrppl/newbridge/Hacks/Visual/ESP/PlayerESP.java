@@ -14,8 +14,8 @@ import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.rendertype.RenderType; // Korrigierter Importpfad
-import net.minecraft.resources.Identifier; // Zurück zu Identifier wie gewünscht
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -50,7 +50,7 @@ public class PlayerESP extends Module {
     private MappableRingBuffer vertexBuffer;
 
     public PlayerESP() {
-        super("EnitiyESP", "(Lets you See Enitys by their Threadlevels)", Category.VISUAL);
+        super("EnitiyESP", "Lets you See Enitys by their Threadlevels", Category.VISUAL);
         INSTANCE = this;
 
         this.settings.add(new ToggleButton("Show Players", showPlayers, val -> showPlayers = (boolean) val));

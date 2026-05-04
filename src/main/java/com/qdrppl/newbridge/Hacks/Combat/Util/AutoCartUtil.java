@@ -10,28 +10,26 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 public class AutoCartUtil {
-    private static final double GRAVITY = 0.05;
-    private static final double DRAG = 0.99;
-    private static final int MAX_TICKS = 1200;
-
-    public static BlockPos predictLanding(LivingEntity entity, float speed) {
+    public static BlockPos predictLanding(LivingEntity entity, float power) {
         Level world = entity.level();
-        if (world == null) return null;
-
         Vec3 pos = new Vec3(entity.getX(), entity.getEyeY() - 0.1, entity.getZ());
-        float pitch = entity.getXRot();
+
+        float speed = power * 3.0f;
         float yaw = entity.getYRot();
+        float pitch = entity.getXRot();
 
-        float vx = -Mth.sin(yaw * 0.017453292F) * Mth.cos(pitch * 0.017453292F);
-        float vy = -Mth.sin(pitch * 0.017453292F);
-        float vz =  Mth.cos(yaw * 0.017453292F) * Mth.cos(pitch * 0.017453292F);
+        double vx = -Mth.sin(yaw * 0.017453292F) * Mth.cos(pitch * 0.017453292F);
+        double vy = -Mth.sin(pitch * 0.017453292F);
+        double vz =  Mth.cos(yaw * 0.017453292F) * Mth.cos(pitch * 0.017453292F);
 
-        Vec3 vel = new Vec3(vx, vy, vz).multiply(speed, speed, speed);
-        Vec3 shooterVel = entity.getDeltaMovement();
-        vel = vel.add(shooterVel.x, entity.onGround() ? 0.0 : shooterVel.y, shooterVel.z);
+        Vec3 arrowVel = new Vec3(vx, vy, vz).normalize().scale(speed);
 
-        for (int tick = 0; tick < MAX_TICKS; tick++) {
-            Vec3 nextPos = pos.add(vel);
+        Vec3 playerVel = entity.getDeltaMovement();
+
+        Vec3 finalVel = arrowVel.add(playerVel.x, entity.onGround() ? 0.0 : playerVel.y, playerVel.z);
+
+        for (int i = 0; i < 200; i++) {
+            Vec3 nextPos = pos.add(finalVel);
             BlockHitResult hit = world.clip(new ClipContext(
                     pos, nextPos,
                     ClipContext.Block.COLLIDER,
@@ -44,8 +42,11 @@ public class AutoCartUtil {
             }
 
             pos = nextPos;
-            vel = new Vec3(vel.x * DRAG, vel.y * DRAG - GRAVITY, vel.z * DRAG);
-            if (pos.y < world.getMinY() - 64) break;
+
+            finalVel = finalVel.scale(0.99);
+            finalVel = finalVel.subtract(0, 0.05, 0);
+
+            if (pos.y < world.getMinY()) break;
         }
         return null;
     }

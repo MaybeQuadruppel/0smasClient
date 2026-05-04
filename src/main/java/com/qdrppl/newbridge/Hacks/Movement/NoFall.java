@@ -16,7 +16,7 @@ public class NoFall extends Module {
     public double fallDistTrigger = 2.5;
 
     public NoFall() {
-        super("NoFall","(Lets you take no Falldamage)", Category.MOVEMENT);
+        super("NoFall","Lets you take no Falldamage", Category.MOVEMENT);
 
 
         this.settings.add(new Slider("Min Distance", 1.0, 5.0, fallDistTrigger, val -> fallDistTrigger = val));

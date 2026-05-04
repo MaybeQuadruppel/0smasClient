@@ -20,7 +20,7 @@ public class AutoTotem extends Module {
     private int currentTargetDelay = 0;
 
     public AutoTotem() {
-        super("AutoTotem", "(Auto Equips a Totem after Pop)", Category.COMBAT);
+        super("AutoTotem", "Auto Equips a Totem after Pop", Category.COMBAT);
 
         this.settings.add(new Slider("Delay Ticks", 0.0, 40.0, 1.0, val -> delay = val));
         this.settings.add(new ToggleButton("Randomize", false, val -> randomDelay = val));

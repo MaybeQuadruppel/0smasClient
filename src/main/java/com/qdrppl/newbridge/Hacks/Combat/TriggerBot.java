@@ -25,9 +25,9 @@ public class TriggerBot extends Module {
     private final Random random = new Random();
 
     public TriggerBot() {
-        super("TriggerBot ","(Just A Triggerbot)", Category.COMBAT);
+        super("TriggerBot ","Just A Triggerbot", Category.COMBAT);
 
-        this.settings.add(new Slider("CPS", 1.0, 20.0, cps, val -> cps = val));
+        this.settings.add(new Slider("CPS", 0.2, 20.0, cps, val -> cps = val));
         this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val));
         this.settings.add(new Slider("Randomize", 0.0, 5.0, randomize, val -> randomize = val));
         this.settings.add(new ToggleButton("Target Players", targetPlayers, val -> targetPlayers = val));

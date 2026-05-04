@@ -6,3 +6,8 @@
 /give Player700 minecraft:totem_of_undying 20
 /give Player149 minecraft:enchanted_golden_apple 64
 /enchant Player647 minecraft:flame
+/weather clear
+/time set minecraft:day
+/kill @e[!type=player]
+/kill @e[type=!player]
+/enchant @a minecraft:flame
