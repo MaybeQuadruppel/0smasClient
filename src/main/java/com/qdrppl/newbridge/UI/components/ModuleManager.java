@@ -33,6 +33,7 @@ public class ModuleManager {
         modules.add(new Trajectories());
         modules.add(new AutoCart());
         modules.add(new AutoDihhTap());
+        modules.add(new ShieldDisable());
 
     }
 

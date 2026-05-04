@@ -26,6 +26,7 @@ public class AutoDihhTap extends Module {
     private double rotationSpeed = 7.0;
     private long lastFrameTime;
     private Runnable afterRotationAction;
+    private long delayStartTime = 0;
 
     private Step currentStep = Step.NONE;
     private LivingEntity currentTarget;
@@ -63,74 +64,85 @@ public class AutoDihhTap extends Module {
 
     private void runStep(Minecraft client) {
         LocalPlayer player = client.player;
-        if (player == null) return;
+        if (player == null || rotating) return;
 
         switch (this.currentStep) {
             case LOOK_AT_TARGET -> {
-                try {
-                    switchToItem(player, Items.NETHERITE_SWORD);
-                }
-                finally {
-                    attackEntity(client);
-                    lookAtTargetBottomRightSmooth(client, this.currentTarget, () -> this.currentStep = Step.SWITCH_TO_OBSIDIAN);
-                }
+                switchToItem(player, Items.NETHERITE_SWORD);
+                attackEntity(client);
+                lookAtTargetBottomRightSmooth(client, this.currentTarget, () -> {
+                    this.currentStep = Step.SWITCH_TO_OBSIDIAN;
+                    runStep(client); // Sofort weiter zum nächsten Schritt
+                });
             }
             case SWITCH_TO_OBSIDIAN -> {
                 if (switchToItem(player, Items.OBSIDIAN)) {
-                    HitResult crosshair = client.hitResult;
-                    if (crosshair instanceof BlockHitResult blockHit) {
+                    if (client.hitResult instanceof BlockHitResult blockHit) {
                         this.obsidianPos = blockHit.getBlockPos();
                         if (!client.level.getBlockState(this.obsidianPos).is(Blocks.OBSIDIAN)) {
                             interactBlock(client);
                         }
                         switchToItem(player, Items.END_CRYSTAL);
                         this.currentStep = Step.PLACE_CRYSTAL;
-                    } else {
-                        this.currentStep = Step.NONE;
+                        runStep(client); // Kein Warten auf nächsten Tick
                     }
                 }
             }
             case PLACE_CRYSTAL -> {
                 interactBlock(client);
-                Vec3 targetPos = null;
-                HitResult crosshair = client.hitResult;
-                if (crosshair instanceof BlockHitResult blockHit) {
-                    targetPos = Vec3.atCenterOf(blockHit.getBlockPos()).add(0.0, 0.4, 0.0);
-                } else if (crosshair instanceof EntityHitResult entityHit) {
-                    targetPos = entityHit.getEntity().position().add(0.0, 0.4, 0.0);
-                }
-
+                Vec3 targetPos = getCrystalVector(client);
                 if (targetPos != null) {
-                    lookAtSmooth(client, targetPos, () -> this.currentStep = Step.ATTACK_CRYSTAL);
+                    lookAtSmooth(client, targetPos, () -> {
+                        this.currentStep = Step.ATTACK_CRYSTAL;
+                        runStep(client);
+                    });
                 }
             }
             case ATTACK_CRYSTAL -> {
                 attackEntity(client);
+                this.delayStartTime = System.currentTimeMillis();
                 this.currentStep = Step.LOOK_AT_OBSIDIAN;
+                runStep(client);
+
+
             }
             case LOOK_AT_OBSIDIAN -> {
-                Vec3 targetPos = Vec3.atCenterOf(this.obsidianPos).add(0.0, 0.7, 0.0);
-                lookAtSmooth(client, targetPos, () -> this.currentStep = Step.PLACE_NEW_CRYSTAL);
+                if (System.currentTimeMillis() - delayStartTime >= 200) {
+                    Vec3 targetPos = Vec3.atCenterOf(this.obsidianPos).add(0.0, 0.7, 0.0);
+                    lookAtSmooth(client, targetPos, () -> {
+                        this.currentStep = Step.PLACE_NEW_CRYSTAL;
+                        runStep(client);
+                    });
+                }
             }
             case PLACE_NEW_CRYSTAL -> {
                 interactBlock(client);
                 this.currentStep = Step.LOOK_AT_NEW_CRYSTAL;
+                runStep(client);
             }
             case LOOK_AT_NEW_CRYSTAL -> {
                 Vec3 targetPos = Vec3.atCenterOf(this.obsidianPos).add(0.0, 1.5, 0.0);
-                lookAtSmooth(client, targetPos, () -> this.currentStep = Step.ATTACK_NEW_CRYSTAL);
+                lookAtSmooth(client, targetPos, () -> {
+                    this.currentStep = Step.ATTACK_NEW_CRYSTAL;
+                    runStep(client);
+                });
             }
             case ATTACK_NEW_CRYSTAL -> {
                 attackEntity(client);
-                switchToItem(player, Items.END_CRYSTAL);
                 switchToItem(player, Items.NETHERITE_SWORD);
                 this.currentStep = Step.DONE;
+                runStep(client);
             }
-            case DONE -> {
-                this.currentStep = Step.NONE;
-            }
-            default -> {}
+            case DONE -> this.currentStep = Step.NONE;
         }
+    }
+
+
+    private Vec3 getCrystalVector(Minecraft client) {
+        HitResult hr = client.hitResult;
+        if (hr instanceof BlockHitResult bh) return Vec3.atCenterOf(bh.getBlockPos()).add(0.0, 0.4, 0.0);
+        if (hr instanceof EntityHitResult eh) return eh.getEntity().position().add(0.0, 0.4, 0.0);
+        return null;
     }
 
     private void smoothLookUpdate(Minecraft client) {
