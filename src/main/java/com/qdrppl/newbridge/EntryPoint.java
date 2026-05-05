@@ -2,6 +2,7 @@ package com.qdrppl.newbridge;
 
 import com.qdrppl.newbridge.Hacks.Combat.AimAssist;
 import com.qdrppl.newbridge.Hacks.Combat.AutoDihhTap;
+import com.qdrppl.newbridge.Hacks.Misc.Scaffold;
 import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
 import com.qdrppl.newbridge.UI.ClickGuiScreen;
 import com.qdrppl.newbridge.UI.components.Module;
@@ -45,7 +46,8 @@ public class EntryPoint implements ClientModInitializer {
             Minecraft client = Minecraft.getInstance();
             if (client.player != null && AimAssist.INSTANCE != null && AimAssist.INSTANCE.enabled) {
                 float tickDelta = client.getFps();
-                AimAssist.INSTANCE.onRender(client, tickDelta);
+                AimAssist.INSTANCE.onUpdate(client); //AimAssist.INSTANCE.onUpdate(client, tickDelta);
+                Scaffold.INSTANCE.onUpdate(client);
             }
         });
 

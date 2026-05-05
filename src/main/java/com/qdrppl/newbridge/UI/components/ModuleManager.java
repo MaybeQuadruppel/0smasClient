@@ -37,6 +37,7 @@ public class ModuleManager {
         modules.add(new ShieldDisable());
         modules.add(new HealthIndicator());
         modules.add(new Freelook());
+        modules.add(new Scaffold());
 
     }
 
