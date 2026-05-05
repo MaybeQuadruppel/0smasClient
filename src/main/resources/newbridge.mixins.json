@@ -6,8 +6,12 @@
   "mixins": [
     "ClientPacketListenerMixin",
     "BowItemMixin",
-    "GuiMixin",
+    "FullBrightMixin",
     "HealthIndicatorMixin"
+  ],
+  "client": [
+    "CameraMixin",
+    "FreeLookPlayerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

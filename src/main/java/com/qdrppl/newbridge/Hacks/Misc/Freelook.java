@@ -6,41 +6,37 @@ import net.minecraft.client.CameraType;
 import org.lwjgl.glfw.GLFW;
 
 public class Freelook extends Module {
-    public static Freelook instance;
 
-    public float cameraYaw;
-    public float cameraPitch;
-    private CameraType oldPerspective;
+    public static Freelook instance;
+    public float maxYaw = 360.0f;
 
     public Freelook() {
-        super("Freelook", "Free perspective (Hold Left Alt)", Category.MISC);
+        super("Freelook", "free third person perspective (hold Left Alt)", Category.MISC);
         instance = this;
     }
 
     @Override
-    public void onTick(Minecraft client) {
-        if (client.player == null) return;
-
-        if (isFreelooking()) {
-            if (client.options.getCameraType() != CameraType.THIRD_PERSON_BACK) {
-                oldPerspective = client.options.getCameraType();
-                client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-
-                cameraYaw = client.player.getYRot();
-                cameraPitch = client.player.getXRot();
-            }
-        } else if (oldPerspective != null) {
-            client.options.setCameraType(oldPerspective);
-            oldPerspective = null;
-        }
+    public void onDisable() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.options.setCameraType(CameraType.FIRST_PERSON);
+        super.onDisable();
     }
 
     public static boolean isFreelooking() {
-        return instance != null && instance.enabled && isAltHeld();
+        return instance != null
+                && instance.enabled
+                && isAltHeld();
     }
 
     public static boolean isAltHeld() {
         long window = Minecraft.getInstance().getWindow().handle();
         return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_ALT) == GLFW.GLFW_PRESS;
+    }
+
+    public interface CameraOverriddenEntity {
+        float freelook$getCameraPitch();
+        float freelook$getCameraYaw();
+        void freelook$setCameraPitch(float pitch);
+        void freelook$setCameraYaw(float yaw);
     }
 }

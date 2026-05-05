@@ -2,6 +2,7 @@ package com.qdrppl.newbridge;
 
 import com.qdrppl.newbridge.Hacks.Combat.AimAssist;
 import com.qdrppl.newbridge.Hacks.Combat.AutoDihhTap;
+import com.qdrppl.newbridge.Hacks.Misc.ModuleList;
 import com.qdrppl.newbridge.Hacks.Misc.Scaffold;
 import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
 import com.qdrppl.newbridge.UI.ClickGuiScreen;
@@ -10,6 +11,7 @@ import com.qdrppl.newbridge.UI.components.ModuleManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -22,6 +24,7 @@ import org.lwjgl.glfw.GLFW;
 public class EntryPoint implements ClientModInitializer {
 
     public static KeyMapping guiKeyBind;
+    private static final Identifier MODULE_LIST_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "module_list");
     String CategoryName = "Client";
     @Override
     public void onInitializeClient() {
@@ -53,8 +56,6 @@ public class EntryPoint implements ClientModInitializer {
 
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
-
-
             while (guiKeyBind.consumeClick()) {
                 client.setScreen(new ClickGuiScreen());
             }
@@ -117,5 +118,6 @@ public class EntryPoint implements ClientModInitializer {
                 }
             }
         });
+        HudElementRegistry.addLast(MODULE_LIST_HUD_ID, (guiGraphics, deltaTracker) -> ModuleList.draw(guiGraphics));
     }
 }

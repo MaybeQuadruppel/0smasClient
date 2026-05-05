@@ -3,9 +3,8 @@ package com.qdrppl.newbridge.UI.components;
 import com.qdrppl.newbridge.Hacks.Combat.*;
 import com.qdrppl.newbridge.Hacks.Movement.*;
 import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
-import com.qdrppl.newbridge.Hacks.Visual.HealthIndicator;
+import com.qdrppl.newbridge.Hacks.Visual.*;
 import com.qdrppl.newbridge.Hacks.Visual.Trajectories;
-import com.qdrppl.newbridge.Hacks.Visual.ModuleList;
 import com.qdrppl.newbridge.Hacks.Misc.*;
 
 import java.util.ArrayList;
