@@ -18,15 +18,11 @@ public class BowItemMixin {
     @Inject(method = "releaseUsing", at = @At("HEAD"))
     private void onBowFired(ItemStack itemStack, Level level, LivingEntity entity, int remainingTime, CallbackInfoReturnable<Boolean> cir) {
         if (!level.isClientSide() || !(entity instanceof net.minecraft.client.player.LocalPlayer)) return;
-        System.out.println("Mixin called");
         AutoCart module = AutoCart.INSTANCE;
         if (module == null || !module.enabled) return;
-
         int useTicks = itemStack.getUseDuration(entity) - remainingTime;
         float power = BowItem.getPowerForTime(useTicks);
-
         if (power >= 0.1f) {
-            System.out.println("Bow fired!");
             BlockPos landing = AutoCartUtil.predictLanding(entity, power);
             if (landing != null) {
                 AutoCart.setLanding(landing);

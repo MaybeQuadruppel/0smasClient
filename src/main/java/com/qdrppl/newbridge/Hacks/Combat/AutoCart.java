@@ -61,7 +61,7 @@ public class AutoCart extends Module {
             client.player.getInventory().setSelectedSlot(oldSlot);
 
             placementStep = 1;
-            delayTicks = 3;
+            delayTicks = 2;
             return;
         }
 
