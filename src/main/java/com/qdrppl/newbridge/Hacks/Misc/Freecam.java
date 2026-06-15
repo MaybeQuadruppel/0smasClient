@@ -15,6 +15,7 @@ public class Freecam extends Module {
     public static double speedValue = 1.0;
 
     private CameraType originalPerspective;
+    private static long lastFrameTime = System.nanoTime();
 
     public Freecam() {
         super("Freecam", "Erlaubt es dir, die Kamera vom Spieler zu trennen.", Category.MOVEMENT);
@@ -36,14 +37,29 @@ public class Freecam extends Module {
         cameraPitch = mc.player.getXRot();
 
         originalPerspective = mc.options.getCameraType();
+        lastFrameTime = System.nanoTime();
         isActive = true;
     }
 
     @Override
     public void onTick(Minecraft mc) {
         if (mc.player == null || !isActive) return;
+        // Blockiert die physische Paket-Bewegung des echten Spielers alle 50ms
+        mc.player.setDeltaMovement(0, 0, 0);
+    }
 
-        // Abfrage der permanent gedrückten Tasten (Funktioniert jetzt perfekt!)
+    // Diese Methode wird jetzt über das CameraMixin bei jedem gerenderten Frame aufgerufen
+    public static void renderMovement() {
+        if (!isActive || cameraPos == null) return;
+        Minecraft mc = Minecraft.getInstance();
+
+        // Zeitdifferenz berechnen (Delta Time) -> Wichtig für die flüssige Bewegung
+        long currentTime = System.nanoTime();
+        double deltaTime = (currentTime - lastFrameTime) / 1000000000.0;
+        lastFrameTime = currentTime;
+
+        if (deltaTime > 0.1) deltaTime = 0.1;
+
         boolean forward = mc.options.keyUp.isDown();
         boolean backward = mc.options.keyDown.isDown();
         boolean left = mc.options.keyLeft.isDown();
@@ -60,18 +76,18 @@ public class Freecam extends Module {
         if (left)     movement = movement.subtract(rightVec);
         if (right)    movement = movement.add(rightVec);
 
+        // Multiplikator für framerate-unabhängige Geschwindigkeit
+        double speedMultiplier = speedValue * 15.0 * deltaTime;
 
         if (movement.lengthSqr() > 0) {
-            movement = movement.normalize().scale(speedValue * 0.4);
+            movement = movement.normalize().scale(speedMultiplier);
         }
 
         double yMove = 0;
-        if (up)   yMove += speedValue * 0.4;
-        if (down) yMove -= speedValue * 0.4;
+        if (up)   yMove += speedMultiplier;
+        if (down) yMove -= speedMultiplier;
 
-        if (cameraPos != null) {
-            cameraPos = cameraPos.add(movement.x, yMove, movement.z);
-        }
+        cameraPos = cameraPos.add(movement.x, yMove, movement.z);
     }
 
     @Override

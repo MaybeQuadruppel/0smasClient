@@ -35,4 +35,7 @@ public abstract class Module {
     public void onDisable() {}
 
     public void onTick(Minecraft client) {}
+
+    // NEU: Wird jeden gerenderten Frame aufgerufen (für flüssige Bewegungen/Grafiken)
+    public void onRender(Minecraft client) {}
 }
