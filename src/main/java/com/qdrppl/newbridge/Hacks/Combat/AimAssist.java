@@ -27,7 +27,6 @@ public class AimAssist extends Module {
     public boolean randomHeight = true;
     public float staticHeight = 0.5f;
 
-    // Interne Status-Variablen
     private float currentAimHeight = 0.5f;
     private UUID lockedTargetUUID = null;
 
@@ -41,7 +40,6 @@ public class AimAssist extends Module {
         this.settings.add(new Slider("Smoothness", 0.01, 1.0, (double)smoothness, val -> smoothness = val.floatValue()));
         this.settings.add(new Slider("FOV", 10.0, 180.0, (double)fov, val -> fov = val.floatValue()));
 
-        // Der gewünschte Toggle für Randomisierung
         this.settings.add(new ToggleButton("Random Height", randomHeight, val -> randomHeight = val));
         this.settings.add(new Slider("Static Height", 0.0, 1.0, (double)staticHeight, val -> staticHeight = val.floatValue()));
     }

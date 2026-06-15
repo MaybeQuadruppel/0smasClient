@@ -6,6 +6,7 @@ import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
 import com.qdrppl.newbridge.Hacks.Visual.*;
 import com.qdrppl.newbridge.Hacks.Visual.Trajectories;
 import com.qdrppl.newbridge.Hacks.Misc.*;
+//import com.qdrppl.newbridge.Hacks.Dupeing.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +38,12 @@ public class ModuleManager {
         modules.add(new HealthIndicator());
         modules.add(new Freelook());
         modules.add(new Scaffold());
-
+        modules.add(new ONETAP());
+        modules.add(new ElytraFly());
+//        modules.add(new PacketControl());
+        modules.add(new AutoCrit());
+        modules.add(new Reach());
+        modules.add(new AttributeSwapping());
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {

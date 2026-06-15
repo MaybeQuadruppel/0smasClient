@@ -18,18 +18,13 @@ public class BlockESP extends Module {
     private boolean isScanning = false;
 
     public BlockESP() {
-        super("BlockESP","Look-Up Blocks", Category.VISUAL);
+        super("BlockESP", "Look-Up Blocks", Category.VISUAL);
 
         this.blockPicker = new BlockPicker("Block List");
         this.settings.add(this.blockPicker);
 
         this.settings.add(new Slider("Chunk Range", 1.0, 16.0, rangeInChunks, val -> rangeInChunks = val));
         this.settings.add(new Slider("Scan Delay (s)", 0.5, 10.0, scanDelay, val -> scanDelay = val));
-
-        this.settings.add(new Slider("Red", 0.0, 1.0, 0.0, val -> RenderUtils.espRed = val.floatValue()));
-        this.settings.add(new Slider("Green", 0.0, 1.0, 1.0, val -> RenderUtils.espGreen = val.floatValue()));
-        this.settings.add(new Slider("Blue", 0.0, 1.0, 1.0, val -> RenderUtils.espBlue = val.floatValue()));
-        this.settings.add(new Slider("Alpha", 0.0, 1.0, 0.4, val -> RenderUtils.espAlpha = val.floatValue()));
     }
 
     @Override
@@ -41,7 +36,7 @@ public class BlockESP extends Module {
         new Thread(() -> {
             isScanning = true;
             try {
-                List<BlockPos> found = new ArrayList<>();
+                List<RenderUtils.ESPBlockData> found = new ArrayList<>();
                 int radius = (int) rangeInChunks;
                 int pX = client.player.chunkPosition().x();
                 int pZ = client.player.chunkPosition().z();
@@ -63,14 +58,17 @@ public class BlockESP extends Module {
         }).start();
     }
 
-    private void scanChunkSection(LevelChunk chunk, int yBase, List<BlockPos> found) {
+    private void scanChunkSection(LevelChunk chunk, int yBase, List<RenderUtils.ESPBlockData> found) {
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = 0; y < 16; y++) {
                     BlockPos pos = chunk.getPos().getBlockAt(x, yBase + y, z);
                     Block block = chunk.getBlockState(pos).getBlock();
+
                     if (blockPicker.selectedBlocks.contains(block)) {
-                        found.add(pos.immutable());
+                        // Holt die individuelle Farbe für diesen Block aus der RenderUtils-Map
+                        int color = RenderUtils.BLOCK_COLORS.getOrDefault(block, 0xFF00FFFF); // Default: Cyan
+                        found.add(new RenderUtils.ESPBlockData(pos.immutable(), color));
                     }
                 }
             }

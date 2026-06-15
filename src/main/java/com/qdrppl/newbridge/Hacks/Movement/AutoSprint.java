@@ -7,7 +7,6 @@ public class AutoSprint extends Module {
     public AutoSprint() {
         super("AutoSprint", "Sprints automatically when moving forward", Category.MOVEMENT);
     }
-
     @Override
     public void onTick(Minecraft client) {
         if (client.player == null) return;

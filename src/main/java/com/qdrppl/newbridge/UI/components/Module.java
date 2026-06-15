@@ -1,6 +1,8 @@
 package com.qdrppl.newbridge.UI.components;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.LivingEntity;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,7 +30,7 @@ public abstract class Module {
         if (enabled) onEnable();
         else onDisable();
     }
-
+    public void onAttack(Minecraft mc, LivingEntity target) {}
     public void onEnable() {}
     public void onDisable() {}
 

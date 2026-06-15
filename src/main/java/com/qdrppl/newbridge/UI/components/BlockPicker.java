@@ -1,5 +1,6 @@
 package com.qdrppl.newbridge.UI.components;
 
+import com.qdrppl.newbridge.Hacks.Visual.ESP.RenderUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -23,10 +24,11 @@ public class BlockPicker extends Component {
     private final int itemHeight = 13;
     private String searchQuery = "";
 
-    // Schwarz-Weiß Palette
+    private Block activeColorBlock = null;
+    private boolean draggingColor = false;
+
     private static final int C_BG         = 0xF20A0A0A;
     private static final int C_BG_HOV     = 0xFF181818;
-    private static final int C_HEADER     = 0xFF181818;
     private static final int C_SEPARATOR  = 0xFF2C2C2C;
     private static final int C_ACCENT     = 0xFFFFFFFF;
     private static final int C_TEXT       = 0xFFEEEEEE;
@@ -43,7 +45,6 @@ public class BlockPicker extends Component {
         this.height = 14;
     }
 
-    // --- Minimaler Getter für Config.java ---
     public String getLabel() {
         return this.label;
     }
@@ -82,7 +83,9 @@ public class BlockPicker extends Component {
         int dropW = width + 50;
         int searchH = 14;
         int listH   = maxVisible * itemHeight;
-        int dropH   = searchH + 2 + listH;
+
+        int colorSliderH = (activeColorBlock != null) ? 18 : 0;
+        int dropH   = searchH + 2 + listH + colorSliderH;
         int dropX   = x;
         int dropY   = y + height + 3;
 
@@ -93,7 +96,11 @@ public class BlockPicker extends Component {
         drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, C_SEARCH_BG);
         guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, C_SEPARATOR);
 
-        String cursor  = (System.currentTimeMillis() / 500) % 2 == 0 ? "|" : "";
+        // --- BLINK LOGIK ---
+        // Der Cursor blinkt nur im 500ms Takt, wenn das Suchfeld im Dropdown offen ist
+        boolean showCursor = open && ((System.currentTimeMillis() / 500) % 2 == 0);
+        String cursor = showCursor ? "|" : "";
+
         String display = searchQuery.isEmpty() ? "\u26b2 Search..." : "\u26b2 " + searchQuery + cursor;
         guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? C_TEXT_DIM : C_TEXT, false);
 
@@ -112,6 +119,19 @@ public class BlockPicker extends Component {
 
             if (selected) guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, itemY + (itemHeight / 2) - 4, C_SELECTED, false);
 
+            int blockColor = RenderUtils.BLOCK_COLORS.getOrDefault(block, 0xFF00FFFF);
+
+            if (selected) {
+                int previewSize = 7;
+                int previewX = dropX + dropW - 14;
+                int previewY = itemY + (itemHeight / 2) - (previewSize / 2);
+                drawRoundedRect(guiGraphics, previewX, previewY, previewSize, previewSize, blockColor | 0xFF000000);
+
+                if (activeColorBlock == block) {
+                    drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, C_ACCENT);
+                }
+            }
+
             String name = block.getName().getString();
             if (name.length() > 22) name = name.substring(0, 19) + "\u2026";
             guiGraphics.text(Minecraft.getInstance().font, name, dropX + (selected ? 17 : 7), itemY + (itemHeight / 2) - 4, selected ? C_SELECTED : (itemHov ? C_TEXT : C_TEXT_DIM), false);
@@ -124,6 +144,38 @@ public class BlockPicker extends Component {
             int ty = listY + (int)(tp * (listH - th));
             guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, C_SCROLLBAR);
             guiGraphics.fill(sbX, ty, sbX + 3, ty + th, C_SCROLLTHM);
+        }
+
+        if (activeColorBlock != null && selectedBlocks.contains(activeColorBlock)) {
+            int sliderY = listY + listH + 4;
+            int sliderX = dropX + 6;
+            int sliderW = dropW - 12;
+            int sliderH = 6;
+
+            guiGraphics.fill(dropX + 1, sliderY - 3, dropX + dropW - 1, sliderY - 2, C_SEPARATOR);
+
+            int currentColor = RenderUtils.BLOCK_COLORS.getOrDefault(activeColorBlock, 0xFF00FFFF);
+            float[] hsb = new float[3];
+            java.awt.Color awtColor = new java.awt.Color(currentColor);
+            java.awt.Color.RGBtoHSB(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue(), hsb);
+            float currentHue = hsb[0];
+
+            if (draggingColor) {
+                currentHue = Math.min(1f, Math.max(0f, (mouseX - sliderX) / (float) sliderW));
+                int newColor = java.awt.Color.HSBtoRGB(currentHue, 1f, 1f);
+                RenderUtils.BLOCK_COLORS.put(activeColorBlock, newColor);
+            }
+
+            for (int i = 0; i < sliderW; i++) {
+                int col = java.awt.Color.HSBtoRGB(i / (float) sliderW, 1f, 1f) | 0xFF000000;
+                guiGraphics.fill(sliderX + i, sliderY, sliderX + i + 1, sliderY + sliderH, col);
+            }
+
+            int thumbX = sliderX + (int) (currentHue * sliderW);
+            thumbX = Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX));
+            guiGraphics.fill(thumbX - 1, sliderY - 1, thumbX + 2, sliderY + sliderH + 1, 0xFFFFFFFF);
+        } else {
+            activeColorBlock = null;
         }
     }
 
@@ -139,7 +191,7 @@ public class BlockPicker extends Component {
     public boolean keyPressed(KeyEvent event) {
         if (!open) return false;
         if (event.key() == 259 && !searchQuery.isEmpty()) { searchQuery = searchQuery.substring(0, searchQuery.length() - 1); scrollOffset = 0; return true; }
-        if (event.key() == 256) { open = false; return true; }
+        if (event.key() == 256) { open = false; activeColorBlock = null; return true; }
         return false;
     }
 
@@ -155,23 +207,58 @@ public class BlockPicker extends Component {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY)) { open = !open; return true; }
+        if (isHovered(mouseX, mouseY) && button == 0) { open = !open; activeColorBlock = null; return true; }
+
         if (open) {
             int dropX = x, dropW = width + 50, listY = y + height + 5 + 14;
-            if (mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= listY && mouseY <= listY + maxVisible * itemHeight) {
+            int listH = maxVisible * itemHeight;
+
+            if (activeColorBlock != null && selectedBlocks.contains(activeColorBlock)) {
+                int sliderY = listY + listH + 4;
+                if (mouseX >= dropX + 6 && mouseX <= dropX + dropW - 6 && mouseY >= sliderY - 2 && mouseY <= sliderY + 10) {
+                    if (button == 0) {
+                        this.draggingColor = true;
+                        return true;
+                    }
+                }
+            }
+
+            if (mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= listY && mouseY <= listY + listH) {
                 int idx = (int)((mouseY - listY) / itemHeight) + scrollOffset;
                 List<Block> blocks = getFilteredBlocks();
+
                 if (idx >= 0 && idx < blocks.size()) {
                     Block b = blocks.get(idx);
-                    if (selectedBlocks.contains(b)) selectedBlocks.remove(b);
-                    else selectedBlocks.add(b);
+
+                    if (button == 0) {
+                        if (selectedBlocks.contains(b)) {
+                            selectedBlocks.remove(b);
+                            if (activeColorBlock == b) activeColorBlock = null;
+                        } else {
+                            selectedBlocks.add(b);
+                        }
+                    } else if (button == 1) {
+                        if (selectedBlocks.contains(b)) {
+                            activeColorBlock = (activeColorBlock == b) ? null : b;
+                        }
+                    }
                 }
                 return true;
             }
-            if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) open = false;
+
+            if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
+                open = false;
+                activeColorBlock = null;
+            }
         }
         return false;
     }
 
-    @Override public boolean mouseReleased(double mouseX, double mouseY, int button) { return false; }
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            this.draggingColor = false;
+        }
+        return false;
+    }
 }

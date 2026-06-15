@@ -278,7 +278,7 @@ public class ClickGuiScreen extends Screen {
         }
     }
 
-    // ── Search bar ────────────────────────────────────────────────────────────
+
 
     private void renderSearchBar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         if (!searchActive) {
@@ -296,15 +296,17 @@ public class ClickGuiScreen extends Screen {
         Component.drawRoundedRect(   g, barX, barY, barW, barH, 0xF00A0A0A);
         Component.drawRoundedOutline(g, barX, barY, barW, barH, C_ACCENT);
 
-        String cursor  = (System.currentTimeMillis() / 500) % 2 == 0 ? "|" : " ";
+        // --- BLINK LOGIK ---
+        // Cursor blinkt nur, wenn das Suchfeld über STRG+F auch wirklich auf dem Bildschirm aktiv ist
+        boolean showCursor = searchActive && ((System.currentTimeMillis() / 500) % 2 == 0);
+        String cursor  = showCursor ? "|" : "";
+
         String display = "\u26b2  " + searchQuery + cursor;
         g.text(this.font, display, barX + 6, barY + 5, C_TEXT, false);
 
         String esc = "ESC";
         g.text(this.font, esc, barX + barW - this.font.width(esc) - 5, barY + 5, C_TEXT_DIM, false);
     }
-
-    // ── Keybind prompt ────────────────────────────────────────────────────────
 
     private void renderKeybindPrompt(GuiGraphicsExtractor g) {
         if (bindingModule == null) return;
@@ -316,7 +318,6 @@ public class ClickGuiScreen extends Screen {
         g.text(this.font, msg, bx + 4, by + 4, C_BIND_PULSE, false);
     }
 
-    // ── Bottom-right sliders ──────────────────────────────────────────────────
 
     private void renderBRSliders(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         final int SW = 100, SH = 13, TH = 3, PAD = 6, GAP = 16;
@@ -328,7 +329,6 @@ public class ClickGuiScreen extends Screen {
         Component.drawRoundedRect(   g, bx - 4, by - 4, SW + 12, totalH + 8, 0xE00A0A0A);
         Component.drawRoundedOutline(g, bx - 4, by - 4, SW + 12, totalH + 8, C_SEPARATOR);
 
-        // Width slider
         int COL_MIN = 60, COL_MAX = 160;
         if (brDrag == 1) {
             dynColW = COL_MIN + (int)(Math.min(1f, Math.max(0f,
@@ -392,7 +392,6 @@ public class ClickGuiScreen extends Screen {
         for (var l : lines) { g.text(this.font, l.getString(), tx, cy, C_TEXT); cy += lh; }
     }
 
-
     private static final Map<Integer, String> KEY_NAMES = new HashMap<>();
     static {
         for (int k = GLFW.GLFW_KEY_A; k <= GLFW.GLFW_KEY_Z; k++)
@@ -419,7 +418,6 @@ public class ClickGuiScreen extends Screen {
     private static String keyName(int key) {
         return KEY_NAMES.getOrDefault(key, "K" + key);
     }
-
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
@@ -476,10 +474,6 @@ public class ClickGuiScreen extends Screen {
         return super.mouseClicked(event, isDoubleClick);
     }
 
-    // NOTE: mouseDragged was removed — drag is now handled every frame
-    // inside extractRenderState using lastMouseX/lastMouseY. This avoids
-    // the signature mismatch introduced in Minecraft 26.1.2.
-
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         draggingCat = null;
@@ -498,7 +492,6 @@ public class ClickGuiScreen extends Screen {
         return super.mouseScrolled(mx, my, hAmt, vAmt);
     }
 
-    // ── Input: keyboard ───────────────────────────────────────────────────────
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {

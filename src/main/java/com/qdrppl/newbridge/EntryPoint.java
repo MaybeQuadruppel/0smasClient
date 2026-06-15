@@ -67,7 +67,6 @@ public class EntryPoint implements ClientModInitializer {
 
                     if (InputConstants.isKeyDown(client.getWindow(), boundKey)) {
                         if (!m.keyAlreadyPressed) {
-                            // Prüfen, ob es sich um das AutoDihhTap Modul handelt
                             if (m instanceof AutoDihhTap tap) {
 
                                 if (tap.getMode().equals("Manual")) {

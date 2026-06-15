@@ -7,14 +7,15 @@ import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext; // world -> level
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;  // world -> level
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier; // Bleibt Identifier laut deinem Setup
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -23,24 +24,27 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class RenderUtils {
     private static RenderUtils instance;
     public static final String MOD_ID = "newbridge";
 
-    public static float espRed = 0f;
-    public static float espGreen = 1f;
-    public static float espBlue = 1f;
-    public static float espAlpha = 0.4f;
+    // Globale Map für Blockfarben (Wird vom BlockPicker/Config befüllt)
+    public static final Map<Block, Integer> BLOCK_COLORS = new ConcurrentHashMap<>();
 
     public static float BoxSizeX = 1;
     public static float BoxSizeY = 1;
     public static float BoxSizeZ = 1;
 
-    public static final List<BlockPos> BLOCKS_TO_RENDER = new java.util.concurrent.CopyOnWriteArrayList<>();
+    // Ein einfaches Record für gekoppelte Positions- und Farbdaten
+    public record ESPBlockData(BlockPos pos, int color) {}
+
+    public static final List<ESPBlockData> BLOCKS_TO_RENDER = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     private static final RenderPipeline FILLED_THROUGH_WALLS = RenderPipelines.register(
             RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
@@ -63,14 +67,13 @@ public class RenderUtils {
     }
 
     public void init(Minecraft client) {
-        // world -> level
         LevelRenderEvents.BEFORE_TRANSLUCENT_TERRAIN.register(this::extractAndDrawESP);
     }
 
-    private void extractAndDrawESP(LevelRenderContext context) { // WorldRenderContext -> LevelRenderContext
+    private void extractAndDrawESP(LevelRenderContext context) {
         if (BLOCKS_TO_RENDER.isEmpty()) return;
-
         if (Minecraft.getInstance().level == null) return;
+
         try {
             renderAllBlocks(context);
             if (buffer != null) {
@@ -82,10 +85,8 @@ public class RenderUtils {
         }
     }
 
-    private void renderAllBlocks(LevelRenderContext context) { // WorldRenderContext -> LevelRenderContext
-        PoseStack matrices = context.poseStack(); // context.matrices() -> context.poseStack()
-
-        // worldState() -> levelState() | cameraRenderState bleibt erhalten
+    private void renderAllBlocks(LevelRenderContext context) {
+        PoseStack matrices = context.poseStack();
         Vec3 camera = context.levelState().cameraRenderState.pos;
         if (matrices == null || camera == null) return;
 
@@ -96,11 +97,21 @@ public class RenderUtils {
         matrices.pushPose();
         matrices.translate((float)-camera.x, (float)-camera.y, (float)-camera.z);
 
-        for (BlockPos pos : BLOCKS_TO_RENDER) {
+        // Wir loopen durch die Daten und extrahieren die individuelle Farbe jedes Blocks
+        for (ESPBlockData data : BLOCKS_TO_RENDER) {
+            BlockPos pos = data.pos();
+            int c = data.color();
+
+            // Aufsplitten von ARGB in Floats
+            float r = ((c >> 16) & 0xFF) / 255f;
+            float g = ((c >> 8) & 0xFF) / 255f;
+            float b = (c & 0xFF) / 255f;
+            float a = 0.4f; // Feste Transparenz oder Alpha aus der Farbe ziehen falls gewünscht
+
             renderFilledBox(matrices.last().pose(), buffer,
                     pos.getX(), pos.getY(), pos.getZ(),
                     pos.getX() + BoxSizeX, pos.getY() + BoxSizeY, pos.getZ() + BoxSizeZ,
-                    espRed, espGreen, espBlue, espAlpha);
+                    r, g, b, a);
         }
 
         matrices.popPose();
@@ -142,7 +153,6 @@ public class RenderUtils {
 
         if (vertexBuffer == null || vertexBuffer.size() < vertexBufferSize) {
             if (vertexBuffer != null) vertexBuffer.close();
-            // Nutzt die gelernten USAGE-Konstanten
             vertexBuffer = new MappableRingBuffer(() -> MOD_ID + "_esp_buffer", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
         }
 

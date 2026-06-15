@@ -16,6 +16,11 @@ loom {
             sourceSet sourceSets.main
         }
     }
+    runs {
+        client {
+            programArgs("--username","Doomed")
+        }
+    }
 }
 
 fabricApi {
