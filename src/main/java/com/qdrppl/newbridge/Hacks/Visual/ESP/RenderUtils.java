@@ -97,16 +97,15 @@ public class RenderUtils {
         matrices.pushPose();
         matrices.translate((float)-camera.x, (float)-camera.y, (float)-camera.z);
 
-        // Wir loopen durch die Daten und extrahieren die individuelle Farbe jedes Blocks
         for (ESPBlockData data : BLOCKS_TO_RENDER) {
             BlockPos pos = data.pos();
             int c = data.color();
 
-            // Aufsplitten von ARGB in Floats
+            // Vollständiges ARGB-Bitshifting
+            float a = ((c >> 24) & 0xFF) / 255f;
             float r = ((c >> 16) & 0xFF) / 255f;
             float g = ((c >> 8) & 0xFF) / 255f;
             float b = (c & 0xFF) / 255f;
-            float a = 0.4f; // Feste Transparenz oder Alpha aus der Farbe ziehen falls gewünscht
 
             renderFilledBox(matrices.last().pose(), buffer,
                     pos.getX(), pos.getY(), pos.getZ(),

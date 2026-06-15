@@ -4,14 +4,20 @@
   "package": "com.qdrppl.newbridge.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
-    "ClientPacketListenerMixin",
     "BowItemMixin",
+    "Connection.ClientPacketListenerMixin",
     "FullBrightMixin",
-    "HealthIndicatorMixin"
+    "HealthIndicatorMixin",
+    "LiquidBlockMixin",
+    "Connection.ClientConnectionMixin"
   ],
   "client": [
-    "CameraMixin",
-    "FreeLookPlayerMixin"
+    "FreeLookPlayerMixin",
+    "ONETAPMIXIN",
+    "freecam.CameraMixin",
+    "freecam.MouseHandlerMixin",
+    "freecam.LocalPlayerMixin",
+    "freecam.EntityRenderDispatcherMixin"
   ],
   "injectors": {
     "defaultRequire": 1

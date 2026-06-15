@@ -1,4 +1,4 @@
-package com.qdrppl.newbridge.mixin;
+package com.qdrppl.newbridge.mixin.Connection;
 
 import com.qdrppl.newbridge.Hacks.Combat.Velocity;
 import com.qdrppl.newbridge.Hacks.Combat.AutoTotem;

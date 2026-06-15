@@ -66,7 +66,6 @@ public class BlockESP extends Module {
                     Block block = chunk.getBlockState(pos).getBlock();
 
                     if (blockPicker.selectedBlocks.contains(block)) {
-                        // Holt die individuelle Farbe für diesen Block aus der RenderUtils-Map
                         int color = RenderUtils.BLOCK_COLORS.getOrDefault(block, 0xFF00FFFF); // Default: Cyan
                         found.add(new RenderUtils.ESPBlockData(pos.immutable(), color));
                     }

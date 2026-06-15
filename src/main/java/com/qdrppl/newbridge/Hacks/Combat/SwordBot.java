@@ -71,8 +71,6 @@ public class SwordBot extends Module {
 
         handleMovement(client, now, dist);
 
-        // ... innerhalb von onTick ...
-
         if (client.player.hasLineOfSight(target)) {
 
             boolean canAttack = (now - lastAttackTime) >= 625;

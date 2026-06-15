@@ -44,6 +44,9 @@ public class ModuleManager {
         modules.add(new AutoCrit());
         modules.add(new Reach());
         modules.add(new AttributeSwapping());
+        modules.add(new Jesus());
+        modules.add(new FakeLag());
+        modules.add(new Freecam());
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {

@@ -1,6 +1,7 @@
 package com.qdrppl.newbridge;
 
 import com.google.gson.*;
+import com.qdrppl.newbridge.Hacks.Visual.ESP.RenderUtils;
 import com.qdrppl.newbridge.UI.ClickGuiScreen;
 import com.qdrppl.newbridge.UI.components.*;
 import com.qdrppl.newbridge.UI.components.Module;
@@ -38,11 +39,14 @@ public class Config {
                 } else if (c instanceof ColorPicker cp) {
                     settings.addProperty(cp.getLabel(), cp.getColor());
                 } else if (c instanceof BlockPicker bp) {
-                    JsonArray arr = new JsonArray();
+                    // Neues Format: Strukturierte Map für Blocks + ARGB (Farbe & Alpha)
+                    JsonObject blockMapObj = new JsonObject();
                     for (Block block : bp.selectedBlocks) {
-                        arr.add(BuiltInRegistries.BLOCK.getKey(block).toString());
+                        String blockId = BuiltInRegistries.BLOCK.getKey(block).toString();
+                        int color = RenderUtils.BLOCK_COLORS.getOrDefault(block, 0x6600FFFF);
+                        blockMapObj.addProperty(blockId, color);
                     }
-                    settings.add(bp.getLabel(), arr);
+                    settings.add(bp.getLabel(), blockMapObj);
                 }
             }
             moduleObj.add("settings", settings);
@@ -133,10 +137,20 @@ public class Config {
             cp.setColor(settings.get(cp.getLabel()).getAsInt());
         } else if (c instanceof BlockPicker bp && settings.has(bp.getLabel())) {
             bp.selectedBlocks.clear();
-            JsonArray arr = settings.getAsJsonArray(bp.getLabel());
-            for (JsonElement e : arr) {
-                Identifier loc = Identifier.parse(e.getAsString());
-                BuiltInRegistries.BLOCK.getOptional(loc).ifPresent(bp.selectedBlocks::add);
+
+            JsonElement el = settings.get(bp.getLabel());
+
+            if (el != null && el.isJsonObject()) {
+                JsonObject blockMapObj = el.getAsJsonObject();
+                for (Map.Entry<String, JsonElement> entry : blockMapObj.entrySet()) {
+                    Identifier loc = Identifier.parse(entry.getKey());
+                    int savedColor = entry.getValue().getAsInt();
+
+                    BuiltInRegistries.BLOCK.getOptional(loc).ifPresent(block -> {
+                        bp.selectedBlocks.add(block);
+                        RenderUtils.BLOCK_COLORS.put(block, savedColor);
+                    });
+                }
             }
         }
     }

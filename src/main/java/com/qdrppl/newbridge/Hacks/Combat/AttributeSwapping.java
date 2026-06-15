@@ -18,7 +18,7 @@ public class AttributeSwapping extends Module {
     private boolean isSwapped = false;
 
     public AttributeSwapping() {
-        super("AttrSwap", "Swappt Items im perfekten Moment für extra Attribute", Category.COMBAT);
+        super("AttrSwap", "Does Attribute swapping for you", Category.COMBAT);
 
         this.settings.add(new ToggleButton("Spear Lunge Swap", spearSwap, val -> spearSwap = val));
         this.settings.add(new ToggleButton("Mace/Sword Swap", maceSwap, val -> maceSwap = val));
