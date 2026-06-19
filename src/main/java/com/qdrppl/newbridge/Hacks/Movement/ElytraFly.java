@@ -12,7 +12,7 @@ public class ElytraFly extends Module {
     private double speedMultiplier = 0.15; // Wie stark der Schub pro Tick ist
 
     public ElytraFly() {
-        super("ElytraBoost", "Lets you use Rockets even if you have none (SpaceBar)", Category.MOVEMENT);
+        super("ElytraBoost", "(IN PROGRESS) Lets you use Rockets even if you have none (SpaceBar)", Category.MOVEMENT);
     }
 
     @Override

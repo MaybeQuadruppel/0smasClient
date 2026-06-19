@@ -47,6 +47,8 @@ public class ModuleManager {
         modules.add(new Jesus());
         modules.add(new FakeLag());
         modules.add(new Freecam());
+        modules.add(new XRay());
+        modules.add(new GoTo());
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {

@@ -1,4 +1,4 @@
-package com.qdrppl.newbridge.mixin.freecam;
+package com.qdrppl.newbridge.mixin.camera;
 
 import com.qdrppl.newbridge.Hacks.Misc.Freelook;
 import com.qdrppl.newbridge.Hacks.Misc.Freecam;

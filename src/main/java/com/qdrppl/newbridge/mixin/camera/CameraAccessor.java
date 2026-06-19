@@ -1,4 +1,4 @@
-package com.qdrppl.newbridge.mixin;
+package com.qdrppl.newbridge.mixin.camera;
 
 import net.minecraft.client.Camera;
 import net.minecraft.world.phys.Vec3;

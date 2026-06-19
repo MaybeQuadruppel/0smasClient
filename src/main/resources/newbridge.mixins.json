@@ -12,12 +12,14 @@
     "Connection.ClientConnectionMixin"
   ],
   "client": [
-    "FreeLookPlayerMixin",
+    "camera.FreeLookPlayerMixin",
     "ONETAPMIXIN",
-    "freecam.CameraMixin",
-    "freecam.MouseHandlerMixin",
-    "freecam.LocalPlayerMixin",
-    "freecam.EntityRenderDispatcherMixin"
+    "camera.CameraMixin",
+    "camera.MouseHandlerMixin",
+    "camera.LocalPlayerMixin",
+    "camera.EntityRenderDispatcherMixin",
+    "xray.AbstractBlockStateMixin",
+    "xray.BlockEntityRenderDispatcherMixin"
   ],
   "injectors": {
     "defaultRequire": 1

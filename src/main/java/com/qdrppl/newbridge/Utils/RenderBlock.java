@@ -100,6 +100,8 @@ public class RenderBlock {
         buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a);
     }
 
+
+
     public static void draw(Minecraft client) {
         if (buffer == null) return;
         MeshData builtBuffer = buffer.build();
@@ -141,5 +143,9 @@ public class RenderBlock {
         builtBuffer.close();
         vertexBuffer.rotate();
         buffer = null;
+    }
+    public static BufferBuilder getBuffer() {
+        if (buffer == null) begin();
+        return buffer;
     }
 }

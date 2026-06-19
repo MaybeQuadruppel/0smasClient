@@ -8,6 +8,7 @@ import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
 import com.qdrppl.newbridge.UI.ClickGuiScreen;
 import com.qdrppl.newbridge.UI.components.Module;
 import com.qdrppl.newbridge.UI.components.ModuleManager;
+import com.qdrppl.newbridge.Utils.ChatHandler;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -44,6 +45,7 @@ public class EntryPoint implements ClientModInitializer {
         RenderUtils.getInstance().init(Minecraft.getInstance());
         PlayerESP.getInstance().init(Minecraft.getInstance());
         Config.load();
+        ChatHandler.register();
 
         net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.START_MAIN.register(context -> {
             Minecraft client = Minecraft.getInstance();

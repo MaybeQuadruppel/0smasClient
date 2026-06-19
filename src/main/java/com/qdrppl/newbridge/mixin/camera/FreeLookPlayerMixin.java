@@ -1,4 +1,4 @@
-package com.qdrppl.newbridge.mixin;
+package com.qdrppl.newbridge.mixin.camera;
 
 import com.qdrppl.newbridge.Hacks.Misc.Freelook;
 import net.minecraft.client.player.LocalPlayer;
