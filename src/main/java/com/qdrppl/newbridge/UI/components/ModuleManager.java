@@ -49,6 +49,7 @@ public class ModuleManager {
         modules.add(new Freecam());
         modules.add(new XRay());
         modules.add(new GoTo());
+        modules.add(new AutoMiner());
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {
