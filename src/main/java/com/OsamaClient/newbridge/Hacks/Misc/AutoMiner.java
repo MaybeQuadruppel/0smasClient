@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.Hacks.Misc;
 
+import com.OsamaClient.newbridge.Hacks.Movement.pathing.BlockHelper;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.GoalBlock;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.MiningAction;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.Navigator;
@@ -51,7 +52,7 @@ public class AutoMiner extends Module {
 
         // 2. PHASE: Der Navigator ist angekommen -> Starte das Vein Mining auf dem Zielblock
         if (currentTargetPos != null && currentTargetBlock != null && !isMining) {
-            client.gui.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("§a[AutoMiner] Ziel erreicht. Starte Vein Mining..."));
+            client.gui.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("§a[AutoMiner] Target reached starting Veinmine"));
             isMining = true;
 
             MiningAction.mineVein(client, currentTargetPos, currentTargetBlock);
@@ -79,7 +80,7 @@ public class AutoMiner extends Module {
             currentTargetPos = target;
             currentTargetBlock = state.getBlock();
 
-            client.gui.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("§e[AutoMiner] Target gefunden bei: " + target.toShortString()));
+            client.gui.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("§e[AutoMiner] Target found at: " + target.toShortString()));
 
             Navigator.INSTANCE.goTo(client, new GoalBlock(target));
             if (!Navigator.INSTANCE.isNavigating()) {
@@ -103,16 +104,20 @@ public class AutoMiner extends Module {
             for (int y = -radius; y <= radius; y++) {
                 for (int z = -radius; z <= radius; z++) {
                     BlockPos currentPos = playerPos.offset(x, y, z);
-
                     if (currentPos.getY() < client.level.getMinY() || currentPos.getY() >= client.level.getMaxY()) {
                         continue;
                     }
-
-                    Block block = client.level.getBlockState(currentPos).getBlock();
+                    BlockState state = client.level.getBlockState(currentPos);
+                    Block block = state.getBlock();
 
                     if (blockPicker.selectedBlocks.contains(block)) {
+                        if (BlockHelper.isEncasedInBedrock(client.level, currentPos)) {
+                            continue;
+                        }
+                        if (BlockHelper.isBedrockAbove(client.level, currentPos)){
+                            continue;
+                        }
                         double dist = currentPos.distSqr(playerPos);
-
                         if (dist < bestDist) {
                             bestDist = dist;
                             bestPos = currentPos;

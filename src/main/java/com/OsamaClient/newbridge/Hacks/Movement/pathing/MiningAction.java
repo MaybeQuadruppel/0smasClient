@@ -38,7 +38,18 @@ public final class MiningAction {
         if (mc.player == null || mc.level == null || mc.gameMode == null) return false;
 
         BlockState state = mc.level.getBlockState(pos);
+
+        if (BlockHelper.isEncasedInBedrock(mc.level, pos)) {
+            return false; // Zurückgeben: "Nein, konnte ich nicht abbauen"
+        }
+
+
         if (state.isAir()) { lastMinedPos = null; return true; }
+        if (state.getCollisionShape(mc.level, pos).isEmpty()) {
+            return true;
+        }
+
+        // 3. Verbotsliste prüfen
         if (BlockHelper.isForbidden(state)) return false;
 
         Vec3 eyes = mc.player.getEyePosition();
@@ -55,6 +66,15 @@ public final class MiningAction {
         return true;
     }
 
+    private static boolean isEncasedInBedrock(net.minecraft.world.level.Level level, BlockPos pos) {
+        int bedrockCount = 0;
+        for (Direction dir : Direction.values()) {
+            if (level.getBlockState(pos.relative(dir)).is(net.minecraft.world.level.block.Blocks.BEDROCK)) {
+                bedrockCount++;
+            }
+        }
+        return bedrockCount >= 5;
+    }
     // ─── Vein mining ──────────────────────────────────────────────────────────
 
     /**

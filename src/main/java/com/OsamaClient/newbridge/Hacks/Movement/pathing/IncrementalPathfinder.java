@@ -9,40 +9,60 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A* pathfinder.
+ * A* pathfinder that runs in slices on the main thread.
+ * Call tick(maxIterations) each game tick until it returns non-null.
  *
- * MAX_ITERATIONS controls how far one segment goes.
- * The Navigator automatically chains segments for long distances.
+ * Running on the main thread fixes thread-safety issues with mc.level
+ * that caused the pathfinder to only find 1-step paths.
  */
-public final class Pathfinder {
+public final class IncrementalPathfinder {
 
-    // At ~20 moves/sec and WALK_ONE_BLOCK_COST ≈ 20 ticks, 50k iterations
-    // covers roughly 200-400 blocks per segment — plenty for smooth chaining.
-    private static final int    MAX_ITERATIONS = 50_000;
     private static final double MIN_IMPROVEMENT = 0.01;
+    private static final int    MAX_TOTAL_ITERATIONS = 100_000;
 
-    private Pathfinder() {}
+    private final Minecraft mc;
+    private final Goal      goal;
 
-    public static PathResult calculatePath(Minecraft mc, BlockPos start, Goal goal) {
-        if (mc.level == null) return PathResult.EMPTY;
+    private final BinaryHeapOpenSet              openSet;
+    private final Long2ObjectOpenHashMap<PathNode> nodeMap;
 
-        BinaryHeapOpenSet openSet = new BinaryHeapOpenSet();
-        Long2ObjectOpenHashMap<PathNode> nodeMap = new Long2ObjectOpenHashMap<>(4096, 0.75f);
+    private PathNode bestNode;
+    private int      totalIterations = 0;
+    private boolean  done            = false;
 
-        PathNode startNode = getOrCreate(nodeMap, start.getX(), start.getY(), start.getZ(), goal);
+    public IncrementalPathfinder(Minecraft mc, BlockPos start, Goal goal) {
+        this.mc   = mc;
+        this.goal = goal;
+
+        this.openSet = new BinaryHeapOpenSet();
+        this.nodeMap = new Long2ObjectOpenHashMap<>(4096, 0.75f);
+
+        PathNode startNode = getOrCreate(start.getX(), start.getY(), start.getZ());
         startNode.cost         = 0;
         startNode.combinedCost = startNode.estimatedCostToGoal;
         openSet.insert(startNode);
 
-        PathNode bestNode  = startNode;
-        int      iterations = 0;
+        this.bestNode = startNode;
+    }
 
-        while (!openSet.isEmpty() && iterations < MAX_ITERATIONS) {
-            iterations++;
+    /**
+     * Run up to maxIterations A* steps.
+     * Returns a PathResult when done (goal reached or max iterations hit), null otherwise.
+     */
+    public PathResult tick(int maxIterations) {
+        if (done) return buildResult();
+
+        int i = 0;
+        while (!openSet.isEmpty() && i < maxIterations && totalIterations < MAX_TOTAL_ITERATIONS) {
+            i++;
+            totalIterations++;
+
             PathNode current = openSet.removeLowest();
 
             if (goal.isInGoal(current.x, current.y, current.z)) {
-                return buildPath(mc, current, goal);
+                bestNode = current;
+                done = true;
+                return buildResult();
             }
 
             if (current.estimatedCostToGoal < bestNode.estimatedCostToGoal) {
@@ -53,13 +73,13 @@ public final class Pathfinder {
                 MoveResult res = move.apply(mc, current.x, current.y, current.z);
                 if (res.isImpossible()) continue;
 
-                BlockPos dp   = res.dest;
-                PathNode neighbor = getOrCreate(nodeMap, dp.getX(), dp.getY(), dp.getZ(), goal);
+                BlockPos dp       = res.dest;
+                PathNode neighbor = getOrCreate(dp.getX(), dp.getY(), dp.getZ());
 
                 double tentativeCost = current.cost + res.cost;
                 if (neighbor.cost - tentativeCost > MIN_IMPROVEMENT) {
-                    neighbor.previous    = current;
-                    neighbor.cost        = tentativeCost;
+                    neighbor.previous     = current;
+                    neighbor.cost         = tentativeCost;
                     neighbor.combinedCost = tentativeCost + neighbor.estimatedCostToGoal;
 
                     if (neighbor.isOpen()) {
@@ -71,16 +91,20 @@ public final class Pathfinder {
             }
         }
 
-        // Return best partial path — Navigator will chain the next segment
-        if (bestNode != startNode) {
-            return buildPath(mc, bestNode, goal);
+        // Hit iteration limit — return partial path
+        if (openSet.isEmpty() || totalIterations >= MAX_TOTAL_ITERATIONS) {
+            done = true;
+            return buildResult();
         }
-        return PathResult.EMPTY;
+
+        return null; // still running
     }
 
-    private static PathResult buildPath(Minecraft mc, PathNode endNode, Goal goal) {
+    private PathResult buildResult() {
+        if (bestNode == null) return PathResult.EMPTY;
+
         List<PathNode> nodes = new ArrayList<>();
-        PathNode cur = endNode;
+        PathNode cur = bestNode;
         while (cur != null) {
             nodes.add(cur);
             cur = cur.previous;
@@ -119,13 +143,12 @@ public final class Pathfinder {
         return new PathResult(waypoints, moves);
     }
 
-    private static PathNode getOrCreate(Long2ObjectOpenHashMap<PathNode> map,
-                                        int x, int y, int z, Goal goal) {
+    private PathNode getOrCreate(int x, int y, int z) {
         long hash = PathNode.longHash(x, y, z);
-        PathNode node = map.get(hash);
+        PathNode node = nodeMap.get(hash);
         if (node == null) {
             node = new PathNode(x, y, z, goal);
-            map.put(hash, node);
+            nodeMap.put(hash, node);
         }
         return node;
     }

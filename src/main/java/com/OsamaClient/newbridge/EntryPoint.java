@@ -6,7 +6,7 @@ import com.OsamaClient.newbridge.Hacks.Misc.ModuleList;
 import com.OsamaClient.newbridge.Hacks.Misc.Scaffold;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.RenderUtils;
-import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
+import com.OsamaClient.newbridge.Hacks.Visual.ESP.*;
 import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;

@@ -7,12 +7,12 @@ import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
 import com.OsamaClient.newbridge.Hacks.Visual.HealthIndicator;
 import com.OsamaClient.newbridge.Hacks.Visual.XRay;
-import com.qdrppl.newbridge.Hacks.Combat.*;
-import com.qdrppl.newbridge.Hacks.Movement.*;
-import com.qdrppl.newbridge.Hacks.Visual.ESP.*;
-import com.qdrppl.newbridge.Hacks.Visual.*;
+import com.OsamaClient.newbridge.Hacks.Combat.*;
+import com.OsamaClient.newbridge.Hacks.Movement.*;
+import com.OsamaClient.newbridge.Hacks.Visual.ESP.*;
+import com.OsamaClient.newbridge.Hacks.Visual.*;
 import com.OsamaClient.newbridge.Hacks.Visual.Trajectories;
-import com.qdrppl.newbridge.Hacks.Misc.*;
+import com.OsamaClient.newbridge.Hacks.Misc.*;
 //import com.qdrppl.newbridge.Hacks.Dupeing.*;
 
 import java.util.ArrayList;

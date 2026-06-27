@@ -10,118 +10,190 @@ import java.util.function.Consumer;
 
 /**
  * Top-level navigation controller.
- *
- * Usage:
- *   Navigator.INSTANCE.goTo(mc, new GoalBlock(targetPos));
- *   Navigator.INSTANCE.stop(mc);
- *
- * Call Navigator.INSTANCE.onTick(mc) every game tick.
- *
- * Async path calculation (like Baritone) so the game doesn't freeze.
+ * Path calculation runs on the MAIN THREAD in a time-sliced manner
+ * to avoid thread-safety issues with mc.level block lookups.
  */
 public final class Navigator {
 
     public static final Navigator INSTANCE = new Navigator();
 
+    // ─── Config ───────────────────────────────────────────────────────────────
+
+    /** Max A* iterations per tick (spread across multiple ticks to avoid lag) */
+    private static final int ITERATIONS_PER_TICK = 2000;
+
+    /** Start pre-calculating next segment when this many steps remain */
+    private static final int REPLAN_STEPS_REMAINING = 10;
+
     // ─── State ────────────────────────────────────────────────────────────────
 
     private final MovementExecutor executor = new MovementExecutor();
 
-    private Goal currentGoal = null;
-    private boolean calculating = false;
-    private final AtomicBoolean cancelCalc = new AtomicBoolean(false);
+    private Goal    currentGoal = null;
+    private boolean active      = false;
+    private int     generationId = 0;
 
-    /** Called when navigation finishes (success or failure) */
+    /** In-progress incremental pathfinder (runs a slice per tick on main thread) */
+    private IncrementalPathfinder incrementalFinder = null;
+
+    /** Pre-calculated next segment ready to swap in */
+    private PathResult nextPath = null;
+
     private Consumer<Boolean> onComplete = null;
 
     private Navigator() {}
 
     // ─── Public API ───────────────────────────────────────────────────────────
 
-    /**
-     * Start navigating to a goal.
-     * Path calculation happens on a background thread.
-     */
     public void goTo(Minecraft mc, Goal goal) {
         goTo(mc, goal, null);
     }
 
     public void goTo(Minecraft mc, Goal goal, Consumer<Boolean> onComplete) {
         stop(mc);
-        this.currentGoal = goal;
-        this.onComplete  = onComplete;
-        calculateAsync(mc, goal);
+        this.currentGoal  = goal;
+        this.onComplete   = onComplete;
+        this.active       = true;
+        this.nextPath     = null;
+        this.generationId++;
+        startPathCalc(mc, mc.player.blockPosition(), goal);
     }
 
-    /**
-     * Stop all navigation immediately.
-     */
     public void stop(Minecraft mc) {
-        cancelCalc.set(true);
-        calculating = false;
-        currentGoal = null;
+        generationId++;
+        active             = false;
+        currentGoal        = null;
+        nextPath           = null;
+        incrementalFinder  = null;
         executor.stop(mc);
     }
 
-    /**
-     * Is the bot currently navigating?
-     */
     public boolean isNavigating() {
-        return executor.isActive() || calculating;
+        return active;
     }
 
-    /**
-     * Must be called every game tick.
-     */
+    // ─── Main tick ────────────────────────────────────────────────────────────
+
     public void onTick(Minecraft mc) {
+        if (!active || mc.player == null) return;
+
+        // Goal reached?
+        if (currentGoal != null) {
+            BlockPos pp = mc.player.blockPosition();
+            if (currentGoal.isInGoal(pp.getX(), pp.getY(), pp.getZ())) {
+                chat(mc, "[Nav] Destination reached!");
+                finishNavigation(mc, true);
+                return;
+            }
+        }
+
+        // ── Tick the incremental pathfinder (runs on main thread, safe) ───────
+        if (incrementalFinder != null) {
+            PathResult result = incrementalFinder.tick(ITERATIONS_PER_TICK);
+            if (result != null) {
+                // Pathfinder finished this tick
+                incrementalFinder = null;
+                onPathReady(mc, result);
+            }
+            // else: still running, continue next tick
+        }
+
+        // ── Tick the movement executor ─────────────────────────────────────────
         if (executor.isActive()) {
             executor.onTick(mc);
 
-            // Check if we finished
+            int stepsLeft = executor.stepsRemaining();
+            if (incrementalFinder == null && nextPath == null
+                    && stepsLeft <= REPLAN_STEPS_REMAINING) {
+
+                BlockPos startPos = executor.getDestination();
+                if (startPos == null) startPos = mc.player.blockPosition();
+
+                startPathCalc(mc, startPos, currentGoal);
+            }
+
+            // Current segment finished
             if (!executor.isActive()) {
-                chat(mc, "§a[Nav] Destination reached");
-                if (onComplete != null) onComplete.accept(true);
-                onComplete = null;
-                currentGoal = null;
+                swapToNextSegment(mc);
+            }
+
+        } else if (incrementalFinder == null) {
+            // Nothing running, nothing calculating — recalculate
+            if (active && currentGoal != null) {
+                startPathCalc(mc, mc.player.blockPosition(), currentGoal);
             }
         }
     }
 
     // ─── Internals ────────────────────────────────────────────────────────────
 
-    private void calculateAsync(Minecraft mc, Goal goal) {
-        if (mc.player == null) return;
-        calculating = true;
-        cancelCalc.set(false);
+    private void startPathCalc(Minecraft mc, BlockPos start, Goal goal) {
+        if (goal == null || mc.level == null) return;
+        if (incrementalFinder != null) return; // already calculating
+        if (goal.isInGoal(start.getX(), start.getY(), start.getZ())) {
+            return;
+        }
 
-        BlockPos start = mc.player.blockPosition();
+        incrementalFinder = new IncrementalPathfinder(mc, start, goal);
+    }
 
-        chat(mc, "§7[Nav] Calculating path...");
+    private void onPathReady(Minecraft mc, PathResult result) {
+        if (!active) return;
 
-        CompletableFuture.supplyAsync(() -> {
-            // This runs on a background thread
-            // Note: reading world state from another thread is technically unsafe,
-            // but Minecraft itself does this in many places and it's stable enough
-            // for pathfinding (worst case: a block check is stale and we recalc)
-            if (cancelCalc.get()) return PathResult.EMPTY;
-            return Pathfinder.calculatePath(mc, start, goal);
-        }).thenAcceptAsync(result -> {
-            // Back on the main thread via scheduleTask
-            calculating = false;
-            if (cancelCalc.get()) return;
-
-            if (result.isEmpty()) {
-                chat(mc, "§c[Nav] No path found!");
-                if (onComplete != null) onComplete.accept(false);
-                onComplete = null;
-                currentGoal = null;
-                return;
+        if (result.isEmpty()) {
+            // Bad result — check if we're basically at the goal already
+            if (currentGoal != null) {
+                BlockPos pp = mc.player.blockPosition();
+                if (currentGoal.isInGoal(pp.getX(), pp.getY(), pp.getZ())) {
+                    chat(mc, "[Nav] Destination reached!");
+                    finishNavigation(mc, true);
+                    return;
+                }
             }
+            // Retry after a short delay (2 ticks) by leaving incrementalFinder null
+            // onTick will restart it next time executor is idle
+            if (!executor.isActive()) {
+                chat(mc, "[Nav] No path found, retrying...");
+            }
+            return;
+        }
 
-            chat(mc, "§7[Nav] Pfad found (" + result.moves.size() + " steps)");
+        chat(mc, "[Nav] Path: " + result.moves.size() + " steps");
+
+        if (!executor.isActive()) {
             executor.setPath(result);
+            // Immediately start pre-calculating next segment
+            startPathCalc(mc, mc.player.blockPosition(), currentGoal);
+        } else {
+            if (nextPath == null) {
+                nextPath = result;
+            }
+        }
+    }
 
-        }, task -> mc.submit(task)); // execute on main thread
+    private void swapToNextSegment(Minecraft mc) {
+        if (nextPath != null) {
+            executor.setPath(nextPath);
+            nextPath = null;
+            // Pre-calc next segment
+            if (incrementalFinder == null) {
+                startPathCalc(mc, mc.player.blockPosition(), currentGoal);
+            }
+        }
+        // else: wait for incrementalFinder to finish
+    }
+
+    private void finishNavigation(Minecraft mc, boolean success) {
+        generationId++;
+        active            = false;
+        currentGoal       = null;
+        nextPath          = null;
+        incrementalFinder = null;
+        executor.stop(mc);
+        if (onComplete != null) {
+            onComplete.accept(success);
+            onComplete = null;
+        }
     }
 
     private void chat(Minecraft mc, String msg) {

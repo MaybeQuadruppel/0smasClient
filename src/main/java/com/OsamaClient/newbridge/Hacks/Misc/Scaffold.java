@@ -1,7 +1,7 @@
 package com.OsamaClient.newbridge.Hacks.Misc;
 
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
-import com.qdrppl.newbridge.UI.components.*;
+import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;

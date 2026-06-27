@@ -2,6 +2,7 @@ package com.OsamaClient.newbridge.Hacks.Movement.pathing;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.FallingBlock;
@@ -104,6 +105,27 @@ public final class BlockHelper {
         return extraCost;
     }
 
+    public static boolean isBedrockAbove(net.minecraft.world.level.Level level, BlockPos pos) {
+        for (int i = 1; i <= 3; i++) {
+            if (level.getBlockState(pos.above(i)).is(Blocks.BEDROCK)) {
+                return true;
+            }
+        }
+        if (level.getBlockState(pos.below()).is(Blocks.AIR)){
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean isEncasedInBedrock(net.minecraft.world.level.Level level, BlockPos pos) {
+        int bedrockCount = 0;
+        for (Direction dir : Direction.values()) {
+            if (level.getBlockState(pos.relative(dir)).is(Blocks.BEDROCK)) {
+                bedrockCount++;
+            }
+        }
+        return bedrockCount >= 5;
+    }
     /**
      * True if the player can walk through this block without mining
      * (air, water, most plants, etc.)

@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.components.Module;
 import com.google.gson.*;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.RenderUtils;
 import com.OsamaClient.newbridge.UI.ClickGuiScreen;
-import com.qdrppl.newbridge.UI.components.*;
+import com.OsamaClient.newbridge.UI.components.*;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;

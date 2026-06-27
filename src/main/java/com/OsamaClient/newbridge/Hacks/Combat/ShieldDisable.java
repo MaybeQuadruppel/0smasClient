@@ -2,7 +2,7 @@ package com.OsamaClient.newbridge.Hacks.Combat;
 
 import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
-import com.qdrppl.newbridge.UI.components.*;
+import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
