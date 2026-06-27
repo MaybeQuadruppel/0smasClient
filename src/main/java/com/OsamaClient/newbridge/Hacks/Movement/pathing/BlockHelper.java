@@ -111,9 +111,8 @@ public final class BlockHelper {
                 return true;
             }
         }
-        if (level.getBlockState(pos.below()).is(Blocks.AIR)){
-            return true;
-        }
+        BlockPos posBelow = pos.below();
+        if (Minecraft.getInstance().player.blockPosition().below().equals(pos) && level.getBlockState(posBelow).isAir()){ return true;}
         return false;
     }
 

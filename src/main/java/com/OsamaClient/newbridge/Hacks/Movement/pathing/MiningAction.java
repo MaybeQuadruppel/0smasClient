@@ -84,32 +84,33 @@ public final class MiningAction {
     public static List<BlockPos> mineVein(Minecraft mc, BlockPos origin, Block targetBlock) {
         List<BlockPos> mined = new ArrayList<>();
         if (mc.player == null || mc.level == null) return mined;
-
+        List<BlockPos> veinBlocks = new ArrayList<>();
         Queue<BlockPos> queue = new LinkedList<>();
         Set<BlockPos> visited = new HashSet<>();
         queue.add(origin);
         visited.add(origin);
-
-        Vec3 eyes = mc.player.getEyePosition();
-
-        while (!queue.isEmpty() && mined.size() < MAX_VEIN_SIZE) {
+        while (!queue.isEmpty()) {
             BlockPos current = queue.poll();
-            BlockState state = mc.level.getBlockState(current);
-
-            if (!state.is(targetBlock)) continue;
-            if (eyes.distanceToSqr(Vec3.atCenterOf(current)) > MAX_REACH_SQ) continue;
-
-            mineBlock(mc, current);
-            mined.add(current);
-
-            for (Direction dir : Direction.values()) {
-                BlockPos neighbor = current.relative(dir);
-                if (!visited.contains(neighbor)) {
-                    visited.add(neighbor);
-                    if (mc.level.getBlockState(neighbor).is(targetBlock)) {
+            if (mc.level.getBlockState(current).is(targetBlock)) {
+                veinBlocks.add(current);
+                for (Direction dir : Direction.values()) {
+                    BlockPos neighbor = current.relative(dir);
+                    if (!visited.contains(neighbor)) {
+                        visited.add(neighbor);
                         queue.add(neighbor);
                     }
                 }
+            }
+        }
+
+        veinBlocks.sort((a, b) -> Integer.compare(b.getY(), a.getY()));
+
+        Vec3 eyes = mc.player.getEyePosition();
+        for (BlockPos pos : veinBlocks) {
+            if (mined.size() >= MAX_VEIN_SIZE) break;
+            if (eyes.distanceToSqr(Vec3.atCenterOf(pos)) > MAX_REACH_SQ) continue;
+            if (mineBlock(mc, pos)) {
+                mined.add(pos);
             }
         }
         return mined;
