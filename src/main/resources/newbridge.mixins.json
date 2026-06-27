@@ -4,22 +4,22 @@
   "package": "com.qdrppl.newbridge.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
-    "BowItemMixin",
-    "Connection.ClientPacketListenerMixin",
-    "FullBrightMixin",
-    "HealthIndicatorMixin",
-    "LiquidBlockMixin",
-    "Connection.ClientConnectionMixin"
+    "com.OsamaClient.newbridge.mixin.BowItemMixin",
+    "com.OsamaClient.newbridge.mixin.Connection.ClientPacketListenerMixin",
+    "com.OsamaClient.newbridge.mixin.FullBrightMixin",
+    "com.OsamaClient.newbridge.mixin.HealthIndicatorMixin",
+    "com.OsamaClient.newbridge.mixin.LiquidBlockMixin",
+    "com.OsamaClient.newbridge.mixin.Connection.ClientConnectionMixin"
   ],
   "client": [
-    "camera.FreeLookPlayerMixin",
-    "ONETAPMIXIN",
-    "camera.CameraMixin",
-    "camera.MouseHandlerMixin",
-    "camera.LocalPlayerMixin",
-    "camera.EntityRenderDispatcherMixin",
-    "xray.AbstractBlockStateMixin",
-    "xray.BlockEntityRenderDispatcherMixin"
+    "com.OsamaClient.newbridge.mixin.camera.FreeLookPlayerMixin",
+    "com.OsamaClient.newbridge.mixin.ONETAPMIXIN",
+    "com.OsamaClient.newbridge.mixin.camera.CameraMixin",
+    "com.OsamaClient.newbridge.mixin.camera.MouseHandlerMixin",
+    "com.OsamaClient.newbridge.mixin.camera.LocalPlayerMixin",
+    "com.OsamaClient.newbridge.mixin.camera.EntityRenderDispatcherMixin",
+    "com.OsamaClient.newbridge.mixin.xray.AbstractBlockStateMixin",
+    "com.OsamaClient.newbridge.mixin.xray.BlockEntityRenderDispatcherMixin"
   ],
   "injectors": {
     "defaultRequire": 1

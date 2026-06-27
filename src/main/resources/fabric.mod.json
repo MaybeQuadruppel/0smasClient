@@ -10,7 +10,7 @@
   "environment": "client",
   "entrypoints": {
     "client": [
-      "com.qdrppl.newbridge.EntryPoint"
+      "com.OsamaClient.newbridge.EntryPoint"
     ]
   },
   "mixins": [
