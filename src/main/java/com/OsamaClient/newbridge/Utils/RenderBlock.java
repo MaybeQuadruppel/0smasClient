@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.Utils;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -7,7 +8,7 @@ import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext; // world -> level
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -18,11 +19,9 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-import org.lwjgl.system.MemoryUtil;
 
 import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.OptionalInt;
 
 public class RenderBlock {
     public static final String MOD_ID = "newbridge";
@@ -44,20 +43,14 @@ public class RenderBlock {
 
     public static void begin() {
         if (buffer == null) {
-            buffer = new BufferBuilder(allocator, VertexFormat.Mode.QUADS, PIPELINE.getVertexFormat());
+            buffer = new BufferBuilder(allocator, PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
         }
     }
 
-    /**
-     * Aktualisiert auf LevelRenderContext für Minecraft 26.1.2
-     */
     public static void renderPoint(LevelRenderContext context, Vec3 pos, float size, float r, float g, float b, float a) {
         if (buffer == null) begin();
 
-        // context.matrices() -> context.poseStack()
         PoseStack matrices = context.poseStack();
-
-        // worldState() -> levelState()
         Vec3 camera = context.levelState().cameraRenderState.pos;
         Matrix4fc matrix = matrices.last().pose();
 
@@ -68,7 +61,6 @@ public class RenderBlock {
         float y2 = (float) (pos.y + (size / 2) - camera.y);
         float z2 = (float) (pos.z + (size / 2) - camera.z);
 
-        // Die Vertex-Daten bleiben logisch gleich
         buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a);
         buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a);
         buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a);
@@ -99,8 +91,6 @@ public class RenderBlock {
         buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a);
         buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a);
     }
-
-
 
     public static void draw(Minecraft client) {
         if (buffer == null) return;
@@ -115,35 +105,38 @@ public class RenderBlock {
 
         if (vertexBuffer == null || vertexBuffer.size() < vertexBufferSize) {
             if (vertexBuffer != null) vertexBuffer.close();
-            // Nutzt weiterhin die gelernten USAGE-Konstanten
-            vertexBuffer = new MappableRingBuffer(() -> MOD_ID + "_traj_buffer", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
+            // FIX: USAGE_COPY_DST hinzugefügt, damit writeToBuffer funktioniert
+            vertexBuffer = new MappableRingBuffer(() -> MOD_ID + "_traj_buffer", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE | GpuBuffer.USAGE_COPY_DST, vertexBufferSize);
         }
 
         CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
-        try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(vertexBuffer.currentBuffer().slice(0, builtBuffer.vertexBuffer().remaining()), false, true)) {
-            MemoryUtil.memCopy(builtBuffer.vertexBuffer(), mappedView.data());
-        }
 
-        GpuBuffer vertices = vertexBuffer.currentBuffer();
-        RenderSystem.AutoStorageIndexBuffer shapeIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+        commandEncoder.writeToBuffer(
+                vertexBuffer.currentBuffer().slice(0L, (long) builtBuffer.vertexBuffer().remaining()),
+                builtBuffer.vertexBuffer()
+        );
+
+        RenderSystem.AutoStorageIndexBuffer shapeIndexBuffer = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
         GpuBuffer indices = shapeIndexBuffer.getBuffer(drawParameters.indexCount());
 
         GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms()
-                .writeTransform(RenderSystem.getModelViewMatrix(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
+                .writeTransform(new Matrix4f(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
 
-        try (RenderPass renderPass = commandEncoder.createRenderPass(() -> MOD_ID + "_traj_pass", client.getMainRenderTarget().getColorTextureView(), OptionalInt.empty(), client.getMainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
+        try (RenderPass renderPass = commandEncoder.createRenderPass(() -> MOD_ID + "_traj_pass", client.gameRenderer.mainRenderTarget().getColorTextureView(), Optional.empty(), client.gameRenderer.mainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
             renderPass.setPipeline(PIPELINE);
             RenderSystem.bindDefaultUniforms(renderPass);
             renderPass.setUniform("DynamicTransforms", dynamicTransforms);
-            renderPass.setVertexBuffer(0, vertices);
+
+            renderPass.setVertexBuffer(0, vertexBuffer.currentBuffer().slice());
             renderPass.setIndexBuffer(indices, shapeIndexBuffer.type());
-            renderPass.drawIndexed(0, 0, drawParameters.indexCount(), 1);
+            renderPass.drawIndexed(drawParameters.indexCount(), 1, 0, 0, 0);
         }
 
         builtBuffer.close();
         vertexBuffer.rotate();
         buffer = null;
     }
+
     public static BufferBuilder getBuffer() {
         if (buffer == null) begin();
         return buffer;

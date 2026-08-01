@@ -1,5 +1,7 @@
 package com.OsamaClient.newbridge.Hacks.Visual.ESP;
 
+import com.mojang.blaze3d.IndexType;
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -22,7 +24,7 @@ import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
-
+import com.mojang.blaze3d.vertex.VertexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -91,9 +93,8 @@ public class RenderUtils {
         if (matrices == null || camera == null) return;
 
         if (buffer == null) {
-            buffer = new BufferBuilder(allocator, VertexFormat.Mode.QUADS, FILLED_THROUGH_WALLS.getVertexFormat());
+            buffer = new BufferBuilder(allocator, PrimitiveTopology.QUADS, FILLED_THROUGH_WALLS.getVertexFormatBinding(0));
         }
-
         matrices.pushPose();
         matrices.translate((float)-camera.x, (float)-camera.y, (float)-camera.z);
 
@@ -152,30 +153,31 @@ public class RenderUtils {
 
         if (vertexBuffer == null || vertexBuffer.size() < vertexBufferSize) {
             if (vertexBuffer != null) vertexBuffer.close();
-            vertexBuffer = new MappableRingBuffer(() -> MOD_ID + "_esp_buffer", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
+            vertexBuffer = new MappableRingBuffer(() -> MOD_ID + "_esp_buffer", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE | GpuBuffer.USAGE_COPY_DST, vertexBufferSize);
         }
 
         CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
-        try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(vertexBuffer.currentBuffer().slice(0, builtBuffer.vertexBuffer().remaining()), false, true)) {
-            MemoryUtil.memCopy(builtBuffer.vertexBuffer(), mappedView.data());
-        }
+        commandEncoder.writeToBuffer(
+                vertexBuffer.currentBuffer().slice(0L, (long) builtBuffer.vertexBuffer().remaining()),
+                builtBuffer.vertexBuffer()
+        );
 
         GpuBuffer vertices = vertexBuffer.currentBuffer();
 
-        RenderSystem.AutoStorageIndexBuffer shapeIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+        RenderSystem.AutoStorageIndexBuffer shapeIndexBuffer = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
         GpuBuffer indices = shapeIndexBuffer.getBuffer(drawParameters.indexCount());
-        VertexFormat.IndexType indexType = shapeIndexBuffer.type();
+        IndexType indexType = shapeIndexBuffer.type();
 
         GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms()
-                .writeTransform(RenderSystem.getModelViewMatrix(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
+                .writeTransform(RenderSystem.getModelViewMatrixCopy(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
 
-        try (RenderPass renderPass = commandEncoder.createRenderPass(() -> MOD_ID + "_esp_pass", client.getMainRenderTarget().getColorTextureView(), OptionalInt.empty(), client.getMainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
+        try (RenderPass renderPass = commandEncoder.createRenderPass(() -> MOD_ID + "_esp_pass", client.gameRenderer.mainRenderTarget().getColorTextureView(), Optional.empty(), client.gameRenderer.mainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
             renderPass.setPipeline(pipeline);
             RenderSystem.bindDefaultUniforms(renderPass);
             renderPass.setUniform("DynamicTransforms", dynamicTransforms);
-            renderPass.setVertexBuffer(0, vertices);
+            renderPass.setVertexBuffer(0, vertices.slice());
             renderPass.setIndexBuffer(indices, indexType);
-            renderPass.drawIndexed(0, 0, drawParameters.indexCount(), 1);
+            renderPass.drawIndexed(drawParameters.indexCount(), 1, 0, 0, 0);
         }
 
         builtBuffer.close();

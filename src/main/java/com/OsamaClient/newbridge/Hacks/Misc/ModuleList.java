@@ -80,7 +80,7 @@ public class ModuleList extends Module {
         if (instance == null
                 || !instance.enabled
                 || mc.player == null
-                || mc.options.hideGui
+                || mc.gui.hud.isHidden()
                 || mc.getDebugOverlay().showDebugScreen()) {
             // Drain all animations to 0 so they fade out cleanly on hide
             for (float[] s : anim.values()) { s[0] = 0f; s[1] = 0f; }

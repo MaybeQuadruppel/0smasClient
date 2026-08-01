@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge;
 
+import net.minecraft.client.gui.screens.Screen;
 import com.OsamaClient.newbridge.Hacks.Combat.AimAssist;
 import com.OsamaClient.newbridge.Hacks.Combat.AutoDihhTap;
 import com.OsamaClient.newbridge.Hacks.Misc.ModuleList;
@@ -61,10 +62,10 @@ public class EntryPoint implements ClientModInitializer {
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
             while (guiKeyBind.consumeClick()) {
-                client.setScreen(new ClickGuiScreen());
+                client.gui.setScreen(new ClickGuiScreen());
             }
 
-            if (client.screen == null) {
+            if (client.gui.screen() == null) {
                 ClickGuiScreen.keybinds.forEach((moduleName, boundKey) -> {
                     Module m = ModuleManager.getModuleByName(moduleName);
                     if (m == null) return;

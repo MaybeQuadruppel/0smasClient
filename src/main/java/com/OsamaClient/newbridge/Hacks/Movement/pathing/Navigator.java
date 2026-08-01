@@ -198,7 +198,7 @@ public final class Navigator {
 
     private void chat(Minecraft mc, String msg) {
         if (mc.gui != null) {
-            mc.gui.getChat().addClientSystemMessage(Component.literal(msg));
+            mc.player.sendSystemMessage(Component.literal(msg));
         }
     }
 }

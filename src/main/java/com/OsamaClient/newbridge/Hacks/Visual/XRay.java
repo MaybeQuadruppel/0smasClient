@@ -2,6 +2,7 @@ package com.OsamaClient.newbridge.Hacks.Visual;
 
 import com.OsamaClient.newbridge.UI.components.Module;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import java.util.HashSet;
@@ -53,22 +54,9 @@ public class XRay extends Module {
 
         // --- SHULKER KISTEN (Alle Farben) ---
         WHITELIST.add(Blocks.SHULKER_BOX);
-        WHITELIST.add(Blocks.WHITE_SHULKER_BOX);
-        WHITELIST.add(Blocks.ORANGE_SHULKER_BOX);
-        WHITELIST.add(Blocks.MAGENTA_SHULKER_BOX);
-        WHITELIST.add(Blocks.LIGHT_BLUE_SHULKER_BOX);
-        WHITELIST.add(Blocks.YELLOW_SHULKER_BOX);
-        WHITELIST.add(Blocks.LIME_SHULKER_BOX);
-        WHITELIST.add(Blocks.PINK_SHULKER_BOX);
-        WHITELIST.add(Blocks.GRAY_SHULKER_BOX);
-        WHITELIST.add(Blocks.LIGHT_GRAY_SHULKER_BOX);
-        WHITELIST.add(Blocks.CYAN_SHULKER_BOX);
-        WHITELIST.add(Blocks.PURPLE_SHULKER_BOX);
-        WHITELIST.add(Blocks.BLUE_SHULKER_BOX);
-        WHITELIST.add(Blocks.BROWN_SHULKER_BOX);
-        WHITELIST.add(Blocks.GREEN_SHULKER_BOX);
-        WHITELIST.add(Blocks.RED_SHULKER_BOX);
-        WHITELIST.add(Blocks.BLACK_SHULKER_BOX);
+        for (DyeColor color : DyeColor.values()) {
+            WHITELIST.add(Blocks.DYED_SHULKER_BOX.pick(color));
+        }
     }
 
     public static boolean isSupported(Block block) {
@@ -91,8 +79,8 @@ public class XRay extends Module {
 
     private void reloadChunks() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.levelRenderer != null) {
-            mc.levelRenderer.allChanged();
+        if (mc.levelExtractor != null) {
+            mc.levelExtractor.allChanged(); // Aktualisiert für Minecraft 26.2+
         }
     }
 }

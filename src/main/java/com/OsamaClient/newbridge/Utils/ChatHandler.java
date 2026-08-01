@@ -19,7 +19,7 @@ public class ChatHandler {
                 // Stop-Funktionalität über den neuen Navigator
                 if (args.length == 2 && args[1].equalsIgnoreCase("stop")) {
                     Navigator.INSTANCE.stop(mc);
-                    mc.gui.getChat().addClientSystemMessage(Component.literal("§c[GoTo] Navigation stopped."));
+                    mc.player.sendSystemMessage(Component.literal("§c[GoTo] Navigation stopped."));
                     return false;
                 }
 
@@ -34,7 +34,7 @@ public class ChatHandler {
 
                         goToModule.enabled = true; // Sicherstellen, dass das Modul ticken darf
                         goToModule.setTarget(x, y, z);
-                        mc.gui.getChat().addClientSystemMessage(Component.literal("§a[GoTo] Walking to X: " + x + " Z: " + z));
+                        mc.player.sendSystemMessage(Component.literal("§a[GoTo] Walking to X: " + x + " Z: " + z));
                     }
                     else if (args.length == 4) {
                         int x = Integer.parseInt(args[1]);
@@ -43,13 +43,13 @@ public class ChatHandler {
 
                         goToModule.enabled = true; // Sicherstellen, dass das Modul ticken darf
                         goToModule.setTarget(x, y, z);
-                        mc.gui.getChat().addClientSystemMessage(Component.literal("§a[GoTo] Walking to X: " + x + " Y: " + y + " Z: " + z));
+                        mc.player.sendSystemMessage(Component.literal("§a[GoTo] Walking to X: " + x + " Y: " + y + " Z: " + z));
                     }
                     else {
-                        mc.gui.getChat().addClientSystemMessage(Component.literal("§6[GoTo] Usage: .goto <x> <z> OR .goto <x> <y> <z> OR .goto stop"));
+                        mc.player.sendSystemMessage(Component.literal("§6[GoTo] Usage: .goto <x> <z> OR .goto <x> <y> <z> OR .goto stop"));
                     }
                 } catch (NumberFormatException e) {
-                    mc.gui.getChat().addClientSystemMessage(Component.literal("§c[GoTo] Error! Please enter valid digits."));
+                    mc.player.sendSystemMessage(Component.literal("§c[GoTo] Error! Please enter valid digits."));
                 }
 
                 return false; // Verhindert, dass die Nachricht an den Server gesendet wird

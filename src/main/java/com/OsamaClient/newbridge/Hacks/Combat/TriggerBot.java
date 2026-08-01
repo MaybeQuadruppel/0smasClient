@@ -37,7 +37,7 @@ public class TriggerBot extends Module {
     }
 
     public void onTick(Minecraft client) {
-        if (!enabled || client.player == null || client.level == null || client.screen != null) return;
+        if (!enabled || client.player == null || client.level == null || client.gui.screen() != null) return;
 
         if (System.currentTimeMillis() < nextAttackTime) return;
 

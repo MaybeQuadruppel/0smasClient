@@ -25,7 +25,7 @@ public class GoTo extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || targetPos == null) return;
 
-        mc.gui.getChat().addClientSystemMessage(Component.literal("§e[GoTo] Starting navigation..."));
+        mc.player.sendSystemMessage(Component.literal("§e[GoTo] Starting navigation..."));
 
         Navigator.INSTANCE.goTo(mc, new GoalBlock(targetPos));
     }
@@ -40,11 +40,11 @@ public class GoTo extends Module {
     @Override
     public void onTick(Minecraft client) {
         if (!enabled) return;
-
+        Minecraft mc = Minecraft.getInstance();
         if (Navigator.INSTANCE.isNavigating()) {
             Navigator.INSTANCE.onTick(client);
         } else {
-            client.gui.getChat().addClientSystemMessage(Component.literal("§a[GoTo] Destination reached!"));
+            mc.player.sendSystemMessage(Component.literal("§a[GoTo] Destination reached!"));
             this.onDisable();
         }
     }

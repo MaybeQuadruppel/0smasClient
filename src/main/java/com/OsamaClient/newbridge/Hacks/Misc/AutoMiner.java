@@ -52,7 +52,9 @@ public class AutoMiner extends Module {
 
         // 2. PHASE: Der Navigator ist angekommen -> Starte das Vein Mining auf dem Zielblock
         if (currentTargetPos != null && currentTargetBlock != null && !isMining) {
-            client.gui.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("§a[AutoMiner] Target reached starting Veinmine"));
+            client.player.sendSystemMessage(
+                    net.minecraft.network.chat.Component.literal("§a[AutoMiner] Target reached starting Veinmine")
+            );
             isMining = true;
 
             MiningAction.mineVein(client, currentTargetPos, currentTargetBlock);
@@ -80,7 +82,9 @@ public class AutoMiner extends Module {
             currentTargetPos = target;
             currentTargetBlock = state.getBlock();
 
-            client.gui.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("§e[AutoMiner] Target found at: " + target.toShortString()));
+            client.player.sendSystemMessage(
+                    net.minecraft.network.chat.Component.literal("§e[AutoMiner] Target found at: " + target.toShortString())
+            );
 
             Navigator.INSTANCE.goTo(client, new GoalBlock(target));
             if (!Navigator.INSTANCE.isNavigating()) {

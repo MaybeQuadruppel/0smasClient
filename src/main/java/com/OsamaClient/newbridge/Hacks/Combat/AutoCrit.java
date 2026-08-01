@@ -31,7 +31,7 @@ public class AutoCrit extends Module {
 
     @Override
     public void onTick(Minecraft client) {
-        if (client.player == null || client.level == null || client.screen != null) return;
+        if (client.player == null || client.level == null || client.gui.screen() != null) return;
         if (client.options.keyAttack.isDown() && !waitingForDrop) {
             LivingEntity target = getCrosshairTarget(client);
 

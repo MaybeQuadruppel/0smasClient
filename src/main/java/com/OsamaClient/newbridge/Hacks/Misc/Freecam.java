@@ -32,7 +32,7 @@ public class Freecam extends Module {
 
         super.onEnable();
 
-        cameraPos = mc.gameRenderer.getMainCamera().position();
+        cameraPos = mc.gameRenderer.mainCamera().position();
         cameraYaw = mc.player.getYRot();
         cameraPitch = mc.player.getXRot();
 
