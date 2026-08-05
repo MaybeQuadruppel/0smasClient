@@ -1,6 +1,7 @@
 package com.OsamaClient.newbridge.Utils;
 
 import com.OsamaClient.newbridge.Hacks.Movement.GoTo;
+import com.OsamaClient.newbridge.Hacks.Movement.Teleport;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.Navigator;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.client.Minecraft;
@@ -50,6 +51,41 @@ public class ChatHandler {
                     }
                 } catch (NumberFormatException e) {
                     mc.player.sendSystemMessage(Component.literal("§c[GoTo] Error! Please enter valid digits."));
+                }
+
+                return false; // Verhindert, dass die Nachricht an den Server gesendet wird
+            }
+
+            if (message.startsWith(".tp")) {
+                String[] args = message.split(" ");
+                Minecraft mc = Minecraft.getInstance();
+
+                if (mc.player == null) return true;
+
+                try {
+                    Teleport tpModule = Teleport.getInstance();
+
+                    if (args.length == 3) {
+                        int x = Integer.parseInt(args[1]);
+                        int z = Integer.parseInt(args[2]);
+                        int y = (int) mc.player.getY(); // Nutzt aktuelle Y-Höhe des Spielers
+
+                        tpModule.enabled = true;
+                        tpModule.setTarget(x, y, z);
+                    }
+                    else if (args.length == 4) {
+                        int x = Integer.parseInt(args[1]);
+                        int y = Integer.parseInt(args[2]);
+                        int z = Integer.parseInt(args[3]);
+
+                        tpModule.enabled = true;
+                        tpModule.setTarget(x, y, z);
+                    }
+                    else {
+                        mc.player.sendSystemMessage(Component.literal("§6[TP] Usage: .tp <x> <z> OR .tp <x> <y> <z>"));
+                    }
+                } catch (NumberFormatException e) {
+                    mc.player.sendSystemMessage(Component.literal("§c[TP] Error! Please enter valid digits."));
                 }
 
                 return false; // Verhindert, dass die Nachricht an den Server gesendet wird
