@@ -2,14 +2,17 @@ package com.OsamaClient.newbridge.Hacks.Combat;
 
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
-import com.OsamaClient.newbridge.UI.components.ToggleButton;
+import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import com.OsamaClient.newbridge.UI.components.*;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.monster.Enemy; // HostileEntity -> Enemy Interface in MojMaps oft bevorzugt
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 
@@ -20,20 +23,20 @@ public class TriggerBot extends Module {
     public double cps = 10.0;
     public double range = 3.5;
     public double randomize = 2.0;
-    public boolean targetPlayers = true;
-    public boolean targetHostile = true;
+    public EntityFilterPicker entityFilter;
 
     private long nextAttackTime = 0;
     private final Random random = new Random();
 
     public TriggerBot() {
-        super("TriggerBot ","Just A Triggerbot", Category.COMBAT);
+        super("TriggerBot", "Just A Triggerbot", Category.COMBAT);
+
+        this.entityFilter = new EntityFilterPicker("Targets");
 
         this.settings.add(new Slider("CPS", 0.2, 20.0, cps, val -> cps = val));
         this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val));
         this.settings.add(new Slider("Randomize", 0.0, 5.0, randomize, val -> randomize = val));
-        this.settings.add(new ToggleButton("Target Players", targetPlayers, val -> targetPlayers = val));
-        this.settings.add(new ToggleButton("Target Hostile", targetHostile, val -> targetHostile = val));
+        this.settings.add(this.entityFilter);
     }
 
     public void onTick(Minecraft client) {
@@ -60,12 +63,15 @@ public class TriggerBot extends Module {
     private boolean isTargetValid(LivingEntity target, Minecraft client) {
         double dist = client.player.distanceTo(target);
         if (dist > range) return false;
+        if (!target.isAlive() || target == client.player) return false;
 
-        if (!target.isAlive()) return false;
+        // Prüfen, ob der jeweilige Typ im Dropdown aktiviert ist
+        if (entityFilter.isFilterEnabled("Players") && target instanceof Player) return true;
+        if (entityFilter.isFilterEnabled("Hostiles") && target instanceof Enemy) return true;
+        if (entityFilter.isFilterEnabled("Animals") && target instanceof Animal) return true;
+        if (entityFilter.isFilterEnabled("NPCs") && target instanceof Npc) return true;
+        if (entityFilter.isFilterEnabled("ArmorStands") && target instanceof ArmorStand) return true;
 
-        if (target instanceof Player && !targetPlayers) return false;
-        if (target instanceof Enemy && !targetHostile) return false;
-
-        return true;
+        return false;
     }
 }

@@ -70,7 +70,6 @@ public class ChatHandler {
                         int z = Integer.parseInt(args[2]);
                         int y = (int) mc.player.getY(); // Nutzt aktuelle Y-Höhe des Spielers
 
-                        tpModule.enabled = true;
                         tpModule.setTarget(x, y, z);
                     }
                     else if (args.length == 4) {
@@ -78,7 +77,6 @@ public class ChatHandler {
                         int y = Integer.parseInt(args[2]);
                         int z = Integer.parseInt(args[3]);
 
-                        tpModule.enabled = true;
                         tpModule.setTarget(x, y, z);
                     }
                     else {

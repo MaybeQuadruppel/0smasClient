@@ -1,15 +1,17 @@
 package com.OsamaClient.newbridge.Hacks.Combat;
 
-import com.OsamaClient.newbridge.UI.components.ModeButton;
-import com.OsamaClient.newbridge.UI.components.Slider;
-import com.OsamaClient.newbridge.UI.components.ToggleButton;
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.util.Mth;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -23,7 +25,7 @@ public class AimAssist extends Module {
 
     // Settings
     public int mode = 0;
-    public int targetType = 0;
+    public EntityFilterPicker entityFilter;
     public float range = 3.8f;
     public float smoothness = 0.15f;
     public float fov = 40.0f;
@@ -37,20 +39,18 @@ public class AimAssist extends Module {
         super("AimAssist", "Advanced Humanized Aim", Category.COMBAT);
         INSTANCE = this;
 
+        this.entityFilter = new EntityFilterPicker("Targets");
+
         this.settings.add(new ModeButton("Logic", List.of("Always", "On Hit"), mode, val -> mode = val.equals("Always") ? 0 : 1));
-        this.settings.add(new ModeButton("Targets", List.of("Players", "All"), targetType, val -> targetType = val.equals("Players") ? 0 : 1));
-        this.settings.add(new Slider("Range", 1.0, 6.0, (double)range, val -> range = val.floatValue()));
-        this.settings.add(new Slider("Smoothness", 0.01, 1.0, (double)smoothness, val -> smoothness = val.floatValue()));
-        this.settings.add(new Slider("FOV", 10.0, 180.0, (double)fov, val -> fov = val.floatValue()));
+        this.settings.add(this.entityFilter);
+        this.settings.add(new Slider("Range", 1.0, 6.0, (double) range, val -> range = val.floatValue()));
+        this.settings.add(new Slider("Smoothness", 0.01, 1.0, (double) smoothness, val -> smoothness = val.floatValue()));
+        this.settings.add(new Slider("FOV", 10.0, 180.0, (double) fov, val -> fov = val.floatValue()));
 
         this.settings.add(new ToggleButton("Random Height", randomHeight, val -> randomHeight = val));
-        this.settings.add(new Slider("Static Height", 0.0, 1.0, (double)staticHeight, val -> staticHeight = val.floatValue()));
+        this.settings.add(new Slider("Static Height", 0.0, 1.0, (double) staticHeight, val -> staticHeight = val.floatValue()));
     }
 
-    /**
-     * WICHTIG: Rufe diese Methode aus deinem OnUpdate-Event oder Pre-Motion-Update auf.
-     * Nutze NICHT onRender, um Vulcan/Grim Flags zu vermeiden.
-     */
     public void onUpdate(Minecraft client) {
         if (!enabled || client.player == null || client.level == null) return;
 
@@ -67,9 +67,26 @@ public class AimAssist extends Module {
             return;
         }
 
-        if (targetType == 0 && !(target instanceof Player)) return;
+        if (!isValidTarget(target)) return;
 
         applyHumanizedAim(client, target);
+    }
+
+    /**
+     * Prüft, ob eine Entität gemäß den Einstellungen im EntityFilterPicker anvisiert werden darf.
+     */
+    public boolean isValidTarget(Entity entity) {
+        if (!(entity instanceof LivingEntity) || entity == Minecraft.getInstance().player || !entity.isAlive()) {
+            return false;
+        }
+
+        if (entityFilter.isFilterEnabled("Players") && entity instanceof Player) return true;
+        if (entityFilter.isFilterEnabled("Hostiles") && entity instanceof Enemy) return true;
+        if (entityFilter.isFilterEnabled("Animals") && entity instanceof Animal) return true;
+        if (entityFilter.isFilterEnabled("NPCs") && entity instanceof Npc) return true;
+        if (entityFilter.isFilterEnabled("ArmorStands") && entity instanceof ArmorStand) return true;
+
+        return false;
     }
 
     private void applyHumanizedAim(Minecraft client, LivingEntity target) {
@@ -121,7 +138,7 @@ public class AimAssist extends Module {
         return StreamSupport.stream(client.level.entitiesForRendering().spliterator(), false)
                 .filter(e -> e instanceof LivingEntity && e != client.player && e.isAlive())
                 .map(e -> (LivingEntity) e)
-                .filter(e -> targetType == 1 || e instanceof Player)
+                .filter(this::isValidTarget)
                 .filter(e -> client.player.distanceTo(e) <= range)
                 .filter(e -> {
                     float yaw = (float) (Math.toDegrees(Math.atan2(e.getZ() - client.player.getZ(), e.getX() - client.player.getX())) - 90.0);

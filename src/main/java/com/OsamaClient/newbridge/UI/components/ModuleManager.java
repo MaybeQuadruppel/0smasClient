@@ -57,6 +57,11 @@ public class ModuleManager {
         modules.add(new XRay());
         modules.add(new GoTo());
         modules.add(new AutoMiner());
+        modules.add(new Teleport());
+        modules.add(new ChestStealer());
+        modules.add(new FastBreak());
+        modules.add(new FastPlace());
+        modules.add(new KillAura());
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {

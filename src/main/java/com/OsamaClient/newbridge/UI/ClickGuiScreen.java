@@ -1,10 +1,8 @@
 package com.OsamaClient.newbridge.UI;
 
 import com.OsamaClient.newbridge.Config;
-import com.OsamaClient.newbridge.UI.components.BlockPicker;
-import com.OsamaClient.newbridge.UI.components.Component;
+import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
-import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -266,7 +264,7 @@ public class ClickGuiScreen extends Screen {
         int rightX = 140;
 
         for (Component component : selectedModule.settings) {
-            if (component instanceof BlockPicker) {
+            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
                 component.x = rightX;
                 component.y = 38;
             } else {
@@ -486,12 +484,15 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double hAmt, double vAmt) {
-        if (selectedModule != null)
-            for (Component c : selectedModule.settings)
+        if (selectedModule != null) {
+            for (Component c : selectedModule.settings) {
                 if (c instanceof BlockPicker bp && bp.mouseScrolled(mx, my, vAmt)) return true;
+                if (c instanceof ItemPicker ip && ip.mouseScrolled(mx, my, vAmt)) return true;
+                if (c instanceof EntityFilterPicker ep && ep.mouseScrolled(mx, my, vAmt)) return true;
+            }
+        }
         return super.mouseScrolled(mx, my, hAmt, vAmt);
     }
-
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
