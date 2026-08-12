@@ -10,7 +10,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
-import com.OsamaClient.newbridge.UI.components.ToggleButton;
+import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
@@ -21,8 +21,13 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -35,11 +40,9 @@ import java.util.OptionalDouble;
 public class PlayerESP extends Module {
     public static PlayerESP INSTANCE;
 
-    public boolean showPlayers = true;
-    public boolean showHostiles = true;
-    public boolean showPassives = true;
     public float alphaValue = 0.4f;
     public float range = 128;
+    public EntityFilterPicker targetPicker;
 
     private static final RenderPipeline FILLED_PIPELINE = RenderPipelines.register(
             RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
@@ -53,14 +56,14 @@ public class PlayerESP extends Module {
     private MappableRingBuffer vertexBuffer;
 
     public PlayerESP() {
-        super("EnitiyESP", "Lets you See Enitys by their Threadlevels", Category.VISUAL);
+        super("EntityESP", "Lets you See Entities by their Threadlevels", Category.VISUAL);
         INSTANCE = this;
 
-        this.settings.add(new ToggleButton("Show Players", showPlayers, val -> showPlayers = (boolean) val));
-        this.settings.add(new ToggleButton("Show Hostiles", showHostiles, val -> showHostiles = (boolean) val));
-        this.settings.add(new ToggleButton("Show Passives", showPassives, val -> showPassives = (boolean) val));
-        this.settings.add(new Slider("Alpha", 0.0, 1.0, (double) alphaValue, val -> alphaValue = val.floatValue()));
-        this.settings.add(new Slider("Range", 1.0, 128.0, (double) range, val -> range = val.floatValue()));
+        this.targetPicker = new EntityFilterPicker("Targets");
+        this.settings.add(this.targetPicker.withDescription("Selects which entity types to highlight with ESP."));
+
+        this.settings.add(new Slider("Alpha", 0.0, 1.0, (double) alphaValue, val -> alphaValue = val.floatValue()).withDescription("Controls the global transparency multiplier of the ESP rendering."));
+        this.settings.add(new Slider("Range", 1.0, 128.0, (double) range, val -> range = val.floatValue()).withDescription("Sets the maximum distance at which entities are highlighted."));
     }
 
     public static PlayerESP getInstance() {
@@ -92,19 +95,30 @@ public class PlayerESP extends Module {
         for (Entity entity : client.level.getEntities(null, searchBox)) {
             if (!(entity instanceof LivingEntity) || entity == client.player || !entity.isAlive()) continue;
 
-            float r = 1, g = 1, b = 1;
-            boolean valid = false;
+            String filterKey = null;
 
+            // Zuordnung der Entitäten zu den Schlüsseln im EntityFilterPicker
             if (entity instanceof Player) {
-                if (showPlayers) { r = 1; g = 0; b = 0; valid = true; }
+                filterKey = "Players";
+            } else if (entity instanceof ArmorStand) {
+                filterKey = "ArmorStands";
             } else if (entity instanceof Enemy) {
-                if (showHostiles) { r = 1; g = 0.5f; b = 0; valid = true; }
-            } else {
-                if (showPassives) { r = 0; g = 1; b = 0; valid = true; }
+                filterKey = "Hostiles";
+            } else if (entity instanceof Animal) {
+                filterKey = "Animals";
+            } else if (entity instanceof Villager || entity instanceof WanderingTrader) {
+                filterKey = "NPCs";
             }
 
-            if (valid) {
+            if (filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey)) {
                 entitiesFound++;
+
+                // Farbe und Alpha direkt aus dem Picker auslesen
+                int argb = targetPicker.getColor(filterKey);
+                float r = ((argb >> 16) & 0xFF) / 255.0f;
+                float g = ((argb >> 8) & 0xFF) / 255.0f;
+                float b = (argb & 0xFF) / 255.0f;
+                float a = (((argb >> 24) & 0xFF) / 255.0f) * alphaValue;
 
                 double x = Mth.lerp(tickDelta, entity.xOld, entity.getX()) - camPos.x;
                 double y = Mth.lerp(tickDelta, entity.yOld, entity.getY()) - camPos.y;
@@ -113,7 +127,7 @@ public class PlayerESP extends Module {
                 float w = entity.getBbWidth() / 2f;
                 float h = entity.getBbHeight();
 
-                drawFilledBox(new Matrix4f(), buffer, (float) x - w, (float) y, (float) x + w, (float) y + h, (float) z - w, (float) z + w, r, g, b, alphaValue);
+                drawFilledBox(new Matrix4f(), buffer, (float) x - w, (float) y, (float) x + w, (float) y + h, (float) z - w, (float) z + w, r, g, b, a);
             }
         }
 
@@ -166,7 +180,6 @@ public class PlayerESP extends Module {
                 builtBuffer.vertexBuffer()
         );
 
-        // Dynamic Transforms für das DEBUG_FILLED_SNIPPET generieren
         Vector4f colorModulator = new Vector4f(1f, 1f, 1f, 1f);
         Vector3f modelOffset = new Vector3f(0f, 0f, 0f);
         Matrix4f textureMatrix = new Matrix4f();
@@ -176,7 +189,6 @@ public class PlayerESP extends Module {
         try (RenderPass pass = encoder.createRenderPass(() -> "esp_filled_pass", client.gameRenderer.mainRenderTarget().getColorTextureView(), Optional.empty(), client.gameRenderer.mainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
             pass.setPipeline(FILLED_PIPELINE);
 
-            // WICHTIG: Uniforms an den Render-Pass übergeben, damit der Shader weiß, wohin projiziert werden soll
             RenderSystem.bindDefaultUniforms(pass);
             pass.setUniform("DynamicTransforms", dynamicTransforms);
 

@@ -12,8 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
-// TODO: Importiere hier deine MiningAction-Klasse, falls sie in einem anderen Package liegt
-// import com.qdrppl.newbridge.Hacks.Mining.MiningAction;
+
 
 public class AutoMiner extends Module {
 
@@ -27,8 +26,8 @@ public class AutoMiner extends Module {
 
     public AutoMiner() {
         super("AutoMiner", "Farms for you", Category.MISC);
-        this.settings.add(blockPicker);
-        this.settings.add(scanRadius);
+        this.settings.add(blockPicker.withDescription("Selects which blocks to automatically mine."));
+        this.settings.add(scanRadius.withDescription("Sets the radius to scan for target blocks."));
     }
 
     @Override

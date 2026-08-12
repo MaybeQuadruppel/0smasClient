@@ -9,7 +9,11 @@
     "FullBrightMixin",
     "HealthIndicatorMixin",
     "LiquidBlockMixin",
-    "Connection.ClientConnectionMixin"
+    "Connection.ClientConnectionMixin",
+    "AbstractContainerScreenAccessor",
+    "NoRender.NoGuiMixin",
+    "NoRender.RenderEffectLocalPlayerMixin",
+    "NoRender.ScreenEffectRendererMixin"
   ],
   "client": [
     "camera.FreeLookPlayerMixin",

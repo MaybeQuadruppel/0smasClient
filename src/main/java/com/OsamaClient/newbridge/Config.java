@@ -9,6 +9,7 @@ import com.OsamaClient.newbridge.UI.components.*;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 
 import java.io.*;
@@ -40,7 +41,7 @@ public class Config {
                 } else if (c instanceof ColorPicker cp) {
                     settings.addProperty(cp.getLabel(), cp.getColor());
                 } else if (c instanceof BlockPicker bp) {
-                    // Neues Format: Strukturierte Map für Blocks + ARGB (Farbe & Alpha)
+                    // Strukturierte Map für Blocks + ARGB (Farbe & Alpha)
                     JsonObject blockMapObj = new JsonObject();
                     for (Block block : bp.selectedBlocks) {
                         String blockId = BuiltInRegistries.BLOCK.getKey(block).toString();
@@ -48,6 +49,28 @@ public class Config {
                         blockMapObj.addProperty(blockId, color);
                     }
                     settings.add(bp.getLabel(), blockMapObj);
+                } else if (c instanceof ItemPicker ip) {
+                    JsonArray itemsArr = new JsonArray();
+                    for (Item item : ip.selectedItems) {
+                        itemsArr.add(BuiltInRegistries.ITEM.getKey(item).toString());
+                    }
+                    settings.add(ip.getLabel(), itemsArr);
+                } else if (c instanceof EntityFilterPicker efp) {
+                    JsonObject efpObj = new JsonObject();
+
+                    JsonObject filtersObj = new JsonObject();
+                    for (Map.Entry<String, Boolean> entry : efp.filters.entrySet()) {
+                        filtersObj.addProperty(entry.getKey(), entry.getValue());
+                    }
+                    efpObj.add("filters", filtersObj);
+
+                    JsonObject colorsObj = new JsonObject();
+                    for (Map.Entry<String, Integer> entry : efp.colors.entrySet()) {
+                        colorsObj.addProperty(entry.getKey(), entry.getValue());
+                    }
+                    efpObj.add("colors", colorsObj);
+
+                    settings.add(efp.getLabel(), efpObj);
                 }
             }
             moduleObj.add("settings", settings);
@@ -62,10 +85,20 @@ public class Config {
         }
         root.add("keybinds", bindsObj);
 
-        // 3. GUI Settings (Slider) speichern
+        // 3. GUI Settings (Slider, Panel-Layout) speichern
         JsonObject guiObj = new JsonObject();
         guiObj.addProperty("panelWidth", ClickGuiScreen.dynColW);
         guiObj.addProperty("rowHeight", ClickGuiScreen.dynModH);
+
+        JsonObject panelPosObj = new JsonObject();
+        for (Map.Entry<Module.Category, int[]> entry : ClickGuiScreen.panelPos.entrySet()) {
+            JsonObject posObj = new JsonObject();
+            posObj.addProperty("x", entry.getValue()[0]);
+            posObj.addProperty("y", entry.getValue()[1]);
+            panelPosObj.add(entry.getKey().name(), posObj);
+        }
+        guiObj.add("panelPositions", panelPosObj);
+
         root.add("gui_settings", guiObj);
 
         try (Writer w = new FileWriter(CONFIG_PATH.toFile())) {
@@ -120,6 +153,22 @@ public class Config {
                 JsonObject guiObj = root.getAsJsonObject("gui_settings");
                 if (guiObj.has("panelWidth")) ClickGuiScreen.dynColW = guiObj.get("panelWidth").getAsInt();
                 if (guiObj.has("rowHeight")) ClickGuiScreen.dynModH = guiObj.get("rowHeight").getAsInt();
+
+                if (guiObj.has("panelPositions")) {
+                    JsonObject panelPosObj = guiObj.getAsJsonObject("panelPositions");
+                    for (Map.Entry<String, JsonElement> entry : panelPosObj.entrySet()) {
+                        try {
+                            Module.Category cat = Module.Category.valueOf(entry.getKey());
+                            JsonObject posObj = entry.getValue().getAsJsonObject();
+                            ClickGuiScreen.panelPos.put(cat, new int[]{
+                                    posObj.get("x").getAsInt(),
+                                    posObj.get("y").getAsInt()
+                            });
+                        } catch (IllegalArgumentException ignored) {
+                            // unbekannte/veraltete Kategorie in der gespeicherten Config, überspringen
+                        }
+                    }
+                }
             }
 
         } catch (IOException e) {
@@ -151,6 +200,39 @@ public class Config {
                         bp.selectedBlocks.add(block);
                         RenderUtils.BLOCK_COLORS.put(block, savedColor);
                     });
+                }
+            }
+        } else if (c instanceof ItemPicker ip && settings.has(ip.getLabel())) {
+            ip.selectedItems.clear();
+
+            JsonElement el = settings.get(ip.getLabel());
+
+            if (el != null && el.isJsonArray()) {
+                for (JsonElement itemEl : el.getAsJsonArray()) {
+                    Identifier loc = Identifier.parse(itemEl.getAsString());
+                    BuiltInRegistries.ITEM.getOptional(loc).ifPresent(ip.selectedItems::add);
+                }
+            }
+        } else if (c instanceof EntityFilterPicker efp && settings.has(efp.getLabel())) {
+            JsonElement el = settings.get(efp.getLabel());
+
+            if (el != null && el.isJsonObject()) {
+                JsonObject efpObj = el.getAsJsonObject();
+
+                if (efpObj.has("filters")) {
+                    JsonObject filtersObj = efpObj.getAsJsonObject("filters");
+                    for (Map.Entry<String, JsonElement> entry : filtersObj.entrySet()) {
+                        if (efp.filters.containsKey(entry.getKey())) {
+                            efp.filters.put(entry.getKey(), entry.getValue().getAsBoolean());
+                        }
+                    }
+                }
+
+                if (efpObj.has("colors")) {
+                    JsonObject colorsObj = efpObj.getAsJsonObject("colors");
+                    for (Map.Entry<String, JsonElement> entry : colorsObj.entrySet()) {
+                        efp.colors.put(entry.getKey(), entry.getValue().getAsInt());
+                    }
                 }
             }
         }

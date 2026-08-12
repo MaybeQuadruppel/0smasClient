@@ -24,16 +24,11 @@ public class Reach extends Module {
     public Reach() {
         super("Reach", "Lets you hit further", Category.COMBAT);
 
-
-        this.settings.add(new Slider("Range", 3.5, 10.0, maxRange, val -> maxRange = val));
-
-        this.settings.add(new ToggleButton("Legit Mode", legitMode, val -> legitMode = val));
-
-        this.settings.add(new Slider("Legit Chance %", 10.0, 30.0, legitChance, val -> legitChance = val));
-
-
-        this.settings.add(new ToggleButton("Players", targetPlayers, val -> targetPlayers = val));
-        this.settings.add(new ToggleButton("Monsters", targetHostile, val -> targetHostile = val));
+        this.settings.add(new Slider("Range", 3.5, 10.0, maxRange, val -> maxRange = val).withDescription("Sets the extended attack reach distance."));
+        this.settings.add(new ToggleButton("Legit Mode", legitMode, val -> legitMode = val).withDescription("Only applies reach under certain conditions to look more natural."));
+        this.settings.add(new Slider("Legit Chance %", 10.0, 30.0, legitChance, val -> legitChance = val).withDescription("Probability percentage for the reach to apply in Legit Mode."));
+        this.settings.add(new ToggleButton("Players", targetPlayers, val -> targetPlayers = val).withDescription("Enables reach extension against player targets."));
+        this.settings.add(new ToggleButton("Monsters", targetHostile, val -> targetHostile = val).withDescription("Enables reach extension against hostile monster targets."));
     }
 
     @Override

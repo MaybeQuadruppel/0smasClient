@@ -15,7 +15,7 @@ public class FakeLag extends Module {
 
     public FakeLag() {
         super("FakeLag", "Delays your movement packets to simulate lag.", Category.MISC);
-        this.settings.add(new Slider("Tick Limit", 1.0, 40.0, tickLimit, val -> tickLimit = val));
+        this.settings.add(new Slider("Tick Limit", 1.0, 40.0, tickLimit, val -> tickLimit = val).withDescription("Maximum number of ticks to delay movement packets."));
     }
 
     @Override

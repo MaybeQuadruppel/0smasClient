@@ -23,8 +23,8 @@ public class Trajectories extends Module {
     public Trajectories() {
         super("Trajectories", "Predicts the flight path of arrows and targets", Category.VISUAL);
 
-        this.settings.add(new ColorPicker("Color", trajColor, (newColor) -> this.trajColor = newColor));
-        this.settings.add(new ToggleButton("Show Path", showPath, (val) -> this.showPath = val));
+        this.settings.add(new ColorPicker("Color", trajColor, (newColor) -> this.trajColor = newColor).withDescription("Sets the color of the trajectory prediction line."));
+        this.settings.add(new ToggleButton("Show Path", showPath, (val) -> this.showPath = val).withDescription("Enables or disables rendering of the flight path."));
 
         LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(context -> {
             if (!this.enabled) return;

@@ -37,12 +37,12 @@ public class SwordBot extends Module {
 
     public SwordBot() {
         super("ComboBot", "A Prototype SwordBot", Category.COMBAT);
-        this.settings.add(new Slider("Lock Range", 3.0, 12.0, lockRange, val -> lockRange = val));
-        this.settings.add(new Slider("Lose Range", 5.0, 15.0, loseRange, val -> loseRange = val));
-        this.settings.add(new Slider("W-Tap Range", 3.0, 6.0, wTapRange, val -> wTapRange = val));
-        this.settings.add(new Slider("CritMode", 0.1, 5.0, CritEnable, val -> CritEnable = val));
-        this.settings.add(new Slider("Smoothness", 0.05, 0.5, smoothSpeed, val -> smoothSpeed = val));
-        this.settings.add(new ToggleButton("Strafing", doStrafing, val -> doStrafing = val));
+        this.settings.add(new Slider("Lock Range", 3.0, 12.0, lockRange, val -> lockRange = val).withDescription("Maximum distance to lock onto a target."));
+        this.settings.add(new Slider("Lose Range", 5.0, 15.0, loseRange, val -> loseRange = val).withDescription("Distance at which the bot loses focus on the target."));
+        this.settings.add(new Slider("W-Tap Range", 3.0, 6.0, wTapRange, val -> wTapRange = val).withDescription("Distance threshold to perform a W-tap for optimal knockback."));
+        this.settings.add(new Slider("CritMode", 0.1, 5.0, CritEnable, val -> CritEnable = val).withDescription("Threshold or frequency for executing critical hits."));
+        this.settings.add(new Slider("Smoothness", 0.05, 0.5, smoothSpeed, val -> smoothSpeed = val).withDescription("Controls how smoothly the bot aims and tracks targets."));
+        this.settings.add(new ToggleButton("Strafing", doStrafing, val -> doStrafing = val).withDescription("Automatically strafes around the target during combat."));
         // Sprint Jump Setting entfernt
     }
 

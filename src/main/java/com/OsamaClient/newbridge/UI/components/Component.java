@@ -8,6 +8,9 @@ public abstract class Component {
     /** Internal hover animation state (0 = not hovered, 1 = fully hovered). */
     protected float hoverAnim = 0f;
 
+    /** Optional tooltip text shown when hovering this component. */
+    protected String description = null;
+
     public Component() {}
 
     public abstract void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY);
@@ -29,6 +32,16 @@ public abstract class Component {
     public boolean handleKeyboard(net.minecraft.client.input.KeyEvent event)  { return false; }
     public boolean charTyped(net.minecraft.client.input.CharacterEvent event) { return false; }
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event)      { return false; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    /** Fluent helper, e.g. {@code new Slider(...).withDescription("...")} */
+    @SuppressWarnings("unchecked")
+    public <T extends Component> T withDescription(String description) {
+        this.description = description;
+        return (T) this;
+    }
 
 
     /** Filled rounded rectangle. */

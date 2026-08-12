@@ -23,8 +23,8 @@ public class Scaffold extends Module {
     public Scaffold() {
         super("Scaffold", "Silent placement for 1.26+", Category.MISC);
         INSTANCE = this;
-        this.settings.add(new ToggleButton("Allow Sprint", sprint, val -> sprint = val));
-        this.settings.add(new ToggleButton("Tower", tower, val -> tower = val));
+        this.settings.add(new ToggleButton("Allow Sprint", sprint, val -> sprint = val).withDescription("Allows you to sprint while placing blocks."));
+        this.settings.add(new ToggleButton("Tower", tower, val -> tower = val).withDescription("Automatically places blocks underneath you to tower upwards."));
     }
 
     public void onUpdate(Minecraft client) {

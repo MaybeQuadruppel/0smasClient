@@ -17,9 +17,8 @@ public class FastPlace extends Module {
         super("FastPlace", "Removes placement delay for blocks", Category.MISC);
         INSTANCE = this;
 
-        this.settings.add(new Slider("Delay", 0.0, 4.0, delay, val -> delay = val));
+        this.settings.add(new Slider("Delay", 0.0, 4.0, delay, val -> delay = val).withDescription("Sets the block placement delay in ticks."));
 
-        // Reflection vorbereiten für den internen Delay-Timer
         try {
             for (Field field : Minecraft.class.getDeclaredFields()) {
                 if (field.getType() == int.class) {

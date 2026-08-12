@@ -13,7 +13,7 @@ public class Jesus extends Module {
 
     public Jesus() {
         super("Jesus", "Allows you to walk on water and lava like a solid block.", Category.MOVEMENT);
-        this.settings.add(new ToggleButton("Lava Support", walkOnLava, val -> walkOnLava = val));
+        this.settings.add(new ToggleButton("Lava Support", walkOnLava, val -> walkOnLava = val).withDescription("Enables walking on lava in addition to water."));
     }
 
     @Override

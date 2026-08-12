@@ -17,16 +17,14 @@ public class NoFall extends Module {
 
     public NoFall() {
         super("NoFall","Lets you take no Falldamage", Category.MOVEMENT);
-
-
-        this.settings.add(new Slider("Min Distance", 1.0, 5.0, fallDistTrigger, val -> fallDistTrigger = val));
+        this.settings.add(new Slider("Min Distance", 1.0, 5.0, fallDistTrigger, val -> fallDistTrigger = val).withDescription("Sets the minimum fall distance required to trigger NoFall protection."));
         this.settings.add(new ToggleButton("Packet Mode", true, val -> {
             if (val) {
                 this.noFallMode = Mode.PACKET;
             } else {
                 this.noFallMode = Mode.CATCH;
             }
-        }));
+        }).withDescription("Switches between packet-based cancellation and catch modes."));
     }
 
     @Override

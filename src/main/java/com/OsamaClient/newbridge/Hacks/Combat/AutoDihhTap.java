@@ -39,8 +39,8 @@ public class AutoDihhTap extends Module {
     public AutoDihhTap() {
         super("AutoDihhTap", "Automated crystal sequence for DihhTap", Category.COMBAT);
 
-        this.settings.add(new Slider("Rotation Speed", 1.0, 20.0, 7.0, val -> rotationSpeed = val));
-        this.settings.add(new ModeButton("Activation", Arrays.asList("Auto", "Manual"), 0, val -> mode = val));
+        this.settings.add(new Slider("Rotation Speed", 1.0, 20.0, 7.0, val -> rotationSpeed = val).withDescription("Controls how fast the camera rotates during the crystal sequence."));
+        this.settings.add(new ModeButton("Activation", Arrays.asList("Auto", "Manual"), 0, val -> mode = val).withDescription("Sets whether the sequence triggers automatically or manually."));
     }
 
     @Override

@@ -37,12 +37,12 @@ public class KillAura extends Module {
         super("KillAura", "Attacks surrounding entities automatically", Category.COMBAT);
         INSTANCE = this;
 
-        this.entityFilter = new EntityFilterPicker("Targets");
+        this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
 
-        this.settings.add(new Slider("Range", 1.0, 6.0, (double) range, val -> range = val.floatValue()));
-        this.settings.add(new Slider("CPS", 1.0, 20.0, (double) cps, val -> cps = val.floatValue()));
-        this.settings.add(new ToggleButton("1.9 Cooldown", useCooldown, val -> useCooldown = val));
-        this.settings.add(new ToggleButton("Rotations", rotate, val -> rotate = val));
+        this.settings.add(new Slider("Range", 1.0, 6.0, (double) range, val -> range = val.floatValue()).withDescription("Maximum distance to attack entities."));
+        this.settings.add(new Slider("CPS", 1.0, 20.0, (double) cps, val -> cps = val.floatValue()).withDescription("Clicks per second for attacking."));
+        this.settings.add(new ToggleButton("1.9 Cooldown", useCooldown, val -> useCooldown = val).withDescription("Waits for the 1.9+ attack cooldown before swinging."));
+        this.settings.add(new ToggleButton("Rotations", rotate, val -> rotate = val).withDescription("Automatically rotates towards the target entity."));
         this.settings.add(this.entityFilter);
     }
 

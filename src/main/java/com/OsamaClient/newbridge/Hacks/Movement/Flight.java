@@ -22,10 +22,10 @@ public class Flight extends Module {
 
     public Flight() {
         super("Flight","Go like a Plane...", Category.MOVEMENT);
-        this.settings.add(new Slider("Speed", 0.05, 1.0, speed, val -> speed = val));
-        this.settings.add(new ToggleButton("V-Match", verticalSpeedMatch, val -> verticalSpeedMatch = val));
-        this.settings.add(new ToggleButton("Anti-Kick", antiKick, val -> antiKick = val));
-        this.settings.add(new Slider("Kick Delay", 10, 100, delay, val -> delay = val.intValue()));
+        this.settings.add(new Slider("Speed", 0.05, 1.0, speed, val -> speed = val).withDescription("Sets the flight movement speed."));
+        this.settings.add(new ToggleButton("V-Match", verticalSpeedMatch, val -> verticalSpeedMatch = val).withDescription("Matches vertical speed for consistent movement."));
+        this.settings.add(new ToggleButton("Anti-Kick", antiKick, val -> antiKick = val).withDescription("Prevents server-side kick checks by performing anti-kick bypasses."));
+        this.settings.add(new Slider("Kick Delay", 10, 100, delay, val -> delay = val.intValue()).withDescription("Sets the delay between anti-kick movements."));
     }
 
     @Override

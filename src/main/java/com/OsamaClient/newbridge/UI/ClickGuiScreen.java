@@ -27,10 +27,14 @@ public class ClickGuiScreen extends Screen {
     private float backBtnHover = 0f;
 
     // ── Draggable panels ──────────────────────────────────────────────────────
-    private final Map<Module.Category, int[]> panelPos = new LinkedHashMap<>();
+    public static final Map<Module.Category, int[]> panelPos = new LinkedHashMap<>();
     private Module.Category draggingCat = null;
     private int dragOffX, dragOffY;
     private int lastMouseX, lastMouseY;
+
+    // ── Panel scroll ──────────────────────────────────────────────────────────
+    private final Map<Module.Category, Integer> panelScroll = new HashMap<>();
+    private static final int PANEL_BOTTOM_PAD = 10;
 
     // ── Dynamic layout (bottom-right sliders) ─────────────────────────────────
     public static int dynColW = 88;
@@ -47,6 +51,13 @@ public class ClickGuiScreen extends Screen {
 
     public static final Map<String, Integer> keybinds = new HashMap<>();
     private String bindingModule = null;
+
+    // ── Settings scroll ──────────────────────────────────────────────────────
+    private double settingsScrollOffset = 0;
+    private int settingsMaxScroll = 0;
+    private static final int SETTINGS_LIST_TOP   = 38;
+    private static final int SETTINGS_BOTTOM_PAD = 8;
+    private static final int SCROLL_STEP         = 18;
 
     // ── Black & White Palette ─────────────────────────────────────────────────
     private static final int C_OVERLAY      = 0xBB000000; // semi-transparent black
@@ -101,7 +112,6 @@ public class ClickGuiScreen extends Screen {
                                    int mouseX, int mouseY, float delta) {
         float fade = easeOut(rawFade());
 
-        // Store mouse position so drag logic can use it in renderBRSliders
         lastMouseX = mouseX;
         lastMouseY = mouseY;
 
@@ -136,7 +146,7 @@ public class ClickGuiScreen extends Screen {
 
     // ── Module list ───────────────────────────────────────────────────────────
 
-    private void renderModuleList(GuiGraphicsExtractor g, // FIX: was 'guiGraphics' below
+    private void renderModuleList(GuiGraphicsExtractor g,
                                   int mouseX, int mouseY, float fade) {
         Module hoveredModule = null;
 
@@ -147,83 +157,98 @@ public class ClickGuiScreen extends Screen {
             int[] pos    = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
             int   panelX = pos[0] + (int)((1f - fade) * -12);
             int   panelY = pos[1];
-            int   frameH = HDR_H + Math.max(1, modules.size()) * dynModH + 6;
+
+            int visibleRows = computeVisibleRows(panelY, modules.size());
+            int frameH      = HDR_H + visibleRows * dynModH + 6;
+
+            int maxScroll = Math.max(0, modules.size() - visibleRows);
+            int scroll    = Math.max(0, Math.min(panelScroll.getOrDefault(cat, 0), maxScroll));
+            panelScroll.put(cat, scroll);
 
             Component.drawShadow(g, panelX - 2, panelY, dynColW + 4, frameH);
 
-            // Panel body
             Component.drawRoundedRect(g, panelX - 2, panelY, dynColW + 4, frameH, C_PANEL_BG);
-            // Header
             Component.drawRoundedRect(g, panelX - 2, panelY, dynColW + 4, HDR_H, C_PANEL_HEADER);
 
-            // Top accent bar — white when dragging, grey otherwise
             boolean hdrHov = mouseX >= panelX - 2 && mouseX <= panelX + dynColW + 2
                     && mouseY >= panelY      && mouseY <= panelY + HDR_H;
             int topBarColor = draggingCat == cat ? C_ACCENT
                     : hdrHov ? C_ACCENT
                     : C_ACCENT_DIM;
-            g.fill(panelX, panelY, panelX + dynColW, panelY + 2, topBarColor); // FIX: was guiGraphics.fill
+            g.fill(panelX, panelY, panelX + dynColW, panelY + 2, topBarColor);
 
-            // Category name
             g.text(this.font, "\u2630 " + cat.name(),
                     panelX + 5, panelY + (HDR_H / 2) - 4,
                     hdrHov ? C_ACCENT : C_TEXT, false);
 
-            // Separator
             g.fill(panelX, panelY + HDR_H, panelX + dynColW, panelY + HDR_H + 1, C_SEPARATOR);
 
-            int rowY = panelY + HDR_H + 3;
+            int listTop    = panelY + HDR_H + 3;
+            int listBottom = listTop + visibleRows * dynModH;
+
+            g.enableScissor(panelX - 2, listTop, panelX + dynColW + 2, listBottom);
+
+            int rowY = listTop;
 
             if (modules.isEmpty()) {
                 g.text(this.font, "no results",
                         panelX + 7, rowY + (dynModH / 2) - 4, C_TEXT_DIM, false);
-                rowY += dynModH;
-            }
+            } else {
+                for (int i = 0; i < visibleRows; i++) {
+                    int idx = i + scroll;
+                    if (idx >= modules.size()) break;
+                    Module module = modules.get(idx);
 
-            for (Module module : modules) {
-                boolean hov = mouseX >= panelX && mouseX <= panelX + dynColW
-                        && mouseY >= rowY   && mouseY <= rowY + dynModH;
+                    boolean hov = mouseX >= panelX && mouseX <= panelX + dynColW
+                            && mouseY >= rowY   && mouseY <= rowY + dynModH;
 
-                float hp = moduleHover.getOrDefault(module.name, 0f);
-                hp = hov ? Math.min(1f, hp + 0.14f) : Math.max(0f, hp - 0.14f);
-                moduleHover.put(module.name, hp);
-                if (hov) hoveredModule = module;
+                    float hp = moduleHover.getOrDefault(module.name, 0f);
+                    hp = hov ? Math.min(1f, hp + 0.14f) : Math.max(0f, hp - 0.14f);
+                    moduleHover.put(module.name, hp);
+                    if (hov) hoveredModule = module;
 
-                // Hover tint
-                if (hp > 0.01f)
-                    Component.drawRoundedRect(g, panelX + 1, rowY, dynColW - 2, dynModH - 1,
-                            Component.withAlpha(0xFFFFFFFF, hp * 0.07f));
+                    if (hp > 0.01f)
+                        Component.drawRoundedRect(g, panelX + 1, rowY, dynColW - 2, dynModH - 1,
+                                Component.withAlpha(0xFFFFFFFF, hp * 0.07f));
 
-                // Left bar: white if enabled, dark grey if not
-                int barColor = module.enabled
-                        ? Component.lerpColor(C_DISABLED, C_ENABLED, 0.8f + hp * 0.2f)
-                        : Component.lerpColor(C_DISABLED, C_ACCENT_DIM, hp * 0.6f);
-                g.fill(panelX + 1, rowY + 2, panelX + 3, rowY + dynModH - 2, barColor);
+                    int barColor = module.enabled
+                            ? Component.lerpColor(C_DISABLED, C_ENABLED, 0.8f + hp * 0.2f)
+                            : Component.lerpColor(C_DISABLED, C_ACCENT_DIM, hp * 0.6f);
+                    g.fill(panelX + 1, rowY + 2, panelX + 3, rowY + dynModH - 2, barColor);
 
-                // Module name
-                int nameColor = module.enabled
-                        ? Component.lerpColor(C_ACCENT_DIM, C_ENABLED, 0.7f + hp * 0.3f)
-                        : Component.lerpColor(C_TEXT_DIM, C_TEXT, hp);
-                g.text(this.font, module.name,
-                        panelX + 7, rowY + (dynModH / 2) - 4, nameColor, false);
+                    int nameColor = module.enabled
+                            ? Component.lerpColor(C_ACCENT_DIM, C_ENABLED, 0.7f + hp * 0.3f)
+                            : Component.lerpColor(C_TEXT_DIM, C_TEXT, hp);
+                    g.text(this.font, module.name,
+                            panelX + 7, rowY + (dynModH / 2) - 4, nameColor, false);
 
-                // Keybind badge
-                boolean isBound   = keybinds.containsKey(module.name);
-                boolean isBinding = module.name.equals(bindingModule);
-                if (isBound || isBinding) {
-                    String kStr = isBinding
-                            ? ((System.currentTimeMillis() / 400) % 2 == 0 ? "[?]" : "[ ]")
-                            : "[" + keyName(keybinds.get(module.name)) + "]";
-                    int kColor = isBinding ? C_BIND_PULSE : C_KEYBIND;
-                    int kw = this.font.width(kStr);
-                    g.text(this.font, kStr,
-                            panelX + dynColW - kw - 3, rowY + (dynModH / 2) - 4, kColor, false);
+                    boolean isBound   = keybinds.containsKey(module.name);
+                    boolean isBinding = module.name.equals(bindingModule);
+                    if (isBound || isBinding) {
+                        String kStr = isBinding
+                                ? ((System.currentTimeMillis() / 400) % 2 == 0 ? "[?]" : "[ ]")
+                                : "[" + keyName(keybinds.get(module.name)) + "]";
+                        int kColor = isBinding ? C_BIND_PULSE : C_KEYBIND;
+                        int kw = this.font.width(kStr);
+                        g.text(this.font, kStr,
+                                panelX + dynColW - kw - 3, rowY + (dynModH / 2) - 4, kColor, false);
+                    }
+
+                    rowY += dynModH;
                 }
-
-                rowY += dynModH;
             }
 
-            // Panel border
+            g.disableScissor();
+
+            if (modules.size() > visibleRows) {
+                int sbX = panelX + dynColW - 1;
+                int listH = listBottom - listTop;
+                int thumbH = Math.max(10, (int) (listH * (visibleRows / (float) modules.size())));
+                int thumbY = listTop + (int) ((listH - thumbH) * (scroll / (float) maxScroll));
+                g.fill(sbX, listTop, sbX + 2, listBottom, C_SEPARATOR);
+                g.fill(sbX, thumbY, sbX + 2, thumbY + thumbH, C_ACCENT_DIM);
+            }
+
             Component.drawRoundedOutline(g, panelX - 2, panelY, dynColW + 4, frameH, C_SEPARATOR);
         }
 
@@ -231,6 +256,13 @@ public class ClickGuiScreen extends Screen {
                 && hoveredModule.description != null
                 && !hoveredModule.description.isEmpty())
             renderTooltip(g, hoveredModule.description, mouseX, mouseY);
+    }
+
+    private int computeVisibleRows(int panelY, int moduleCount) {
+        int availH  = this.height - panelY - HDR_H - 6 - PANEL_BOTTOM_PAD;
+        int maxRows = Math.max(1, availH / dynModH);
+        int display = Math.max(1, moduleCount);
+        return Math.min(display, maxRows);
     }
 
     private List<Module> getFilteredModules(Module.Category cat) {
@@ -260,23 +292,70 @@ public class ClickGuiScreen extends Screen {
         g.text(this.font, "Settings  \u2014  " + selectedModule.name, 102, 14, C_TEXT, false);
         g.fill(8, 32, this.width - 8, 33, C_SEPARATOR);
 
-        int leftY  = 38;
         int rightX = 140;
+
+        Component hoveredComponent = null;
+
+        int contentHeight = 0;
+        for (Component component : selectedModule.settings) {
+            if (!(component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker)) {
+                contentHeight += component.height + 5;
+            }
+        }
+
+        int viewBottom = this.height - SETTINGS_BOTTOM_PAD;
+        int viewHeight = Math.max(0, viewBottom - SETTINGS_LIST_TOP);
+        settingsMaxScroll = Math.max(0, contentHeight - viewHeight);
+        settingsScrollOffset = Math.max(0, Math.min(settingsScrollOffset, settingsMaxScroll));
+
+        g.enableScissor(0, SETTINGS_LIST_TOP, this.width, viewBottom);
+
+        int leftY = SETTINGS_LIST_TOP - (int) settingsScrollOffset;
+        for (Component component : selectedModule.settings) {
+            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
+                continue;
+            }
+            component.x = 15;
+            component.y = leftY;
+            if (component.y + component.height >= SETTINGS_LIST_TOP && component.y <= viewBottom) {
+                component.render(g, mouseX, mouseY);
+                if (component.getDescription() != null && !component.getDescription().isEmpty()
+                        && mouseX >= component.x && mouseX <= component.x + component.width
+                        && mouseY >= Math.max(component.y, SETTINGS_LIST_TOP)
+                        && mouseY <= Math.min(component.y + component.height, viewBottom)) {
+                    hoveredComponent = component;
+                }
+            }
+            leftY += component.height + 5;
+        }
+
+        g.disableScissor();
 
         for (Component component : selectedModule.settings) {
             if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
                 component.x = rightX;
-                component.y = 38;
-            } else {
-                component.x = 15;
-                component.y = leftY;
-                leftY += component.height + 5;
+                component.y = SETTINGS_LIST_TOP;
+                component.render(g, mouseX, mouseY);
+                if (component.getDescription() != null && !component.getDescription().isEmpty()
+                        && mouseX >= component.x && mouseX <= component.x + component.width
+                        && mouseY >= component.y && mouseY <= component.y + component.height) {
+                    hoveredComponent = component;
+                }
             }
-            component.render(g, mouseX, mouseY);
         }
+
+        if (settingsMaxScroll > 0) {
+            int trackX = this.width - 6;
+            Component.drawRoundedRect(g, trackX, SETTINGS_LIST_TOP, 3, viewHeight, 0xFF1A1A1A);
+            int thumbH = Math.max(20, (int) (viewHeight * (viewHeight / (float) contentHeight)));
+            int thumbY = SETTINGS_LIST_TOP
+                    + (int) ((viewHeight - thumbH) * (settingsScrollOffset / (float) settingsMaxScroll));
+            Component.drawRoundedRect(g, trackX, thumbY, 3, thumbH, C_ACCENT_DIM);
+        }
+
+        if (hoveredComponent != null)
+            renderTooltip(g, hoveredComponent.getDescription(), mouseX, mouseY);
     }
-
-
 
     private void renderSearchBar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         if (!searchActive) {
@@ -294,8 +373,6 @@ public class ClickGuiScreen extends Screen {
         Component.drawRoundedRect(   g, barX, barY, barW, barH, 0xF00A0A0A);
         Component.drawRoundedOutline(g, barX, barY, barW, barH, C_ACCENT);
 
-        // --- BLINK LOGIK ---
-        // Cursor blinkt nur, wenn das Suchfeld über STRG+F auch wirklich auf dem Bildschirm aktiv ist
         boolean showCursor = searchActive && ((System.currentTimeMillis() / 500) % 2 == 0);
         String cursor  = showCursor ? "|" : "";
 
@@ -315,7 +392,6 @@ public class ClickGuiScreen extends Screen {
         Component.drawRoundedOutline(g, bx, by, w, 15, C_ACCENT);
         g.text(this.font, msg, bx + 4, by + 4, C_BIND_PULSE, false);
     }
-
 
     private void renderBRSliders(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         final int SW = 100, SH = 13, TH = 3, PAD = 6, GAP = 16;
@@ -337,7 +413,6 @@ public class ClickGuiScreen extends Screen {
                 (dynColW - COL_MIN) / (float)(COL_MAX - COL_MIN),
                 C_ACCENT, brDrag == 1);
 
-        // Row-height slider
         int ROW_MIN = 11, ROW_MAX = 22;
         if (brDrag == 2) {
             dynModH = ROW_MIN + (int)(Math.min(1f, Math.max(0f,
@@ -366,7 +441,6 @@ public class ClickGuiScreen extends Screen {
         return this.height - totalH - 6;
     }
     private int brSliderX() { return this.width - 100 - 8; }
-
 
     private void renderTooltip(GuiGraphicsExtractor g, String desc, int mx, int my) {
         List<net.minecraft.network.chat.FormattedText> lines =
@@ -421,7 +495,6 @@ public class ClickGuiScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
         int mx = (int) event.x(), my = (int) event.y(), btn = event.button();
 
-        // Bottom-right sliders
         int bsx = brSliderX();
         int s1y = brS1Y();
         int s2y = s1y + 10 + 13 + 16;
@@ -431,7 +504,6 @@ public class ClickGuiScreen extends Screen {
         }
 
         if (selectedModule == null) {
-            // Panel header — start drag
             if (btn == 0) {
                 for (Module.Category cat : Module.Category.values()) {
                     int[] pos = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
@@ -445,14 +517,21 @@ public class ClickGuiScreen extends Screen {
                 }
             }
 
-            // Module rows
             for (Module.Category cat : Module.Category.values()) {
                 int[] pos = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
-                int rowY  = pos[1] + HDR_H + 3;
-                for (Module module : getFilteredModules(cat)) {
+                List<Module> modules = getFilteredModules(cat);
+                int visibleRows = computeVisibleRows(pos[1], modules.size());
+                int maxScroll   = Math.max(0, modules.size() - visibleRows);
+                int scroll      = Math.max(0, Math.min(panelScroll.getOrDefault(cat, 0), maxScroll));
+
+                int rowY = pos[1] + HDR_H + 3;
+                for (int i = 0; i < visibleRows; i++) {
+                    int idx = i + scroll;
+                    if (idx >= modules.size()) break;
+                    Module module = modules.get(idx);
                     if (mx >= pos[0] && mx <= pos[0] + dynColW
                             && my >= rowY && my <= rowY + dynModH) {
-                        if      (btn == 1) { selectedModule = module; bindingModule = null; }
+                        if      (btn == 1) { selectedModule = module; bindingModule = null; settingsScrollOffset = 0; }
                         else if (btn == 0) module.toggle();
                         else if (btn == 2) bindingModule = module.name;
                         return true;
@@ -463,6 +542,7 @@ public class ClickGuiScreen extends Screen {
         } else {
             if (mx >= 8 && mx <= 94 && my >= 8 && my <= 28) {
                 selectedModule = null;
+                settingsScrollOffset = 0;
                 return true;
             }
             for (Component c : selectedModule.settings)
@@ -489,6 +569,29 @@ public class ClickGuiScreen extends Screen {
                 if (c instanceof BlockPicker bp && bp.mouseScrolled(mx, my, vAmt)) return true;
                 if (c instanceof ItemPicker ip && ip.mouseScrolled(mx, my, vAmt)) return true;
                 if (c instanceof EntityFilterPicker ep && ep.mouseScrolled(mx, my, vAmt)) return true;
+            }
+            if (settingsMaxScroll > 0) {
+                settingsScrollOffset -= vAmt * SCROLL_STEP;
+                settingsScrollOffset = Math.max(0, Math.min(settingsScrollOffset, settingsMaxScroll));
+                return true;
+            }
+        } else {
+            for (Module.Category cat : Module.Category.values()) {
+                int[] pos = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
+                List<Module> modules = getFilteredModules(cat);
+                int visibleRows = computeVisibleRows(pos[1], modules.size());
+                int frameH      = HDR_H + visibleRows * dynModH + 6;
+
+                if (mx >= pos[0] - 2 && mx <= pos[0] + dynColW + 2
+                        && my >= pos[1] && my <= pos[1] + frameH) {
+                    int maxScroll = Math.max(0, modules.size() - visibleRows);
+                    if (maxScroll <= 0) return true;
+                    int scroll = panelScroll.getOrDefault(cat, 0);
+                    if      (vAmt > 0 && scroll > 0)         scroll--;
+                    else if (vAmt < 0 && scroll < maxScroll) scroll++;
+                    panelScroll.put(cat, scroll);
+                    return true;
+                }
             }
         }
         return super.mouseScrolled(mx, my, hAmt, vAmt);

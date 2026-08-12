@@ -13,7 +13,7 @@ public class Spider extends Module {
     public Spider() {
         super("Spider","Lets you climb walls", Category.MOVEMENT);
 
-        this.settings.add(new Slider("Climb Speed", 0.1, 1.0, climbSpeed, val -> climbSpeed = val));
+        this.settings.add(new Slider("Climb Speed", 0.1, 1.0, climbSpeed, val -> climbSpeed = val).withDescription("Sets the speed at which you climb up walls."));
     }
 
     @Override

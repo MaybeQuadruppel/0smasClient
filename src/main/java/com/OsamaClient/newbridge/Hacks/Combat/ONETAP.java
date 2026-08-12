@@ -14,12 +14,13 @@ public class ONETAP extends Module {
     private int spamPackets    = 8;
     private int attackCount    = 5;
     private int heightIncrease = 9;
-public ONETAP() {
+
+    public ONETAP() {
         super("ONETAP", "Spoofs Y position to boost mace damage", Category.COMBAT);
-        settings.add(new Slider("FallHeight",     0, 45, 49, v -> fallHeight     = v.intValue()));
-        settings.add(new Slider("SpamPackets",    0, 17,  8, v -> spamPackets    = v.intValue()));
-        settings.add(new Slider("Attacks",        0,  10,  5, v -> attackCount    = v.intValue()));
-        settings.add(new Slider("HeightIncrease", 0, 20,  9, v -> heightIncrease = v.intValue()));
+        settings.add(new Slider("FallHeight", 0, 45, 49, v -> fallHeight = v.intValue()).withDescription("Sets the spoofed fall height for mace damage calculation."));
+        settings.add(new Slider("SpamPackets", 0, 17, 8, v -> spamPackets = v.intValue()).withDescription("Number of packets sent to spoof the fall height."));
+        settings.add(new Slider("Attacks", 0, 10, 5, v -> attackCount = v.intValue()).withDescription("Number of attacks executed during the exploit."));
+        settings.add(new Slider("HeightIncrease", 0, 20, 9, v -> heightIncrease = v.intValue()).withDescription("Controls the vertical increase amount for the spoof."));
     }
 
     @Override

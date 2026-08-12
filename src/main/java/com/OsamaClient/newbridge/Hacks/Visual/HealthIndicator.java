@@ -10,7 +10,7 @@ public class HealthIndicator extends Module {
     public HealthIndicator() {
         super("HealthIndicator", "Shows entity health in nametags", Category.VISUAL);
         instance = this;
-        this.settings.add(new Slider("Green at %", 0.5, 1.0, 0.75, val -> greenThreshold = val));
-        this.settings.add(new Slider("Yellow at %", 0.2, 0.4, 0.35, val -> yellowThreshold = val));
+        this.settings.add(new Slider("Green at %", 0.5, 1.0, 0.75, val -> greenThreshold = val).withDescription("Sets the health percentage threshold for green coloring."));
+        this.settings.add(new Slider("Yellow at %", 0.2, 0.4, 0.35, val -> yellowThreshold = val).withDescription("Sets the health percentage threshold for yellow coloring."));
     }
 }

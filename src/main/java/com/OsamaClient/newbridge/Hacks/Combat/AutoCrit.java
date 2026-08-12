@@ -1,8 +1,8 @@
 package com.OsamaClient.newbridge.Hacks.Combat;
 
+import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
-import com.OsamaClient.newbridge.UI.components.ToggleButton;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -15,8 +15,7 @@ import net.minecraft.world.phys.HitResult;
 public class AutoCrit extends Module {
 
     public double range = 3.5;
-    public boolean targetPlayers = true;
-    public boolean targetHostile = true;
+    public EntityFilterPicker entityFilter;
 
     private boolean waitingForDrop = false;
     private LivingEntity activeTarget = null;
@@ -24,9 +23,10 @@ public class AutoCrit extends Module {
     public AutoCrit() {
         super("AutoCrit", "Makes every hit a Crit", Category.COMBAT);
 
-        this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val));
-        this.settings.add(new ToggleButton("Target Players", targetPlayers, val -> targetPlayers = val));
-        this.settings.add(new ToggleButton("Target Hostile", targetHostile, val -> targetHostile = val));
+        this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
+
+        this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val).withDescription("Maximum distance to execute critical hits."));
+        this.settings.add(this.entityFilter);
     }
 
     @Override
@@ -51,7 +51,6 @@ public class AutoCrit extends Module {
                 reset();
                 return;
             }
-
 
             if (!client.player.onGround() && client.player.getDeltaMovement().y < -0.1) {
                 client.gameMode.attack(client.player, activeTarget);
@@ -90,8 +89,12 @@ public class AutoCrit extends Module {
         double dist = client.player.distanceTo(targetEntity);
         if (dist > range) return false;
 
-        if (targetEntity instanceof Player && !targetPlayers) return false;
-        if (targetEntity instanceof Enemy && !targetHostile) return false;
+        if (targetEntity instanceof Player && !this.entityFilter.isFilterEnabled("Players")) {
+            return false;
+        }
+        if (targetEntity instanceof Enemy && !this.entityFilter.isFilterEnabled("Hostile")) {
+            return false;
+        }
 
         return true;
     }

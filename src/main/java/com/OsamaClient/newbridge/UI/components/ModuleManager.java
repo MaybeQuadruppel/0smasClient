@@ -62,6 +62,7 @@ public class ModuleManager {
         modules.add(new FastBreak());
         modules.add(new FastPlace());
         modules.add(new KillAura());
+        modules.add(new NoRender());
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {

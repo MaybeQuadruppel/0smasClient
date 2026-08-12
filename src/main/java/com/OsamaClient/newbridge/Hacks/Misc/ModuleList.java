@@ -60,17 +60,17 @@ public class ModuleList extends Module {
 
         this.settings.add(new ModeButton("Sort",
                 List.of("Width", "Alphabetical"), 0,
-                val -> sortMode = val));
+                val -> sortMode = val).withDescription("Determines how the active modules are sorted in the list."));
         this.settings.add(new ToggleButton("Rainbow", false,
-                val -> rainbow = val));
+                val -> rainbow = val).withDescription("Enables a dynamic rainbow color effect for the module list."));
         this.settings.add(new Slider("Rainbow Speed", 0.5, 10.0, 3.0,
-                val -> rainbowSpeed = val));
+                val -> rainbowSpeed = val).withDescription("Controls the speed of the rainbow color transition."));
 
         // Neue Optionen im Menü registrieren
         this.settings.add(new ToggleButton("Letter Fade", false,
-                val -> letterFade = val));
+                val -> letterFade = val).withDescription("Adds a fading animation effect to the text."));
         this.settings.add(new Slider("Text Scale", 0.5, 1.0, 1.0,
-                val -> fontScale = val));
+                val -> fontScale = val).withDescription("Adjusts the text size and scale of the HUD list."));
     }
 
     // ── HUD draw (called every frame from HudElementRegistry) ─────────────────

@@ -10,6 +10,6 @@ public class FullBright extends Module {
     public FullBright() {
         super("FullBright", "Makes your game Bright", Category.MISC);
         instance = this;
-        this.settings.add(new Slider("amount", 0.1, 16.0, 16.0, val -> amount = val));
+        this.settings.add(new Slider("amount", 0.1, 16.0, 16.0, val -> amount = val).withDescription("Controls the brightness multiplier of the game."));
     }
 }

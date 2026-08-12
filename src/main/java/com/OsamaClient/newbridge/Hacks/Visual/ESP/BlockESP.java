@@ -20,11 +20,11 @@ public class BlockESP extends Module {
     public BlockESP() {
         super("BlockESP", "Look-Up Blocks", Category.VISUAL);
 
-        this.blockPicker = new BlockPicker("Block List");
+        this.blockPicker = new BlockPicker("Block List").withDescription("Selects which blocks to highlight with ESP.");
         this.settings.add(this.blockPicker);
 
-        this.settings.add(new Slider("Chunk Range", 1.0, 16.0, rangeInChunks, val -> rangeInChunks = val));
-        this.settings.add(new Slider("Scan Delay (s)", 0.5, 10.0, scanDelay, val -> scanDelay = val));
+        this.settings.add(new Slider("Chunk Range", 1.0, 16.0, rangeInChunks, val -> rangeInChunks = val).withDescription("Sets the chunk render and scan range for block ESP."));
+        this.settings.add(new Slider("Scan Delay (s)", 0.5, 10.0, scanDelay, val -> scanDelay = val).withDescription("Sets the delay in seconds between block scans."));
     }
 
     @Override

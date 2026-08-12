@@ -17,7 +17,7 @@ public class AirJump extends Module {
 
     public AirJump() {
         super("AirJump","Lets you Jump in the Air", Category.MOVEMENT);
-        this.settings.add(new Slider("Max Jumps", 1.0, 20.0, maxJumps, val -> maxJumps = val));
+        this.settings.add(new Slider("Max Jumps", 1.0, 20.0, maxJumps, val -> maxJumps = val).withDescription("Controls how many times you can jump in mid-air."));
     }
 
     @Override

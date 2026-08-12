@@ -31,11 +31,11 @@ public class TriggerBot extends Module {
     public TriggerBot() {
         super("TriggerBot", "Just A Triggerbot", Category.COMBAT);
 
-        this.entityFilter = new EntityFilterPicker("Targets");
+        this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
 
-        this.settings.add(new Slider("CPS", 0.2, 20.0, cps, val -> cps = val));
-        this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val));
-        this.settings.add(new Slider("Randomize", 0.0, 5.0, randomize, val -> randomize = val));
+        this.settings.add(new Slider("CPS", 0.2, 20.0, cps, val -> cps = val).withDescription("Attack frequency in clicks per second."));
+        this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val).withDescription("Maximum distance to trigger attacks."));
+        this.settings.add(new Slider("Randomize", 0.0, 5.0, randomize, val -> randomize = val).withDescription("Adds randomness to attack timings to mimic human behavior."));
         this.settings.add(this.entityFilter);
     }
 

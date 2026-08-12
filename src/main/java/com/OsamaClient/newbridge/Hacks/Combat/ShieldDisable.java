@@ -27,8 +27,8 @@ public class ShieldDisable extends Module {
 
     public ShieldDisable() {
         super("ShieldDisable", "Breaks enemy shields automatically", Category.COMBAT);
-        this.settings.add(new ToggleButton("Hit with prev. Item", true, val -> autoStrikeBack = val));
-        this.settings.add(new Slider("Range", 1.0, 6.0, 3.5, val -> range = val));
+        this.settings.add(new ToggleButton("Hit with prev. Item", true, val -> autoStrikeBack = val).withDescription("Automatically strikes the target using the previously held item."));
+        this.settings.add(new Slider("Range", 1.0, 6.0, 3.5, val -> range = val).withDescription("Maximum distance to detect and disable shields."));
     }
 
     @Override

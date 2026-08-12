@@ -20,8 +20,8 @@ public class AttributeSwapping extends Module {
     public AttributeSwapping() {
         super("AttrSwap", "Does Attribute swapping for you", Category.COMBAT);
 
-        this.settings.add(new ToggleButton("Spear Lunge Swap", spearSwap, val -> spearSwap = val));
-        this.settings.add(new ToggleButton("Mace/Sword Swap", maceSwap, val -> maceSwap = val));
+        this.settings.add(new ToggleButton("Spear Lunge Swap", spearSwap, val -> spearSwap = val).withDescription("Automatically performs attribute swapping during spear lunges."));
+        this.settings.add(new ToggleButton("Mace/Sword Swap", maceSwap, val -> maceSwap = val).withDescription("Automatically swaps attributes when using maces and swords."));
     }
 
     @Override

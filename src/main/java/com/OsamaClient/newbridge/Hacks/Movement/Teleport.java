@@ -22,8 +22,8 @@ public class Teleport extends Module {
         INSTANCE = this;
 
         // UI-Slider für Schrittweite und Frequenz
-        this.settings.add(new Slider("Step Range", 5.0, 100.0, stepDistance, val -> stepDistance = val));
-        this.settings.add(new Slider("Tick Delay", 0.0, 10.0, (double) tickDelay, val -> tickDelay = val.intValue()));
+        this.settings.add(new Slider("Step Range", 5.0, 100.0, stepDistance, val -> stepDistance = val).withDescription("Sets the maximum distance per teleport step."));
+        this.settings.add(new Slider("Tick Delay", 0.0, 10.0, (double) tickDelay, val -> tickDelay = val.intValue()).withDescription("Sets the delay in ticks between each teleport step."));
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
     }

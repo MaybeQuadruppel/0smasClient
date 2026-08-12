@@ -19,7 +19,7 @@ public class Freecam extends Module {
 
     public Freecam() {
         super("Freecam", "Erlaubt es dir, die Kamera vom Spieler zu trennen.", Category.MOVEMENT);
-        this.settings.add(new Slider("Speed", 0.1, 3.0, speedValue, val -> speedValue = val));
+        this.settings.add(new Slider("Speed", 0.1, 3.0, speedValue, val -> speedValue = val).withDescription("Controls the movement speed of the camera."));
     }
 
     @Override

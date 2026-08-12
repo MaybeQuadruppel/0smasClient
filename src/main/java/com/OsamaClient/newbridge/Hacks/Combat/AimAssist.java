@@ -39,16 +39,16 @@ public class AimAssist extends Module {
         super("AimAssist", "Advanced Humanized Aim", Category.COMBAT);
         INSTANCE = this;
 
-        this.entityFilter = new EntityFilterPicker("Targets");
+        this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
 
-        this.settings.add(new ModeButton("Logic", List.of("Always", "On Hit"), mode, val -> mode = val.equals("Always") ? 0 : 1));
+        this.settings.add(new ModeButton("Logic", List.of("Always", "On Hit"), mode, val -> mode = val.equals("Always") ? 0 : 1).withDescription("Determines when the aim assist should activate."));
         this.settings.add(this.entityFilter);
-        this.settings.add(new Slider("Range", 1.0, 6.0, (double) range, val -> range = val.floatValue()));
-        this.settings.add(new Slider("Smoothness", 0.01, 1.0, (double) smoothness, val -> smoothness = val.floatValue()));
-        this.settings.add(new Slider("FOV", 10.0, 180.0, (double) fov, val -> fov = val.floatValue()));
+        this.settings.add(new Slider("Range", 1.0, 6.0, (double) range, val -> range = val.floatValue()).withDescription("Maximum distance to target entities."));
+        this.settings.add(new Slider("Smoothness", 0.01, 1.0, (double) smoothness, val -> smoothness = val.floatValue()).withDescription("Controls how smooth and human-like the aim movement is."));
+        this.settings.add(new Slider("FOV", 10.0, 180.0, (double) fov, val -> fov = val.floatValue()).withDescription("Field of view restriction for valid targets."));
 
-        this.settings.add(new ToggleButton("Random Height", randomHeight, val -> randomHeight = val));
-        this.settings.add(new Slider("Static Height", 0.0, 1.0, (double) staticHeight, val -> staticHeight = val.floatValue()));
+        this.settings.add(new ToggleButton("Random Height", randomHeight, val -> randomHeight = val).withDescription("Randomizes the hit position height on the entity."));
+        this.settings.add(new Slider("Static Height", 0.0, 1.0, (double) staticHeight, val -> staticHeight = val.floatValue()).withDescription("Sets a fixed vertical offset for the target position."));
     }
 
     public void onUpdate(Minecraft client) {
