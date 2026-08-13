@@ -7,13 +7,8 @@ import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
 import com.OsamaClient.newbridge.Hacks.Visual.HealthIndicator;
 import com.OsamaClient.newbridge.Hacks.Visual.XRay;
-import com.OsamaClient.newbridge.Hacks.Combat.*;
-import com.OsamaClient.newbridge.Hacks.Movement.*;
-import com.OsamaClient.newbridge.Hacks.Visual.ESP.*;
 import com.OsamaClient.newbridge.Hacks.Visual.*;
 import com.OsamaClient.newbridge.Hacks.Visual.Trajectories;
-import com.OsamaClient.newbridge.Hacks.Misc.*;
-//import com.qdrppl.newbridge.Hacks.Dupeing.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +58,7 @@ public class ModuleManager {
         modules.add(new FastPlace());
         modules.add(new KillAura());
         modules.add(new NoRender());
+        modules.add(new Tracers());
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {

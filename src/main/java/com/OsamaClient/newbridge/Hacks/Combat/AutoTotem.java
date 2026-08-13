@@ -34,11 +34,11 @@ public class AutoTotem extends Module {
         super("AutoTotem", "Auto Equips a Totem after Pop", Category.COMBAT);
 
         // GUI Settings
-        this.settings.add(new ToggleButton("Legit Mode", legitMode, val -> legitMode = val));
-        this.settings.add(new ToggleButton("Always Equip", alwaysEquip, val -> alwaysEquip = val));
-        this.settings.add(new ToggleButton("Auto Close", autoClose, val -> autoClose = val));
-        this.settings.add(new Slider("Delay Ticks", 0.0, 40.0, delay, val -> delay = val));
-        this.settings.add(new ToggleButton("Randomize", randomDelay, val -> randomDelay = val));
+        this.settings.add(new ToggleButton("Legit Mode", legitMode, val -> legitMode = val).withDescription("Requires you to hover your mouse over the totem to equip it legitimately."));
+        this.settings.add(new ToggleButton("Always Equip", alwaysEquip, val -> alwaysEquip = val).withDescription("Controls whether to equip after a pop or when your offhand is empty."));
+        this.settings.add(new ToggleButton("Auto Close", autoClose, val -> autoClose = val).withDescription("Automatically closes the inventory screen after equipping a totem."));
+        this.settings.add(new Slider("Delay Ticks", 0.0, 40.0, delay, val -> delay = val).withDescription("Sets the delay in ticks before equipping another totem."));
+        this.settings.add(new ToggleButton("Randomize", randomDelay, val -> randomDelay = val).withDescription("Adds a random variance to the delay to mimic human behavior."));
 
         INSTANCE = this;
     }
