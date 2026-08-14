@@ -13,7 +13,9 @@
     "AbstractContainerScreenAccessor",
     "NoRender.NoGuiMixin",
     "NoRender.RenderEffectLocalPlayerMixin",
-    "NoRender.ScreenEffectRendererMixin"
+    "NoRender.ScreenEffectRendererMixin",
+    "LevelRendererMixin",
+    "ShaderManagerMixin"
   ],
   "client": [
     "camera.FreeLookPlayerMixin",

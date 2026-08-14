@@ -1,11 +1,13 @@
 package com.OsamaClient.newbridge.Hacks.Visual;
 
+import com.OsamaClient.newbridge.EntryPoint;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ColorPicker;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
-import com.OsamaClient.newbridge.Utils.RenderBlock;
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext; // world -> level
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;  // world -> level
+import com.OsamaClient.newbridge.Utils.Render.Color;
+import com.OsamaClient.newbridge.Utils.Render.Events.EventHandler;
+import com.OsamaClient.newbridge.Utils.Render.Events.Render3DEvent;
+import com.OsamaClient.newbridge.Utils.Render.Renderer3D;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
@@ -26,13 +28,13 @@ public class Trajectories extends Module {
         this.settings.add(new ColorPicker("Color", trajColor, (newColor) -> this.trajColor = newColor).withDescription("Sets the color of the trajectory prediction line."));
         this.settings.add(new ToggleButton("Show Path", showPath, (val) -> this.showPath = val).withDescription("Enables or disables rendering of the flight path."));
 
-        LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(context -> {
-            if (!this.enabled) return;
-            renderTrajectory(context);
-        });
+        EntryPoint.EVENT_BUS.subscribe(this);
     }
 
-    private void renderTrajectory(LevelRenderContext context) { // WorldRenderContext -> LevelRenderContext
+    @EventHandler
+    public void onRender3D(Render3DEvent event) {
+        if (!this.enabled) return;
+
         Minecraft client = Minecraft.getInstance();
         if (client.player == null || client.level == null) return;
 
@@ -46,14 +48,12 @@ public class Trajectories extends Module {
         if (pullProgress < 0.1f) return;
 
         double velocityMag = pullProgress * 3.0f;
-        float r = ((trajColor >> 16) & 0xFF) / 255f;
-        float g = ((trajColor >> 8) & 0xFF) / 255f;
-        float b = (trajColor & 0xFF) / 255f;
+        int r = (trajColor >> 16) & 0xFF;
+        int g = (trajColor >> 8) & 0xFF;
+        int b = trajColor & 0xFF;
 
         Vec3 pos = client.player.getEyePosition();
         Vec3 motion = client.player.getLookAngle().scale(velocityMag);
-
-        RenderBlock.begin();
 
         for (int i = 0; i < 200; i++) {
             Vec3 nextPos = pos.add(motion);
@@ -73,40 +73,75 @@ public class Trajectories extends Module {
 
             if (entityHit != null) {
                 if (blockHit.getType() == HitResult.Type.MISS || pos.distanceTo(entityHit.getLocation()) < pos.distanceTo(blockHit.getLocation())) {
-                    renderEntityIndicator(context, entityHit.getEntity(), r, g, b, 0.6f);
+                    renderEntityIndicator(event, entityHit.getEntity(), r, g, b);
                     break;
                 }
             }
 
             if (blockHit.getType() != HitResult.Type.MISS) {
-                renderLandingBlock(context, blockHit, r, g, b, 0.6f);
+                renderLandingBlock(event, blockHit, r, g, b);
                 break;
             }
 
             if (showPath) {
-                RenderBlock.renderPoint(context, pos, 0.08f, r, g, b, 0.4f);
+                // Weltposition relativ zur Kamera für den Punkt
+                double rx = pos.x - event.offsetX;
+                double ry = pos.y - event.offsetY;
+                double rz = pos.z - event.offsetZ;
+
+                double size = 0.08;
+                event.renderer.boxNoDepth(
+                        rx - size, ry - size, rz - size,
+                        rx + size, ry + size, rz + size,
+                        new Color(r, g, b, 100),
+                        new Color(r, g, b, 255),
+                        Renderer3D.ShapeMode.BOTH,
+                        0
+                );
             }
 
             pos = nextPos;
-            // Die Physik-Werte bleiben identisch zu 1.21
             motion = motion.scale(0.99).subtract(0, 0.05, 0);
 
             if (pos.y < client.level.getMinY()) break;
         }
-
-        RenderBlock.draw(client);
     }
 
-    private void renderEntityIndicator(LevelRenderContext context, Entity target, float r, float g, float b, float a) {
-        RenderBlock.renderPoint(context, target.position().add(0, target.getBbHeight() / 2, 0),
-                target.getBbHeight(), r, g, b, a);
+    private void renderEntityIndicator(Render3DEvent event, Entity target, int r, int g, int b) {
+        double tx = target.getX() - event.offsetX;
+        double ty = target.getY() - event.offsetY + (target.getBbHeight() / 2);
+        double tz = target.getZ() - event.offsetZ;
 
-        RenderBlock.renderPoint(context, target.getEyePosition(), 0.15f, 1f, 0f, 0f, 1f);
+        float w = target.getBbWidth() / 2f;
+        float h = target.getBbHeight();
+
+        // Zeigt eine Box um das getroffene Ziel
+        event.renderer.boxNoDepth(
+                tx - w, ty, tz - w,
+                tx + w, ty + h, tz + w,
+                new Color(r, g, b, 150),
+                new Color(255, 0, 0, 255),
+                Renderer3D.ShapeMode.BOTH,
+                0
+        );
     }
 
-    private void renderLandingBlock(LevelRenderContext context, BlockHitResult hit, float r, float g, float b, float a) {
+    private void renderLandingBlock(Render3DEvent event, BlockHitResult hit, int r, int g, int b) {
         Direction side = hit.getDirection();
         Vec3 landingPos = Vec3.atLowerCornerOf(hit.getBlockPos()).add(side.getStepX(), side.getStepY(), side.getStepZ());
-        RenderBlock.renderPoint(context, landingPos.add(0.5, 0.5, 0.5), 1.0f, r, g, b, a);
+
+        double lx = landingPos.x + 0.5 - event.offsetX;
+        double ly = landingPos.y + 0.5 - event.offsetY;
+        double lz = landingPos.z + 0.5 - event.offsetZ;
+
+        double size = 0.5;
+        event.renderer.boxNoDepth(
+                lx - size, ly - size, lz - size,
+                lx + size, ly + size, lz + size,
+                new Color(r, g, b, 100),
+                new Color(r, g, b, 255),
+                Renderer3D.ShapeMode.BOTH,
+                0
+        );
     }
 }

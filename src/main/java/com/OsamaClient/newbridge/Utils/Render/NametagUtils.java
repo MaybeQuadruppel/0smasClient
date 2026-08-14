@@ -1,6 +1,5 @@
-package com.OsamaClient.newbridge.Utils.Render2D;
+package com.OsamaClient.newbridge.Utils.Render;
 
-import com.OsamaClient.newbridge.Utils.Render2D.RenderUtils;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
