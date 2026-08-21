@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.UI.components;
 
+import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -77,6 +78,7 @@ public class ToggleButton extends Component {
         if (button == 0 && isHovered(mouseX, mouseY)) {
             enabled = !enabled;
             callback.accept(enabled);
+            ClickGuiScreen.playGuiSound(enabled ? 1.2f : 0.85f, 0.25f);
             return true;
         }
         return false;

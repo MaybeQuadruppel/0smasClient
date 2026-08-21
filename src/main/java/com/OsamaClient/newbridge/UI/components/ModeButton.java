@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.UI.components;
 
+import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -58,8 +59,15 @@ public class ModeButton extends Component {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (isHovered(mouseX, mouseY)) {
-            if      (button == 0) index = (index + 1) % modes.size();
-            else if (button == 1) index = (index - 1 + modes.size()) % modes.size();
+            if (button == 0) {
+                index = (index + 1) % modes.size();
+                ClickGuiScreen.playGuiSound(1.1f, 0.25f);
+            } else if (button == 1) {
+                index = (index - 1 + modes.size()) % modes.size();
+                ClickGuiScreen.playGuiSound(0.9f, 0.25f);
+            } else {
+                return false;
+            }
             onChange.accept(modes.get(index));
             return true;
         }

@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.UI.components;
 
+import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -145,7 +146,13 @@ public class EntityFilterPicker extends Component {
             if (draggingSlider != 0) {
                 int rgb = java.awt.Color.HSBtoRGB(currentHue, 1f, 1f) & 0xFFFFFF;
                 int finalARGB = (currentAlpha << 24) | rgb;
-                colors.put(activeColorFilter, finalARGB);
+                if (finalARGB != currentARGB) {
+                    colors.put(activeColorFilter, finalARGB);
+                    float pitch = (draggingSlider == 1)
+                            ? 0.8f + (currentHue * 0.8f)
+                            : 0.8f + ((currentAlpha / 255f) * 0.8f);
+                    ClickGuiScreen.playGuiSound(pitch, 0.08f);
+                }
             }
 
             for (int i = 0; i < sliderW; i++) {
@@ -177,6 +184,7 @@ public class EntityFilterPicker extends Component {
         if (isHovered(mouseX, mouseY) && button == 0) {
             open = !open;
             activeColorFilter = null;
+            ClickGuiScreen.playGuiSound(open ? 1.1f : 0.85f, 0.25f);
             return true;
         }
 
@@ -197,10 +205,12 @@ public class EntityFilterPicker extends Component {
 
                 if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY - 2 && mouseY <= startSliderY + 7 && button == 0) {
                     this.draggingSlider = 1;
+                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
                     return true;
                 }
                 if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY + 20 && mouseY <= startSliderY + 28 && button == 0) {
                     this.draggingSlider = 2;
+                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
                     return true;
                 }
             }
@@ -214,9 +224,11 @@ public class EntityFilterPicker extends Component {
                         boolean newState = !filters.getOrDefault(key, false);
                         filters.put(key, newState);
                         if (!newState && key.equals(activeColorFilter)) activeColorFilter = null;
+                        ClickGuiScreen.playGuiSound(newState ? 1.15f : 0.85f, 0.25f);
                     } else if (button == 1) {
                         if (filters.getOrDefault(key, false)) {
                             activeColorFilter = key.equals(activeColorFilter) ? null : key;
+                            ClickGuiScreen.playGuiSound(activeColorFilter != null ? 1.3f : 0.9f, 0.25f);
                         }
                     }
                 }
@@ -226,6 +238,7 @@ public class EntityFilterPicker extends Component {
             if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
                 open = false;
                 activeColorFilter = null;
+                ClickGuiScreen.playGuiSound(0.85f, 0.2f);
             }
         }
         return false;

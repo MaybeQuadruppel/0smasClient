@@ -14,8 +14,10 @@
     "NoRender.NoGuiMixin",
     "NoRender.RenderEffectLocalPlayerMixin",
     "NoRender.ScreenEffectRendererMixin",
+    "ShaderManagerMixin",
+    "LevelRendererGuardMixin",
     "LevelRendererMixin",
-    "ShaderManagerMixin"
+    "LevelRendererOutlineMixin"
   ],
   "client": [
     "camera.FreeLookPlayerMixin",
@@ -25,7 +27,14 @@
     "camera.LocalPlayerMixin",
     "camera.EntityRenderDispatcherMixin",
     "xray.AbstractBlockStateMixin",
-    "xray.BlockEntityRenderDispatcherMixin"
+    "xray.BlockEntityRenderDispatcherMixin",
+    "chams.ChamsCapeLayerMixin",
+    "chams.ChamsLivingEntityMixin",
+    "chams.ChamsSubmitMixin",
+    "chams.EntityRenderStateChamsMixin",
+    "chams.RenderPipelineInvoker",
+    "chams.RenderSetupAccessor",
+    "chams.RenderTypeStateAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

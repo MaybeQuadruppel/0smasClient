@@ -3,10 +3,13 @@ package com.OsamaClient.newbridge.UI;
 import com.OsamaClient.newbridge.Config;
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Style;
+import net.minecraft.sounds.SoundEvents;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
 
@@ -22,9 +25,10 @@ public class ClickGuiScreen extends Screen {
     private long openTimeMs = -1;
     private static final long FADE_MS = 200L;
 
-    // ── Hover animations ──────────────────────────────────────────────────────
+    // ── Hover animations & sound tracking ─────────────────────────────────────
     private final Map<String, Float> moduleHover = new HashMap<>();
     private float backBtnHover = 0f;
+    private String lastHoveredModule = null; // Verhindert Sound-Spamming beim Hovern
 
     // ── Draggable panels ──────────────────────────────────────────────────────
     public static final Map<Module.Category, int[]> panelPos = new LinkedHashMap<>();
@@ -36,10 +40,9 @@ public class ClickGuiScreen extends Screen {
     private final Map<Module.Category, Integer> panelScroll = new HashMap<>();
     private static final int PANEL_BOTTOM_PAD = 10;
 
-    // ── Dynamic layout (bottom-right sliders) ─────────────────────────────────
+    // ── Dynamic layout (Adaptive layout) ──────────────────────────────────────
     public static int dynColW = 88;
     public static int dynModH = 15;
-    private int brDrag = 0;
 
     private static final int HDR_H   = 18;
     private static final int START_X = 10;
@@ -79,21 +82,75 @@ public class ClickGuiScreen extends Screen {
         super(net.minecraft.network.chat.Component.literal(""));
     }
 
+// ── Sound Utility ─────────────────────────────────────────────────────────
+
+    public static void playGuiSound(float pitch, float volume) {
+        try {
+            Minecraft.getInstance().getSoundManager().play(
+                    SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), pitch, volume)
+            );
+        } catch (Exception ignored) {}
+    }
+
+    public static void playGuiSound(float pitch) {
+        playGuiSound(pitch, 0.25f);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     @Override
     public void init() {
         super.init();
         openTimeMs = System.currentTimeMillis();
-        initPanelPositions();
+        updateAdaptiveLayout();
+
+        // Sound beim Öffnen der ClickGUI
+        playGuiSound(1.4f, 0.35f);
     }
 
-    private void initPanelPositions() {
+    /**
+     * Berechnet die Breite der Kategorien dynamisch anhand der Bildschirmbreite
+     * und ordnet sie so an, dass sie niemals rechts aus dem Bildschirm ragen.
+     */
+    private void updateAdaptiveLayout() {
+        List<Module.Category> activeCats = Arrays.stream(Module.Category.values())
+                .filter(cat -> !ModuleManager.getModulesByCategory(cat).isEmpty())
+                .collect(Collectors.toList());
+
+        if (activeCats.isEmpty()) return;
+
+        int gap = 8;
+        int totalAvail = this.width - (START_X * 2);
+
+        // Dynamische Breite berechnen (Minimum 55px, Maximum 88px)
+        int calculatedW = (totalAvail - (activeCats.size() - 1) * gap) / activeCats.size();
+        dynColW = Math.max(55, Math.min(88, calculatedW));
+
         int x = START_X;
-        for (Module.Category cat : Module.Category.values()) {
+        for (Module.Category cat : activeCats) {
             if (!panelPos.containsKey(cat)) {
                 panelPos.put(cat, new int[]{x, START_Y});
             }
-            if (!ModuleManager.getModulesByCategory(cat).isEmpty()) x += dynColW + 12;
+
+            // Verhindern, dass Panels nach Bildschirm-Resize rechts raushängen
+            int[] pos = panelPos.get(cat);
+            if (pos != null) {
+                pos[0] = Math.min(pos[0], Math.max(0, this.width - dynColW - 4));
+            }
+            x += dynColW + gap;
         }
+    }
+
+    // ── Text Utility ──────────────────────────────────────────────────────────
+
+    private String trimToWidth(String text, int maxWidth) {
+        if (this.font.width(text) <= maxWidth) return text;
+        String dots = "..";
+        String trimmed = text;
+        while (!trimmed.isEmpty() && this.font.width(trimmed + dots) > maxWidth) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed.isEmpty() ? "" : trimmed + dots;
     }
 
     // ── Animation ─────────────────────────────────────────────────────────────
@@ -110,12 +167,13 @@ public class ClickGuiScreen extends Screen {
     @Override
     public void extractRenderState(@NotNull GuiGraphicsExtractor guiGraphics,
                                    int mouseX, int mouseY, float delta) {
+        updateAdaptiveLayout(); // Sorgt jederzeit für korrekte Breiten & Positionen
+
         float fade = easeOut(rawFade());
 
         lastMouseX = mouseX;
         lastMouseY = mouseY;
 
-        // Apply panel drag each frame (replaces mouseDragged which changed in 26.1.2)
         if (draggingCat != null) {
             int[] pos = panelPos.get(draggingCat);
             if (pos != null) {
@@ -135,7 +193,6 @@ public class ClickGuiScreen extends Screen {
 
         renderSearchBar(guiGraphics, mouseX, mouseY);
         renderKeybindPrompt(guiGraphics);
-        renderBRSliders(guiGraphics, mouseX, mouseY);
 
         if (fade < 1f)
             guiGraphics.fill(0, 0, this.width, this.height,
@@ -149,6 +206,7 @@ public class ClickGuiScreen extends Screen {
     private void renderModuleList(GuiGraphicsExtractor g,
                                   int mouseX, int mouseY, float fade) {
         Module hoveredModule = null;
+        boolean anyModuleHovered = false;
 
         for (Module.Category cat : Module.Category.values()) {
             if (ModuleManager.getModulesByCategory(cat).isEmpty()) continue;
@@ -177,8 +235,10 @@ public class ClickGuiScreen extends Screen {
                     : C_ACCENT_DIM;
             g.fill(panelX, panelY, panelX + dynColW, panelY + 2, topBarColor);
 
-            g.text(this.font, "\u2630 " + cat.name(),
-                    panelX + 5, panelY + (HDR_H / 2) - 4,
+            // Titel adaptiv trimmen
+            String headerTitle = trimToWidth("\u2630 " + cat.name(), dynColW - 6);
+            g.text(this.font, headerTitle,
+                    panelX + 4, panelY + (HDR_H / 2) - 4,
                     hdrHov ? C_ACCENT : C_TEXT, false);
 
             g.fill(panelX, panelY + HDR_H, panelX + dynColW, panelY + HDR_H + 1, C_SEPARATOR);
@@ -205,7 +265,17 @@ public class ClickGuiScreen extends Screen {
                     float hp = moduleHover.getOrDefault(module.name, 0f);
                     hp = hov ? Math.min(1f, hp + 0.14f) : Math.max(0f, hp - 0.14f);
                     moduleHover.put(module.name, hp);
-                    if (hov) hoveredModule = module;
+
+                    if (hov) {
+                        hoveredModule = module;
+                        anyModuleHovered = true;
+
+                        // Hover-Sound abspielen, falls neu darauf gezeigt wird
+                        if (!module.name.equals(lastHoveredModule)) {
+                            playGuiSound(1.8f, 0.12f);
+                            lastHoveredModule = module.name;
+                        }
+                    }
 
                     if (hp > 0.01f)
                         Component.drawRoundedRect(g, panelX + 1, rowY, dynColW - 2, dynModH - 1,
@@ -216,18 +286,29 @@ public class ClickGuiScreen extends Screen {
                             : Component.lerpColor(C_DISABLED, C_ACCENT_DIM, hp * 0.6f);
                     g.fill(panelX + 1, rowY + 2, panelX + 3, rowY + dynModH - 2, barColor);
 
+                    boolean isBound   = keybinds.containsKey(module.name);
+                    boolean isBinding = module.name.equals(bindingModule);
+
+                    int keybindWidth = 0;
+                    String kStr = "";
+                    if (isBound || isBinding) {
+                        kStr = isBinding
+                                ? ((System.currentTimeMillis() / 400) % 2 == 0 ? "[?]" : "[ ]")
+                                : "[" + keyName(keybinds.get(module.name)) + "]";
+                        keybindWidth = this.font.width(kStr) + 2;
+                    }
+
+                    // Modulname adaptiv trimmen
+                    int maxNameWidth = dynColW - 10 - keybindWidth;
+                    String displayName = trimToWidth(module.name, maxNameWidth);
+
                     int nameColor = module.enabled
                             ? Component.lerpColor(C_ACCENT_DIM, C_ENABLED, 0.7f + hp * 0.3f)
                             : Component.lerpColor(C_TEXT_DIM, C_TEXT, hp);
-                    g.text(this.font, module.name,
+                    g.text(this.font, displayName,
                             panelX + 7, rowY + (dynModH / 2) - 4, nameColor, false);
 
-                    boolean isBound   = keybinds.containsKey(module.name);
-                    boolean isBinding = module.name.equals(bindingModule);
                     if (isBound || isBinding) {
-                        String kStr = isBinding
-                                ? ((System.currentTimeMillis() / 400) % 2 == 0 ? "[?]" : "[ ]")
-                                : "[" + keyName(keybinds.get(module.name)) + "]";
                         int kColor = isBinding ? C_BIND_PULSE : C_KEYBIND;
                         int kw = this.font.width(kStr);
                         g.text(this.font, kStr,
@@ -250,6 +331,11 @@ public class ClickGuiScreen extends Screen {
             }
 
             Component.drawRoundedOutline(g, panelX - 2, panelY, dynColW + 4, frameH, C_SEPARATOR);
+        }
+
+        // Reset hover state, wenn über keinem Modul gehovert wird
+        if (!anyModuleHovered) {
+            lastHoveredModule = null;
         }
 
         if (hoveredModule != null
@@ -293,15 +379,18 @@ public class ClickGuiScreen extends Screen {
         g.fill(8, 32, this.width - 8, 33, C_SEPARATOR);
 
         int rightX = 140;
-
         Component hoveredComponent = null;
 
-        int contentHeight = 0;
+        int leftHeight = 0;
+        int rightHeight = 0;
         for (Component component : selectedModule.settings) {
-            if (!(component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker)) {
-                contentHeight += component.height + 5;
+            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
+                rightHeight += component.height + 5;
+            } else {
+                leftHeight += component.height + 5;
             }
         }
+        int contentHeight = Math.max(leftHeight, rightHeight);
 
         int viewBottom = this.height - SETTINGS_BOTTOM_PAD;
         int viewHeight = Math.max(0, viewBottom - SETTINGS_LIST_TOP);
@@ -311,38 +400,39 @@ public class ClickGuiScreen extends Screen {
         g.enableScissor(0, SETTINGS_LIST_TOP, this.width, viewBottom);
 
         int leftY = SETTINGS_LIST_TOP - (int) settingsScrollOffset;
-        for (Component component : selectedModule.settings) {
-            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
-                continue;
-            }
-            component.x = 15;
-            component.y = leftY;
-            if (component.y + component.height >= SETTINGS_LIST_TOP && component.y <= viewBottom) {
-                component.render(g, mouseX, mouseY);
-                if (component.getDescription() != null && !component.getDescription().isEmpty()
-                        && mouseX >= component.x && mouseX <= component.x + component.width
-                        && mouseY >= Math.max(component.y, SETTINGS_LIST_TOP)
-                        && mouseY <= Math.min(component.y + component.height, viewBottom)) {
-                    hoveredComponent = component;
-                }
-            }
-            leftY += component.height + 5;
-        }
-
-        g.disableScissor();
+        int rightY = SETTINGS_LIST_TOP - (int) settingsScrollOffset;
 
         for (Component component : selectedModule.settings) {
             if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
                 component.x = rightX;
-                component.y = SETTINGS_LIST_TOP;
-                component.render(g, mouseX, mouseY);
-                if (component.getDescription() != null && !component.getDescription().isEmpty()
-                        && mouseX >= component.x && mouseX <= component.x + component.width
-                        && mouseY >= component.y && mouseY <= component.y + component.height) {
-                    hoveredComponent = component;
+                component.y = rightY;
+                if (component.y + component.height >= SETTINGS_LIST_TOP && component.y <= viewBottom) {
+                    component.render(g, mouseX, mouseY);
+                    if (component.getDescription() != null && !component.getDescription().isEmpty()
+                            && mouseX >= component.x && mouseX <= component.x + component.width
+                            && mouseY >= Math.max(component.y, SETTINGS_LIST_TOP)
+                            && mouseY <= Math.min(component.y + component.height, viewBottom)) {
+                        hoveredComponent = component;
+                    }
                 }
+                rightY += component.height + 5;
+            } else {
+                component.x = 15;
+                component.y = leftY;
+                if (component.y + component.height >= SETTINGS_LIST_TOP && component.y <= viewBottom) {
+                    component.render(g, mouseX, mouseY);
+                    if (component.getDescription() != null && !component.getDescription().isEmpty()
+                            && mouseX >= component.x && mouseX <= component.x + component.width
+                            && mouseY >= Math.max(component.y, SETTINGS_LIST_TOP)
+                            && mouseY <= Math.min(component.y + component.height, viewBottom)) {
+                        hoveredComponent = component;
+                    }
+                }
+                leftY += component.height + 5;
             }
         }
+
+        g.disableScissor();
 
         if (settingsMaxScroll > 0) {
             int trackX = this.width - 6;
@@ -392,55 +482,6 @@ public class ClickGuiScreen extends Screen {
         Component.drawRoundedOutline(g, bx, by, w, 15, C_ACCENT);
         g.text(this.font, msg, bx + 4, by + 4, C_BIND_PULSE, false);
     }
-
-    private void renderBRSliders(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        final int SW = 100, SH = 13, TH = 3, PAD = 6, GAP = 16;
-
-        int totalH = 10 + SH + GAP + 10 + SH + 4;
-        int bx = this.width  - SW - PAD - 2;
-        int by = this.height - totalH - PAD;
-
-        Component.drawRoundedRect(   g, bx - 4, by - 4, SW + 12, totalH + 8, 0xE00A0A0A);
-        Component.drawRoundedOutline(g, bx - 4, by - 4, SW + 12, totalH + 8, C_SEPARATOR);
-
-        int COL_MIN = 60, COL_MAX = 160;
-        if (brDrag == 1) {
-            dynColW = COL_MIN + (int)(Math.min(1f, Math.max(0f,
-                    (mouseX - bx) / (float) SW)) * (COL_MAX - COL_MIN));
-        }
-        renderMiniSlider(g, bx, by, SW, SH, TH,
-                "Panel W  " + dynColW,
-                (dynColW - COL_MIN) / (float)(COL_MAX - COL_MIN),
-                C_ACCENT, brDrag == 1);
-
-        int ROW_MIN = 11, ROW_MAX = 22;
-        if (brDrag == 2) {
-            dynModH = ROW_MIN + (int)(Math.min(1f, Math.max(0f,
-                    (mouseX - bx) / (float) SW)) * (ROW_MAX - ROW_MIN));
-        }
-        renderMiniSlider(g, bx, by + 10 + SH + GAP, SW, SH, TH,
-                "Row H  " + dynModH,
-                (dynModH - ROW_MIN) / (float)(ROW_MAX - ROW_MIN),
-                C_ACCENT_DIM, brDrag == 2);
-    }
-
-    private void renderMiniSlider(GuiGraphicsExtractor g,
-                                  int x, int y, int w, int sh, int th,
-                                  String label, float t, int fillColor, boolean active) {
-        g.text(this.font, label, x, y, active ? fillColor : C_TEXT_DIM, false);
-        int ty = y + 10 + (sh - th) / 2;
-        Component.drawRoundedRect(g, x, ty, w, th, 0xFF1A1A1A);
-        int fw = Math.max(0, (int)(t * w));
-        if (fw > 0) Component.drawRoundedRect(g, x, ty, fw, th, fillColor);
-        int tx = Math.max(x, Math.min(x + w - 3, x + fw - 1));
-        g.fill(tx, y + 10, tx + 3, y + 10 + sh, C_ACCENT);
-    }
-
-    private int brS1Y() {
-        int totalH = 10 + 13 + 16 + 10 + 13 + 4;
-        return this.height - totalH - 6;
-    }
-    private int brSliderX() { return this.width - 100 - 8; }
 
     private void renderTooltip(GuiGraphicsExtractor g, String desc, int mx, int my) {
         List<net.minecraft.network.chat.FormattedText> lines =
@@ -495,14 +536,6 @@ public class ClickGuiScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
         int mx = (int) event.x(), my = (int) event.y(), btn = event.button();
 
-        int bsx = brSliderX();
-        int s1y = brS1Y();
-        int s2y = s1y + 10 + 13 + 16;
-        if (mx >= bsx && mx <= bsx + 100) {
-            if (my >= s1y && my <= s1y + 13) { brDrag = 1; return true; }
-            if (my >= s2y && my <= s2y + 13) { brDrag = 2; return true; }
-        }
-
         if (selectedModule == null) {
             if (btn == 0) {
                 for (Module.Category cat : Module.Category.values()) {
@@ -512,6 +545,7 @@ public class ClickGuiScreen extends Screen {
                         draggingCat = cat;
                         dragOffX = mx - pos[0];
                         dragOffY = my - pos[1];
+                        playGuiSound(1.1f, 0.2f);
                         return true;
                     }
                 }
@@ -531,9 +565,20 @@ public class ClickGuiScreen extends Screen {
                     Module module = modules.get(idx);
                     if (mx >= pos[0] && mx <= pos[0] + dynColW
                             && my >= rowY && my <= rowY + dynModH) {
-                        if      (btn == 1) { selectedModule = module; bindingModule = null; settingsScrollOffset = 0; }
-                        else if (btn == 0) module.toggle();
-                        else if (btn == 2) bindingModule = module.name;
+                        if (btn == 1) {
+                            selectedModule = module;
+                            bindingModule = null;
+                            settingsScrollOffset = 0;
+                            playGuiSound(1.2f, 0.3f);
+                        }
+                        else if (btn == 0) {
+                            module.toggle();
+                            playGuiSound(module.enabled ? 1.0f : 0.8f, 0.3f);
+                        }
+                        else if (btn == 2) {
+                            bindingModule = module.name;
+                            playGuiSound(0.9f, 0.3f);
+                        }
                         return true;
                     }
                     rowY += dynModH;
@@ -543,10 +588,27 @@ public class ClickGuiScreen extends Screen {
             if (mx >= 8 && mx <= 94 && my >= 8 && my <= 28) {
                 selectedModule = null;
                 settingsScrollOffset = 0;
+                playGuiSound(0.85f, 0.3f);
                 return true;
             }
-            for (Component c : selectedModule.settings)
-                if (c.mouseClicked(mx, my, btn)) return true;
+
+            int viewBottom = this.height - SETTINGS_BOTTOM_PAD;
+
+            for (Component c : selectedModule.settings) {
+                if (c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker) {
+                    if (c.y + c.height >= SETTINGS_LIST_TOP && c.y <= viewBottom) {
+                        if (c.mouseClicked(mx, my, btn)) return true;
+                    }
+                }
+            }
+
+            for (Component c : selectedModule.settings) {
+                if (!(c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker)) {
+                    if (c.y + c.height >= SETTINGS_LIST_TOP && c.y <= viewBottom) {
+                        if (c.mouseClicked(mx, my, btn)) return true;
+                    }
+                }
+            }
         }
 
         return super.mouseClicked(event, isDoubleClick);
@@ -555,7 +617,6 @@ public class ClickGuiScreen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         draggingCat = null;
-        brDrag      = 0;
         if (selectedModule != null)
             for (Component c : selectedModule.settings)
                 c.mouseReleased(event.x(), event.y(), event.button());
@@ -603,8 +664,13 @@ public class ClickGuiScreen extends Screen {
         int mods = event.modifiers();
 
         if (bindingModule != null) {
-            if (key == GLFW.GLFW_KEY_ESCAPE) keybinds.remove(bindingModule);
-            else keybinds.put(bindingModule, key);
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                keybinds.remove(bindingModule);
+                playGuiSound(0.7f, 0.3f);
+            } else {
+                keybinds.put(bindingModule, key);
+                playGuiSound(1.3f, 0.3f);
+            }
             bindingModule = null;
             return true;
         }
@@ -612,12 +678,8 @@ public class ClickGuiScreen extends Screen {
         if (key == GLFW.GLFW_KEY_F && (mods & GLFW.GLFW_MOD_CONTROL) != 0) {
             searchActive = !searchActive;
             searchQuery  = "";
+            playGuiSound(searchActive ? 1.5f : 0.9f, 0.25f);
             return true;
-        }
-
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
-            if (searchActive)           { searchActive = false; searchQuery = ""; return true; }
-            if (selectedModule != null) { selectedModule = null; return true; }
         }
 
         if (searchActive && key == GLFW.GLFW_KEY_BACKSPACE && !searchQuery.isEmpty()) {
@@ -625,9 +687,25 @@ public class ClickGuiScreen extends Screen {
             return true;
         }
 
-        if (selectedModule != null)
-            for (Component c : selectedModule.settings)
+        if (selectedModule != null) {
+            for (Component c : selectedModule.settings) {
                 if (c.keyPressed(event)) return true;
+            }
+        }
+
+        if (key == GLFW.GLFW_KEY_ESCAPE) {
+            if (searchActive) {
+                searchActive = false;
+                searchQuery = "";
+                playGuiSound(0.8f, 0.25f);
+                return true;
+            }
+            if (selectedModule != null) {
+                selectedModule = null;
+                playGuiSound(0.85f, 0.3f);
+                return true;
+            }
+        }
 
         return super.keyPressed(event);
     }

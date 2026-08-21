@@ -1,6 +1,7 @@
 package com.OsamaClient.newbridge.UI.components;
 
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.RenderUtils;
+import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -170,7 +171,15 @@ public class BlockPicker extends Component {
             if (draggingSlider != 0) {
                 int rgb = java.awt.Color.HSBtoRGB(currentHue, 1f, 1f) & 0xFFFFFF;
                 int finalARGB = (currentAlpha << 24) | rgb;
-                RenderUtils.BLOCK_COLORS.put(activeColorBlock, finalARGB);
+
+                if (finalARGB != currentARGB) {
+                    RenderUtils.BLOCK_COLORS.put(activeColorBlock, finalARGB);
+                    // Dynamischer Pitch-Sound beim Ziehen der Slider
+                    float pitch = (draggingSlider == 1)
+                            ? 0.8f + (currentHue * 0.8f)
+                            : 0.8f + ((currentAlpha / 255f) * 0.8f);
+                    ClickGuiScreen.playGuiSound(pitch, 0.08f);
+                }
             }
 
             // 1. Hue Slider (Regenbogen)
@@ -203,23 +212,47 @@ public class BlockPicker extends Component {
     public boolean charTyped(CharacterEvent event) {
         if (!open) return false;
         char c = (char) event.codepoint();
-        if (c >= 32 && c != 127) { searchQuery += c; scrollOffset = 0; return true; }
+        if (c >= 32 && c != 127) {
+            searchQuery += c;
+            scrollOffset = 0;
+            ClickGuiScreen.playGuiSound(1.2f, 0.15f);
+            return true;
+        }
         return false;
     }
 
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (!open) return false;
-        if (event.key() == 259 && !searchQuery.isEmpty()) { searchQuery = searchQuery.substring(0, searchQuery.length() - 1); scrollOffset = 0; return true; }
-        if (event.key() == 256) { open = false; activeColorBlock = null; return true; }
+
+        int key = event.key();
+        // Enter (257 oder 335) oder Escape (256) schließt die Suche / den Picker
+        if (key == 256 || key == 257 || key == 335) {
+            open = false;
+            activeColorBlock = null;
+            ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+            return true;
+        }
+
+        if (key == 259 && !searchQuery.isEmpty()) { // Backspace
+            searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+            scrollOffset = 0;
+            ClickGuiScreen.playGuiSound(0.9f, 0.15f);
+            return true;
+        }
         return false;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
         if (open && mouseX >= x && mouseX <= x + width + 50) {
+            int oldScroll = scrollOffset;
             if (amount > 0 && scrollOffset > 0) scrollOffset--;
             else if (amount < 0 && scrollOffset < Math.max(0, getFilteredBlocks().size() - maxVisible)) scrollOffset++;
+
+            if (scrollOffset != oldScroll) {
+                ClickGuiScreen.playGuiSound(1.3f, 0.1f);
+            }
             return true;
         }
         return false;
@@ -227,7 +260,12 @@ public class BlockPicker extends Component {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY) && button == 0) { open = !open; activeColorBlock = null; return true; }
+        if (isHovered(mouseX, mouseY) && button == 0) {
+            open = !open;
+            activeColorBlock = null;
+            ClickGuiScreen.playGuiSound(open ? 1.1f : 0.85f, 0.25f);
+            return true;
+        }
 
         if (open) {
             int dropX = x, dropW = width + 50, listY = y + height + 5 + 14;
@@ -238,11 +276,13 @@ public class BlockPicker extends Component {
                 // Klick-Erkennung für Hue-Slider
                 if (mouseX >= dropX + 6 && mouseX <= dropX + dropW - 6 && mouseY >= startSliderY - 2 && mouseY <= startSliderY + 7 && button == 0) {
                     this.draggingSlider = 1;
+                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
                     return true;
                 }
                 // Klick-Erkennung für Alpha-Slider
                 if (mouseX >= dropX + 6 && mouseX <= dropX + dropW - 6 && mouseY >= startSliderY + 20 && mouseY <= startSliderY + 28 && button == 0) {
                     this.draggingSlider = 2;
+                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
                     return true;
                 }
             }
@@ -257,12 +297,15 @@ public class BlockPicker extends Component {
                         if (selectedBlocks.contains(b)) {
                             selectedBlocks.remove(b);
                             if (activeColorBlock == b) activeColorBlock = null;
+                            ClickGuiScreen.playGuiSound(0.85f, 0.25f);
                         } else {
                             selectedBlocks.add(b);
+                            ClickGuiScreen.playGuiSound(1.15f, 0.25f);
                         }
                     } else if (button == 1) {
                         if (selectedBlocks.contains(b)) {
                             activeColorBlock = (activeColorBlock == b) ? null : b;
+                            ClickGuiScreen.playGuiSound(activeColorBlock != null ? 1.3f : 0.9f, 0.25f);
                         }
                     }
                 }
@@ -272,6 +315,7 @@ public class BlockPicker extends Component {
             if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
                 open = false;
                 activeColorBlock = null;
+                ClickGuiScreen.playGuiSound(0.85f, 0.2f);
             }
         }
         return false;

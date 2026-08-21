@@ -19,25 +19,29 @@ public class AttributeSwapping extends Module {
     private int ticksToWait = -1;
     private int originalSlot = -1;
     private boolean isSwapped = false;
-    private int pearlDelayTicksSetting = 10;
 
-    private int pearlDelayTicks = 0;
-    private boolean pendingWindCharge = false;
+    // Variablen für den Pearl-Swap
+    public double settingPearlTickToWait = 1;
+    private int pearlOriginalSlot = -1;
+    private int pearlTicksToWait = -1;
+    private boolean isPearlSwapped = false;
     private boolean wasUsePressed = false;
+    private int cachedWindChargeSlot = -1;
 
     public AttributeSwapping() {
         super("AttrSwap", "Does Attribute swapping for you", Category.COMBAT);
 
         this.settings.add(new ToggleButton("Spear Lunge Swap", spearSwap, val -> spearSwap = val).withDescription("Automatically performs attribute swapping during spear lunges."));
         this.settings.add(new ToggleButton("Mace/Sword Swap", maceSwap, val -> maceSwap = val).withDescription("Automatically swaps attributes when using maces and swords."));
-        this.settings.add(new ToggleButton("Pearl WindCharge Swap", pearlWindChargeSwap, val -> pearlWindChargeSwap = val).withDescription("Automatically throws a wind charge 0.5 seconds after throwing an ender pearl while holding CTRL."));
-        settings.add(new Slider("Delay", 0.1, 20, 8, v -> pearlDelayTicks = v.intValue()).withDescription("Changes the delay between the Pearl to Windcharge swap."));
+        this.settings.add(new ToggleButton("Pearl WindCharge Swap", pearlWindChargeSwap, val -> pearlWindChargeSwap = val).withDescription("Automatically swaps to wind charge after throwing an ender pearl."));
+        this.settings.add(new Slider("Pearl Delay", 0.0, 10.0, settingPearlTickToWait, val -> settingPearlTickToWait = val).withDescription("Sets Tick delay between Pearl and WindCharge swap"));
     }
 
     @Override
     public void onTick(Minecraft client) {
         if (client.player == null) return;
 
+        // Spear Swap Logik
         if (spearSwap && !isSwapped && client.options.keyAttack.isDown() && client.options.keySprint.isDown()) {
             ItemStack handItem = client.player.getMainHandItem();
             String itemName = BuiltInRegistries.ITEM.getKey(handItem.getItem()).getPath();
@@ -64,35 +68,35 @@ public class AttributeSwapping extends Module {
             }
         }
 
-        // Pearl to Wind Charge Logic
+        // Pearl to Wind Charge Logik
         boolean usePressed = client.options.keyUse.isDown();
-        if (pearlWindChargeSwap && !pendingWindCharge && usePressed && !wasUsePressed && client.options.keySprint.isDown()) {
+        if (pearlWindChargeSwap && !isPearlSwapped && usePressed && !wasUsePressed && client.options.keySprint.isDown()) {
             ItemStack mainItem = client.player.getMainHandItem();
             ItemStack offItem = client.player.getOffhandItem();
+
             if (mainItem.is(Items.ENDER_PEARL) || offItem.is(Items.ENDER_PEARL)) {
-                int windChargeSlot = findItemInHotbar(client, Items.WIND_CHARGE);
-                if (windChargeSlot != -1) {
-                    pendingWindCharge = true;
-                    pearlDelayTicks = pearlDelayTicksSetting; // 0.5 seconds = 10 ticks
+                cachedWindChargeSlot = findItemInHotbar(client, Items.WIND_CHARGE);
+                if (cachedWindChargeSlot != -1) {
+                    this.pearlOriginalSlot = client.player.getInventory().getSelectedSlot();
+                    this.isPearlSwapped = true;
+                    this.pearlTicksToWait = (int) settingPearlTickToWait;
                 }
             }
         }
         wasUsePressed = usePressed;
 
-        if (pendingWindCharge) {
-            if (pearlDelayTicks <= 0) {
-                int windChargeSlot = findItemInHotbar(client, Items.WIND_CHARGE);
-                if (windChargeSlot != -1) {
-                    int prevSlot = client.player.getInventory().getSelectedSlot();
-                    client.player.getInventory().setSelectedSlot(windChargeSlot);
-                    if (client.gameMode != null) {
-                        client.gameMode.useItem(client.player, InteractionHand.MAIN_HAND);
-                    }
-                    client.player.getInventory().setSelectedSlot(prevSlot);
+        if (isPearlSwapped) {
+            if (pearlTicksToWait <= 0) {
+                if (client.gameMode != null && cachedWindChargeSlot != -1) {
+                    client.player.getInventory().setSelectedSlot(cachedWindChargeSlot);
+                    client.gameMode.useItem(client.player, InteractionHand.MAIN_HAND);
                 }
-                pendingWindCharge = false;
+                client.player.getInventory().setSelectedSlot(pearlOriginalSlot);
+                isPearlSwapped = false;
+                pearlOriginalSlot = -1;
+                cachedWindChargeSlot = -1;
             } else {
-                pearlDelayTicks--;
+                pearlTicksToWait--;
             }
         }
     }
@@ -143,8 +147,10 @@ public class AttributeSwapping extends Module {
         isSwapped = false;
         originalSlot = -1;
         ticksToWait = -1;
-        pendingWindCharge = false;
-        pearlDelayTicks = 0;
+        isPearlSwapped = false;
+        pearlOriginalSlot = -1;
+        pearlTicksToWait = -1;
+        cachedWindChargeSlot = -1;
         wasUsePressed = false;
     }
 }

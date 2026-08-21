@@ -8,11 +8,7 @@ import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import com.OsamaClient.newbridge.Utils.ChatHandler;
-import com.OsamaClient.newbridge.Utils.Render.Events.EventBus;
-import com.OsamaClient.newbridge.Utils.Render.Events.IEventBus;
-import com.OsamaClient.newbridge.Utils.Render.OsamaRenderPipelines;
-import com.OsamaClient.newbridge.Utils.Render.Renderer3D;
-
+import com.OsamaClient.newbridge.event.EventBus;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -36,9 +32,7 @@ public class EntryPoint implements ClientModInitializer {
     public static EntryPoint INSTANCE;
     public static KeyMapping guiKeyBind;
 
-    // ZENTRALE METEOR-KOMPONENTEN
-    public static final IEventBus EVENT_BUS = new EventBus();
-    public static Renderer3D RENDERER;
+    public static final EventBus EVENT_BUS = new EventBus();
 
     private static final Identifier MODULE_LIST_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "module_list");
     private static final Identifier RENDER_2D_INVOKER_ID = Identifier.fromNamespaceAndPath("newbridge", "render_2d_invoker");
@@ -63,15 +57,7 @@ public class EntryPoint implements ClientModInitializer {
                         .build()
         );
 
-        // 2. Initialisiere den Renderer mit allen 4 Pipelines (Normal + NoDepth)
-        RENDERER = new Renderer3D(
-                OsamaRenderPipelines.WORLD_COLORED_LINES,
-                OsamaRenderPipelines.WORLD_COLORED,
-                linesNoDepth,
-                trianglesNoDepth
-        );
 
-        EVENT_BUS.subscribe(this);
 
         Identifier catId = Identifier.parse("client");
         KeyMapping.Category myCategory = KeyMapping.Category.register(catId);
@@ -100,17 +86,6 @@ public class EntryPoint implements ClientModInitializer {
 
             float tickDelta = client.getDeltaTracker().getGameTimeDeltaTicks();
 
-            // 1. Renderer für diesen Frame starten
-            RENDERER.begin();
-
-            // 2. Events an alle 3D-Module (ESP, Tracers etc.) verteilen
-            EVENT_BUS.post(com.OsamaClient.newbridge.Utils.Render.Events.Render3DEvent.get(
-                    context.poseStack(),
-                    RENDERER,
-                    tickDelta
-            ));
-
-            RENDERER.render(context.poseStack());
         });
 
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
@@ -182,17 +157,8 @@ public class EntryPoint implements ClientModInitializer {
             int height = client.getWindow().getGuiScaledHeight();
             float tickDelta = deltaTracker.getGameTimeDeltaTicks();
 
-            EVENT_BUS.post(com.OsamaClient.newbridge.Utils.Render.Events.Render2DEvent.get(
-                    guiGraphics, width, height, tickDelta
-            ));
         });
     }
 
-    public Renderer3D getRenderer3D() {
-        return RENDERER;
-    }
 
-    public IEventBus getEventBus() {
-        return EVENT_BUS;
-    }
 }

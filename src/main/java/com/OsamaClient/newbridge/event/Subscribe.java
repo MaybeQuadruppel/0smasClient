@@ -1,4 +1,4 @@
-package com.OsamaClient.newbridge.Utils.Render.Events;
+package com.OsamaClient.newbridge.event;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -7,6 +7,5 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface EventHandler {
-    int priority() default 0;
+public @interface Subscribe {
 }

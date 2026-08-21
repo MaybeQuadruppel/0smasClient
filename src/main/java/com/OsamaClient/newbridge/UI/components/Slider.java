@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.UI.components;
 
+import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -44,14 +45,23 @@ public class Slider extends Component {
         if (dragging) {
             double usable = width - TRACK_INSET_X * 2;
             double diff   = Math.min(usable, Math.max(0, mouseX - x - TRACK_INSET_X));
-            this.value    = min + (diff / usable) * (max - min);
-            onChange.accept(this.value);
+            double newValue = min + (diff / usable) * (max - min);
+
+            if (newValue != this.value) {
+                this.value = newValue;
+                onChange.accept(this.value);
+
+                // Dynamische Tonhöhe beim Ziehen
+                float pct = (float) ((this.value - min) / (max - min));
+                float pitch = 0.8f + (pct * 0.8f);
+                ClickGuiScreen.playGuiSound(pitch, 0.08f);
+            }
         }
 
         float hover = stepHover(mouseX, mouseY);
 
         // Hintergrund (Panel-Farben)
-        drawRoundedRect(   guiGraphics, x, y, width, height,
+        drawRoundedRect(guiGraphics, x, y, width, height,
                 lerpColor(C_BG, C_BG_HOV, hover));
 
         // Umrandung (Akzentuierung bei Hover)
@@ -83,13 +93,25 @@ public class Slider extends Component {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && isHovered(mouseX, mouseY)) { this.dragging = true; return true; }
+        if (button == 0 && isHovered(mouseX, mouseY)) {
+            this.dragging = true;
+
+            double usable = width - TRACK_INSET_X * 2;
+            double diff   = Math.min(usable, Math.max(0, mouseX - x - TRACK_INSET_X));
+            this.value    = min + (diff / usable) * (max - min);
+            onChange.accept(this.value);
+
+            float pct = (float) ((this.value - min) / (max - min));
+            float pitch = 0.8f + (pct * 0.8f);
+            ClickGuiScreen.playGuiSound(pitch, 0.2f);
+            return true;
+        }
         return false;
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        this.dragging = false;
+        if (button == 0) this.dragging = false;
         return true;
     }
 

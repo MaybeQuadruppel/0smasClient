@@ -3,12 +3,15 @@ package com.OsamaClient.newbridge.UI.components;
 import com.OsamaClient.newbridge.Hacks.Combat.*;
 import com.OsamaClient.newbridge.Hacks.Misc.*;
 import com.OsamaClient.newbridge.Hacks.Movement.*;
+import com.OsamaClient.newbridge.Hacks.Donut.*;
+//import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
+//import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
 import com.OsamaClient.newbridge.Hacks.Visual.HealthIndicator;
 import com.OsamaClient.newbridge.Hacks.Visual.XRay;
 import com.OsamaClient.newbridge.Hacks.Visual.*;
-import com.OsamaClient.newbridge.Hacks.Visual.Trajectories;
+//import com.OsamaClient.newbridge.Hacks.Visual.Trajectories;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +45,6 @@ public class ModuleManager {
         modules.add(new Scaffold());
         modules.add(new ONETAP());
         modules.add(new ElytraFly());
-//        modules.add(new PacketControl());
         modules.add(new AutoCrit());
         modules.add(new Reach());
         modules.add(new AttributeSwapping());
@@ -58,7 +60,10 @@ public class ModuleManager {
         modules.add(new FastPlace());
         modules.add(new KillAura());
         modules.add(new NoRender());
-        modules.add(new Tracers());
+//        modules.add(new Tracers());
+        modules.add(new AutoSell());
+//        modules.add(new TestEnderChestESP());
+
     }
 
     public static List<Module> getModulesByCategory(Module.Category c) {

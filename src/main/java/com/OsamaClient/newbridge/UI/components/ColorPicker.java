@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.UI.components;
 
+import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import java.util.function.Consumer;
@@ -58,16 +59,21 @@ public class ColorPicker extends Component {
         int trackY = y + height - TRACK_H - 5;
 
         if (dragging) {
-            this.hue = Math.min(1f, Math.max(0f, (mouseX - trackX) / (float) trackW));
-            updateColorFromHue();
+            float oldHue = this.hue;
+            this.hue = (float) Math.min(1.0, Math.max(0.0, (mouseX - trackX) / (double) trackW));
+
+            if (this.hue != oldHue) {
+                updateColorFromHue();
+                // Tonhöhe steigt dynamisch mit dem Hue-Wert beim Ziehen
+                float pitch = 0.8f + (this.hue * 0.8f);
+                ClickGuiScreen.playGuiSound(pitch, 0.08f);
+            }
         }
 
         drawRoundedRect(guiGraphics, x, y, width, height, C_BG);
         drawRoundedOutline(guiGraphics, x, y, width, height, C_BORDER);
 
-
         guiGraphics.text(Minecraft.getInstance().font, label, x + PAD, y + 3, C_TEXT_DIM, false);
-
 
         for (int i = 0; i < trackW; i++) {
             int col = java.awt.Color.HSBtoRGB(i / (float) trackW, 1f, 1f) | 0xFF000000;
@@ -77,7 +83,6 @@ public class ColorPicker extends Component {
         int thumbX = trackX + (int)(hue * trackW);
         thumbX = Math.max(trackX, Math.min(trackX + trackW - 2, thumbX));
         guiGraphics.fill(thumbX - 1, trackY - 1, thumbX + 2, trackY + TRACK_H + 1, 0xFFFFFFFF);
-
 
         int previewX = x + width - 14;
         int previewY = y + 5;
@@ -89,6 +94,15 @@ public class ColorPicker extends Component {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && isHovered(mouseX, mouseY)) {
             this.dragging = true;
+
+            int trackX = x + PAD + 8;
+            int trackW = width - (PAD * 2) - 22;
+
+            this.hue = (float) Math.min(1.0, Math.max(0.0, (mouseX - trackX) / (double) trackW));
+            updateColorFromHue();
+
+            float pitch = 0.8f + (this.hue * 0.8f);
+            ClickGuiScreen.playGuiSound(pitch, 0.2f);
             return true;
         }
         return false;
