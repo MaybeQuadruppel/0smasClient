@@ -384,7 +384,7 @@ public class ClickGuiScreen extends Screen {
         int leftHeight = 0;
         int rightHeight = 0;
         for (Component component : selectedModule.settings) {
-            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
+            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker || component instanceof EnchantmentPicker) {
                 rightHeight += component.height + 5;
             } else {
                 leftHeight += component.height + 5;
@@ -403,7 +403,7 @@ public class ClickGuiScreen extends Screen {
         int rightY = SETTINGS_LIST_TOP - (int) settingsScrollOffset;
 
         for (Component component : selectedModule.settings) {
-            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker) {
+            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker || component instanceof EnchantmentPicker) {
                 component.x = rightX;
                 component.y = rightY;
                 if (component.y + component.height >= SETTINGS_LIST_TOP && component.y <= viewBottom) {
@@ -595,7 +595,7 @@ public class ClickGuiScreen extends Screen {
             int viewBottom = this.height - SETTINGS_BOTTOM_PAD;
 
             for (Component c : selectedModule.settings) {
-                if (c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker) {
+                if (c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker || c instanceof EnchantmentPicker) {
                     if (c.y + c.height >= SETTINGS_LIST_TOP && c.y <= viewBottom) {
                         if (c.mouseClicked(mx, my, btn)) return true;
                     }
@@ -603,7 +603,7 @@ public class ClickGuiScreen extends Screen {
             }
 
             for (Component c : selectedModule.settings) {
-                if (!(c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker)) {
+                if (!(c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker || c instanceof EnchantmentPicker)) {
                     if (c.y + c.height >= SETTINGS_LIST_TOP && c.y <= viewBottom) {
                         if (c.mouseClicked(mx, my, btn)) return true;
                     }
@@ -630,6 +630,7 @@ public class ClickGuiScreen extends Screen {
                 if (c instanceof BlockPicker bp && bp.mouseScrolled(mx, my, vAmt)) return true;
                 if (c instanceof ItemPicker ip && ip.mouseScrolled(mx, my, vAmt)) return true;
                 if (c instanceof EntityFilterPicker ep && ep.mouseScrolled(mx, my, vAmt)) return true;
+                if (c instanceof EnchantmentPicker enc && enc.mouseScrolled(mx, my, vAmt)) return true;
             }
             if (settingsMaxScroll > 0) {
                 settingsScrollOffset -= vAmt * SCROLL_STEP;

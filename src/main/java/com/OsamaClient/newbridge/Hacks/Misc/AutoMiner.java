@@ -9,10 +9,10 @@ import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-
-
+import net.minecraft.world.level.material.FluidState;
 
 public class AutoMiner extends Module {
 
@@ -114,12 +114,12 @@ public class AutoMiner extends Module {
                     Block block = state.getBlock();
 
                     if (blockPicker.selectedBlocks.contains(block)) {
-                        if (BlockHelper.isEncasedInBedrock(client.level, currentPos)) {
-                            continue;
-                        }
-                        if (BlockHelper.isBedrockAbove(client.level, currentPos)){
-                            continue;
-                        }
+                        if (BlockHelper.isEncasedInBedrock(client.level, currentPos)) continue;
+                        if (BlockHelper.isBedrockAbove(client.level, currentPos)) continue;
+
+                        // NEUER CHECK: Ignoriere den Block, wenn er an Lava/Wasser grenzt!
+                        if (isExposedToLiquid(client, currentPos)) continue;
+
                         double dist = currentPos.distSqr(playerPos);
                         if (dist < bestDist) {
                             bestDist = dist;
@@ -130,5 +130,21 @@ public class AutoMiner extends Module {
             }
         }
         return bestPos;
+    }
+
+    /**
+     * Prüft alle 6 angrenzenden Blöcke, um zu sehen, ob eine Flüssigkeit (wie Lava) vorhanden ist.
+     */
+    private boolean isExposedToLiquid(Minecraft client, BlockPos pos) {
+        for (Direction dir : Direction.values()) {
+            BlockPos adjacent = pos.relative(dir);
+            FluidState fluidState = client.level.getFluidState(adjacent);
+
+            // Wenn der angrenzende Block eine Flüssigkeit enthält, gib true zurück
+            if (!fluidState.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

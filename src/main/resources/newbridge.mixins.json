@@ -17,7 +17,8 @@
     "ShaderManagerMixin",
     "LevelRendererGuardMixin",
     "LevelRendererMixin",
-    "LevelRendererOutlineMixin"
+    "LevelRendererOutlineMixin",
+    "ServerboundMovePlayerPacketAccessor"
   ],
   "client": [
     "camera.FreeLookPlayerMixin",

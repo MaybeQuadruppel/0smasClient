@@ -214,7 +214,8 @@ public class BlockESP extends Module {
                 float targetY = minY + ((maxY - minY) / 2.0f);
                 float targetZ = minZ + ((maxZ - minZ) / 2.0f);
 
-                line(matrix, normalMatrix, tracerConsumer, startX, startY, startZ, targetX, targetY, targetZ, box.argb());
+                // Tracers mit Linienbreite 2.0f
+                line(matrix, normalMatrix, tracerConsumer, startX, startY, startZ, targetX, targetY, targetZ, box.argb(), 2.0f);
             }
         }
 
@@ -250,33 +251,38 @@ public class BlockESP extends Module {
     }
 
     private static void renderBoxOutline(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color) {
-        line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, color);
-        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y1, z2, color);
-        line(matrix, normalMatrix, consumer, x2, y1, z2, x1, y1, z2, color);
-        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y1, z1, color);
+        float width = 6.0f; // Box Outlines mit Linienbreite 6.0f
 
-        line(matrix, normalMatrix, consumer, x1, y2, z1, x2, y2, z1, color);
-        line(matrix, normalMatrix, consumer, x2, y2, z1, x2, y2, z2, color);
-        line(matrix, normalMatrix, consumer, x2, y2, z2, x1, y2, z2, color);
-        line(matrix, normalMatrix, consumer, x1, y2, z2, x1, y2, z1, color);
+        // Unteres Quadrat
+        line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, color, width);
+        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y1, z2, color, width);
+        line(matrix, normalMatrix, consumer, x2, y1, z2, x1, y1, z2, color, width);
+        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y1, z1, color, width);
 
-        line(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, color);
-        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, color);
-        line(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, color);
-        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y2, z2, color);
+        // Oberes Quadrat
+        line(matrix, normalMatrix, consumer, x1, y2, z1, x2, y2, z1, color, width);
+        line(matrix, normalMatrix, consumer, x2, y2, z1, x2, y2, z2, color, width);
+        line(matrix, normalMatrix, consumer, x2, y2, z2, x1, y2, z2, color, width);
+        line(matrix, normalMatrix, consumer, x1, y2, z2, x1, y2, z1, color, width);
+
+        // Vertikale Streben
+        line(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, color, width);
+        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, color, width);
+        line(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, color, width);
+        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y2, z2, color, width);
     }
 
-    private static void line(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color) {
+    private static void line(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color, float lineWidth) {
         int a = (color >> 24) & 0xFF;
         int r = (color >> 16) & 0xFF;
         int g = (color >> 8) & 0xFF;
         int b = color & 0xFF;
-        line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y2, z2, r, g, b, a);
+        line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y2, z2, r, g, b, a, lineWidth);
     }
 
     private static void line(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
                              float x1, float y1, float z1, float x2, float y2, float z2,
-                             int r, int g, int b, int a) {
+                             int r, int g, int b, int a, float lineWidth) {
 
         float dx = x2 - x1;
         float dy = y2 - y1;
@@ -294,8 +300,8 @@ public class BlockESP extends Module {
         Vector3f normal = new Vector3f(dx, dy, dz);
         normal.mul(normalMatrix);
 
-        consumer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a).setNormal(normal.x(), normal.y(), normal.z()).setLineWidth(5.0f);
-        consumer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a).setNormal(normal.x(), normal.y(), normal.z()).setLineWidth(5.0f);
+        consumer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a).setNormal(normal.x(), normal.y(), normal.z()).setLineWidth(lineWidth);
+        consumer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a).setNormal(normal.x(), normal.y(), normal.z()).setLineWidth(lineWidth);
     }
 
     @Override
