@@ -33,6 +33,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class BlockESP extends Module {
     public double rangeInChunks = 4.0;
     public double scanDelay = 2.0;
+    public double outlineWidth = 2.0;
+    public double tracerWidth = 2.0;
 
     public String renderMode = "Fill";
     public boolean renderTracers = false;
@@ -49,6 +51,8 @@ public class BlockESP extends Module {
         this.settings.add(this.blockPicker);
         this.settings.add(new Slider("Chunk Range", 1.0, 16.0, rangeInChunks, val -> rangeInChunks = val).withDescription("Sets the chunk render and scan range for block ESP."));
         this.settings.add(new Slider("Scan Delay (s)", 0.5, 10.0, scanDelay, val -> scanDelay = val).withDescription("Sets the delay in seconds between block scans."));
+        this.settings.add(new Slider("Outline Width", 0.5, 10.0, outlineWidth, val -> outlineWidth = val).withDescription("Sets the line thickness for box outlines."));
+        this.settings.add(new Slider("Tracer Width", 0.5, 10.0, tracerWidth, val -> tracerWidth = val).withDescription("Sets the line thickness for tracers."));
 
         List<String> modes = List.of("Fill", "Outline", "Both", "None");
         this.settings.add(new ModeButton("Mode", modes, modes.indexOf(renderMode), val -> renderMode = val).withDescription("Selects box rendering style (Fill, Outline, Both, None)."));
@@ -195,7 +199,7 @@ public class BlockESP extends Module {
                 float maxY = (float) (box.bounds().maxY - camY);
                 float maxZ = (float) (box.bounds().maxZ - camZ);
 
-                renderBoxOutline(matrix, normalMatrix, lineConsumer, minX, minY, minZ, maxX, maxY, maxZ, box.argb());
+                renderBoxOutline(matrix, normalMatrix, lineConsumer, minX, minY, minZ, maxX, maxY, maxZ, box.argb(), (float) outlineWidth);
             }
         }
 
@@ -214,8 +218,7 @@ public class BlockESP extends Module {
                 float targetY = minY + ((maxY - minY) / 2.0f);
                 float targetZ = minZ + ((maxZ - minZ) / 2.0f);
 
-                // Tracers mit Linienbreite 2.0f
-                line(matrix, normalMatrix, tracerConsumer, startX, startY, startZ, targetX, targetY, targetZ, box.argb(), 2.0f);
+                line(matrix, normalMatrix, tracerConsumer, startX, startY, startZ, targetX, targetY, targetZ, box.argb(), (float) tracerWidth);
             }
         }
 
@@ -250,26 +253,24 @@ public class BlockESP extends Module {
         consumer.addVertex(matrix, x4, y4, z4).setColor(r, g, b, a).setUv(0f, 0f).setOverlay(OverlayTexture.NO_OVERLAY).setNormal(normal.x(), normal.y(), normal.z());
     }
 
-    private static void renderBoxOutline(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color) {
-        float width = 6.0f; // Box Outlines mit Linienbreite 6.0f
-
+    private static void renderBoxOutline(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color, float lineWidth) {
         // Unteres Quadrat
-        line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, color, width);
-        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y1, z2, color, width);
-        line(matrix, normalMatrix, consumer, x2, y1, z2, x1, y1, z2, color, width);
-        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y1, z1, color, width);
+        line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y1, z2, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x2, y1, z2, x1, y1, z2, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y1, z1, color, lineWidth);
 
         // Oberes Quadrat
-        line(matrix, normalMatrix, consumer, x1, y2, z1, x2, y2, z1, color, width);
-        line(matrix, normalMatrix, consumer, x2, y2, z1, x2, y2, z2, color, width);
-        line(matrix, normalMatrix, consumer, x2, y2, z2, x1, y2, z2, color, width);
-        line(matrix, normalMatrix, consumer, x1, y2, z2, x1, y2, z1, color, width);
+        line(matrix, normalMatrix, consumer, x1, y2, z1, x2, y2, z1, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x2, y2, z1, x2, y2, z2, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x2, y2, z2, x1, y2, z2, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x1, y2, z2, x1, y2, z1, color, lineWidth);
 
         // Vertikale Streben
-        line(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, color, width);
-        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, color, width);
-        line(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, color, width);
-        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y2, z2, color, width);
+        line(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, color, lineWidth);
+        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y2, z2, color, lineWidth);
     }
 
     private static void line(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color, float lineWidth) {

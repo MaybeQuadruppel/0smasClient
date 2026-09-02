@@ -27,7 +27,6 @@ public class EntityFilterPicker extends Component {
     private static final int C_ACCENT     = 0xFFFFFFFF;
     private static final int C_TEXT       = 0xFFEEEEEE;
     private static final int C_TEXT_DIM   = 0xFF666666;
-    private static final int C_SELECTED   = 0xFFFFFFFF;
     private static final int C_SEL_BG     = 0x40FFFFFF;
 
     public EntityFilterPicker(String label) {
@@ -102,17 +101,21 @@ public class EntityFilterPicker extends Component {
                 guiGraphics.fill(dropX + 1, currentY, dropX + dropW - 1, currentY + itemH, 0x1AFFFFFF);
             }
 
+            // Farbe abrufen und Alpha-Kanal für Text entfernen (immer 100% deckend)
+            int filterColor = getColor(key);
+            int displayColor = active ? (filterColor | 0xFF000000) : (itemHov ? C_TEXT : C_TEXT_DIM);
+
             if (active) {
-                guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, currentY + (itemH / 2) - 4, C_SELECTED, false);
+                guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, currentY + (itemH / 2) - 4, displayColor, false);
             }
 
-            guiGraphics.text(Minecraft.getInstance().font, key, dropX + (active ? 17 : 7), currentY + (itemH / 2) - 4, active ? C_SELECTED : (itemHov ? C_TEXT : C_TEXT_DIM), false);
+            guiGraphics.text(Minecraft.getInstance().font, key, dropX + (active ? 17 : 7), currentY + (itemH / 2) - 4, displayColor, false);
 
             if (active) {
                 int previewSize = 7;
                 int previewX = dropX + dropW - 14;
                 int previewY = currentY + (itemH / 2) - (previewSize / 2);
-                drawRoundedRect(guiGraphics, previewX, previewY, previewSize, previewSize, getColor(key) | 0xFF000000);
+                drawRoundedRect(guiGraphics, previewX, previewY, previewSize, previewSize, filterColor | 0xFF000000);
 
                 if (activeColorFilter != null && activeColorFilter.equals(key)) {
                     drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, C_ACCENT);

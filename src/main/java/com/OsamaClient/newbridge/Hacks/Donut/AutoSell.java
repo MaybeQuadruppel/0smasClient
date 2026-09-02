@@ -142,6 +142,8 @@ public class AutoSell extends Module {
 
     private boolean isUsefulItem(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
-        return itemPicker.selectedItems.contains(stack.getItem());
+
+        // HIER IST DER FIX: .containsKey anstelle von .contains
+        return itemPicker.selectedItems.containsKey(stack.getItem());
     }
 }

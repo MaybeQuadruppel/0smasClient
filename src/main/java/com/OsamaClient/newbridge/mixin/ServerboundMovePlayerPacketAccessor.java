@@ -9,7 +9,21 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface ServerboundMovePlayerPacketAccessor {
 
     @Mutable
-    @Accessor("onGround") // Falls dein Mappings-System den Namen ändert (z.B. Yarn vs Mojmap), hier anpassen!
+    @Accessor("onGround")
     void setOnGround(boolean onGround);
 
+    @Mutable
+    @Accessor("yRot")
+    void setYRot(float yRot);
+
+    @Mutable
+    @Accessor("xRot")
+    void setXRot(float xRot);
+
+    @Mutable
+    @Accessor("hasRot")
+    void setHasRot(boolean hasRot);
+
+    @Accessor("hasRot")
+    boolean getHasRot();
 }

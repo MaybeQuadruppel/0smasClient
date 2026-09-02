@@ -7,7 +7,9 @@ import com.OsamaClient.newbridge.Hacks.Donut.*;
 //import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
 //import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
+import com.OsamaClient.newbridge.Hacks.Visual.ESP.ItemESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
+import com.OsamaClient.newbridge.Hacks.Visual.ESP.SkeletonESP;
 import com.OsamaClient.newbridge.Hacks.Visual.HealthIndicator;
 import com.OsamaClient.newbridge.Hacks.Visual.XRay;
 import com.OsamaClient.newbridge.Hacks.Visual.*;
@@ -67,6 +69,9 @@ public class ModuleManager {
         modules.add(new ClickTP());
         modules.add(new AutoTrade());
         modules.add(new BoatFly());
+        modules.add(new ItemESP());
+        modules.add(new SafeAnchor());
+        modules.add(new SkeletonESP());
 
     }
 

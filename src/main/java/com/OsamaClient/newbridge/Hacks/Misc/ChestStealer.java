@@ -1,4 +1,4 @@
-package com.OsamaClient.newbridge.Hacks.Misc; // Passe das Package bei Bedarf an
+package com.OsamaClient.newbridge.Hacks.Misc;
 
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
@@ -15,12 +15,12 @@ public class ChestStealer extends Module {
     public static ChestStealer INSTANCE;
 
     // Settings
-    public boolean stealAll = false;       // true = Take All, false = Item Picker Modus
-    public boolean autoClose = true;      // Schließt die Kiste automatisch, sobald keine Ziel-Items mehr da sind
-    public double delay = 80.0;           // Verzögerung in ms pro Item (Anti-Cheat / Legit-Look)
-    public boolean randomizeDelay = true; // Kleine Zufallsabweichung beim Delay
+    public boolean stealAll = false;
+    public boolean autoClose = true;
+    public double delay = 80.0;
+    public boolean randomizeDelay = true;
 
-    // ItemPicker GUI Component
+
     public ItemPicker itemPicker;
 
     private long nextStealTime = 0;
@@ -45,8 +45,6 @@ public class ChestStealer extends Module {
         if (client.gui.screen() instanceof InventoryScreen) {
             return;
         }
-
-        // Nur ausführen, wenn wirklich ein Kisten-Menü (ChestMenu) geöffnet ist
         if (!(client.player.containerMenu instanceof ChestMenu menu)) {
             return;
         }
@@ -54,18 +52,16 @@ public class ChestStealer extends Module {
         // Delay-Abfrage (Wartet x Millisekunden ab)
         if (System.currentTimeMillis() < nextStealTime) return;
 
-        int chestSize = menu.getContainer().getContainerSize(); // Anzahl der Kisten-Slots (27/54)
+        int chestSize = menu.getContainer().getContainerSize();
         boolean hasRemainingTargets = false;
 
         for (int i = 0; i < chestSize; i++) {
             ItemStack stack = menu.getSlot(i).getItem();
 
             if (!stack.isEmpty()) {
-                // Prüfen, ob das Item nach aktuellen Einstellungen gestohlen werden soll
                 if (stealAll || isUsefulItem(stack)) {
                     hasRemainingTargets = true;
 
-                    // Shift-Klick (Quick Move) ausführen, um das Item ins eigene Inventar zu verschieben
                     client.gameMode.handleContainerInput(menu.containerId, i, 0, ContainerInput.QUICK_MOVE, client.player);
 
                     // Nächsten Klick-Zeitpunkt berechnen
@@ -78,8 +74,6 @@ public class ChestStealer extends Module {
                 }
             }
         }
-
-        // Sobald keine relevanten Items mehr in der Kiste sind -> Kiste schließen
         if (!hasRemainingTargets && autoClose) {
             client.player.closeContainer();
         }
@@ -91,7 +85,7 @@ public class ChestStealer extends Module {
     private boolean isUsefulItem(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
 
-        // Greift direkt auf das ausgewählte Set im ItemPicker zu
-        return itemPicker.selectedItems.contains(stack.getItem());
+        // HIER IST DER FIX: .containsKey anstelle von .contains
+        return itemPicker.selectedItems.containsKey(stack.getItem());
     }
 }

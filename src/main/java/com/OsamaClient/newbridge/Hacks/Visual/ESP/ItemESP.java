@@ -1,10 +1,9 @@
 package com.OsamaClient.newbridge.Hacks.Visual.ESP;
 
 import com.OsamaClient.newbridge.EntryPoint;
-import com.OsamaClient.newbridge.Hacks.Visual.Trajectories;
 import com.OsamaClient.newbridge.Hacks.Visual.render.RenderTypes;
 import com.OsamaClient.newbridge.Hacks.Visual.render.chams.ChamsBufferSource;
-import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
+import com.OsamaClient.newbridge.UI.components.ItemPicker;
 import com.OsamaClient.newbridge.UI.components.ModeButton;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
@@ -13,47 +12,41 @@ import com.OsamaClient.newbridge.event.Render3DEvent;
 import com.OsamaClient.newbridge.event.Subscribe;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.entity.monster.Enemy;
-import net.minecraft.world.entity.npc.villager.Villager;
-import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.util.List;
 
-public class PlayerESP extends Module {
-    public static PlayerESP INSTANCE;
+public class ItemESP extends Module {
+    public static ItemESP INSTANCE;
 
     public float range = 128;
     public double outlineWidth = 2.0;
     public double tracerWidth = 2.0;
     public String renderMode = "Both";
     public boolean renderTracers = false;
-    public EntityFilterPicker targetPicker;
+    public ItemPicker itemPicker;
 
-    public PlayerESP() {
-        super("EntityESP", "Lets you See Entities by their Threatlevels", Category.VISUAL);
+    public ItemESP() {
+        super("ItemESP", "Highlights dropped items on the ground.", Category.VISUAL);
         INSTANCE = this;
 
-        this.targetPicker = new EntityFilterPicker("Targets");
-        this.settings.add(this.targetPicker.withDescription("Selects which entity types to highlight with ESP."));
+        this.itemPicker = new ItemPicker("Items Filter");
+        this.settings.add(this.itemPicker.withDescription("Select items to highlight. Right-click selected items to change color!"));
 
         this.settings.add(new Slider("Range", 1.0, 128.0, (double) range, val -> range = val.floatValue())
-                .withDescription("Sets the maximum distance at which entities are highlighted."));
+                .withDescription("Sets the maximum distance at which items are highlighted."));
 
         this.settings.add(new Slider("Outline Width", 0.5, 10.0, outlineWidth, val -> outlineWidth = val)
-                .withDescription("Sets the line thickness for entity box outlines."));
+                .withDescription("Sets the line thickness for item box outlines."));
 
         this.settings.add(new Slider("Tracer Width", 0.5, 10.0, tracerWidth, val -> tracerWidth = val)
                 .withDescription("Sets the line thickness for tracers."));
@@ -63,13 +56,13 @@ public class PlayerESP extends Module {
                 .withDescription("Selects box rendering style (Fill, Outline, Both, None)."));
 
         this.settings.add(new ToggleButton("Tracers", renderTracers, val -> renderTracers = val)
-                .withDescription("Draws tracer lines to entities."));
+                .withDescription("Draws tracer lines to items."));
 
         EntryPoint.EVENT_BUS.subscribe(this);
     }
 
-    public static PlayerESP getInstance() {
-        if (INSTANCE == null) INSTANCE = new PlayerESP();
+    public static ItemESP getInstance() {
+        if (INSTANCE == null) INSTANCE = new ItemESP();
         return INSTANCE;
     }
 
@@ -109,91 +102,68 @@ public class PlayerESP extends Module {
             startZ = dirZ * offset;
         }
 
-        // --- SCHLEIFE 1: FILLS ---
-        if (drawFill) {
-            VertexConsumer fillConsumer = bufferSource.getBuffer(RenderTypes.storageEspFillSeeThrough());
-            for (Entity entity : client.level.entitiesForRendering()) {
-                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
+        for (Entity entity : client.level.entitiesForRendering()) {
+            if (!(entity instanceof ItemEntity itemEntity)) continue;
 
-                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
+            // Distanz Check
+            if (client.player.distanceToSqr(itemEntity) > range * range) continue;
 
-                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
+            Item rawItem = itemEntity.getItem().getItem();
 
-                String filterKey = getFilterKey(entity);
-                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
+            // Standardfarbe, falls keine Filter aktiv sind
+            int outlineColor = 0xFFFFD700;
 
-                if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0x80FF0000 : getAdjustedColor(targetPicker.getColor(filterKey), 0.5f);
-                    renderRotatedBox(poseStack, fillConsumer, living, tickDelta, camX, camY, camZ, color, true, (float) outlineWidth);
+            // Filter Logik und Farbabruf
+            if (!itemPicker.selectedItems.isEmpty()) {
+                if (!itemPicker.selectedItems.containsKey(rawItem)) {
+                    continue; // Überspringen, wenn es nicht in der Liste ist
                 }
+                // Hol dir die im Picker eingestellte Farbe
+                outlineColor = itemPicker.selectedItems.get(rawItem);
             }
-        }
 
-        // --- SCHLEIFE 2: OUTLINES ---
-        if (drawOutline) {
-            VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
-            for (Entity entity : client.level.entitiesForRendering()) {
-                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
+            int fillColor = getAdjustedColor(outlineColor, 0.4f);
 
-                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
-                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
-
-                String filterKey = getFilterKey(entity);
-                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
-
-                if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0xFFFF0000 : getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
-                    renderRotatedBox(poseStack, lineConsumer, living, tickDelta, camX, camY, camZ, color, false, (float) outlineWidth);
-                }
+            if (drawFill) {
+                VertexConsumer fillConsumer = bufferSource.getBuffer(RenderTypes.storageEspFillSeeThrough());
+                renderBox(poseStack, fillConsumer, itemEntity, tickDelta, camX, camY, camZ, fillColor, true, (float) outlineWidth);
             }
-        }
 
-        // --- SCHLEIFE 3: TRACERS ---
-        if (renderTracers) {
-            VertexConsumer tracerConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
-            for (Entity entity : client.level.entitiesForRendering()) {
-                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
+            if (drawOutline) {
+                VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
+                renderBox(poseStack, lineConsumer, itemEntity, tickDelta, camX, camY, camZ, outlineColor, false, (float) outlineWidth);
+            }
 
-                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
-                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
+            if (renderTracers) {
+                VertexConsumer tracerConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
 
-                String filterKey = getFilterKey(entity);
-                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
+                double x = Mth.lerp(tickDelta, itemEntity.xo, itemEntity.getX()) - camX;
+                double y = Mth.lerp(tickDelta, itemEntity.yo, itemEntity.getY()) - camY;
+                double z = Mth.lerp(tickDelta, itemEntity.zo, itemEntity.getZ()) - camZ;
 
-                if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0xFFFF0000 : getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
+                float targetX = (float) x;
+                float targetY = (float) (y + itemEntity.getBbHeight() / 2f);
+                float targetZ = (float) z;
 
-                    double x = Mth.lerp(tickDelta, living.xo, living.getX()) - camX;
-                    double y = Mth.lerp(tickDelta, living.yo, living.getY()) - camY;
-                    double z = Mth.lerp(tickDelta, living.zo, living.getZ()) - camZ;
-
-                    float targetX = (float) x;
-                    float targetY = (float) (y + living.getBbHeight() / 2f);
-                    float targetZ = (float) z;
-
-                    Matrix4f matrix = poseStack.last().pose();
-                    Matrix3f normalMatrix = poseStack.last().normal();
-
-                    line(matrix, normalMatrix, tracerConsumer, startX, startY, startZ, targetX, targetY, targetZ, color, (float) tracerWidth);
-                }
+                Matrix4f matrix = poseStack.last().pose();
+                Matrix3f normalMatrix = poseStack.last().normal();
+                line(matrix, normalMatrix, tracerConsumer, startX, startY, startZ, targetX, targetY, targetZ, outlineColor, (float) tracerWidth);
             }
         }
 
         bufferSource.uploadAndDraw();
     }
 
-    private void renderRotatedBox(PoseStack poseStack, VertexConsumer consumer, LivingEntity entity, float tickDelta, double camX, double camY, double camZ, int color, boolean isFill, float lineWidth) {
+    private void renderBox(PoseStack poseStack, VertexConsumer consumer, ItemEntity entity, float tickDelta, double camX, double camY, double camZ, int color, boolean isFill, float lineWidth) {
         double x = Mth.lerp(tickDelta, entity.xo, entity.getX()) - camX;
         double y = Mth.lerp(tickDelta, entity.yo, entity.getY()) - camY;
         double z = Mth.lerp(tickDelta, entity.zo, entity.getZ()) - camZ;
 
         float w = entity.getBbWidth() / 2f;
         float h = entity.getBbHeight();
-        float yaw = Mth.lerp(tickDelta, entity.yBodyRotO, entity.yBodyRot);
 
         poseStack.pushPose();
         poseStack.translate(x, y, z);
-        poseStack.mulPose(Axis.YP.rotationDegrees(-yaw));
 
         Matrix4f matrix = poseStack.last().pose();
         Matrix3f normalMatrix = poseStack.last().normal();
@@ -208,15 +178,6 @@ public class PlayerESP extends Module {
         }
 
         poseStack.popPose();
-    }
-
-    private String getFilterKey(Entity entity) {
-        if (entity instanceof Player) return "Players";
-        if (entity instanceof ArmorStand) return "ArmorStands";
-        if (entity instanceof Enemy) return "Hostiles";
-        if (entity instanceof Animal) return "Animals";
-        if (entity instanceof Villager || entity instanceof WanderingTrader) return "NPCs";
-        return null;
     }
 
     private int getAdjustedColor(int argb, float alphaMultiplier) {
@@ -261,19 +222,14 @@ public class PlayerESP extends Module {
     }
 
     private static void renderBoxOutline(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color, float lineWidth) {
-        // Unteres Quadrat
         line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y1, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z2, x1, y1, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y1, z1, color, lineWidth);
-
-        // Oberes Quadrat
         line(matrix, normalMatrix, consumer, x1, y2, z1, x2, y2, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y2, z1, x2, y2, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y2, z2, x1, y2, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x1, y2, z2, x1, y2, z1, color, lineWidth);
-
-        // Vertikale Streben
         line(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, color, lineWidth);

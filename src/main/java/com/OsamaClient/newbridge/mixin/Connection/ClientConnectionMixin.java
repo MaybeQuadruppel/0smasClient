@@ -4,6 +4,7 @@ import com.OsamaClient.newbridge.Hacks.Misc.FakeLag;
 import com.OsamaClient.newbridge.Hacks.Misc.Freecam;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
+import com.OsamaClient.newbridge.mixin.ServerboundMovePlayerPacketAccessor;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
@@ -20,21 +21,24 @@ public class ClientConnectionMixin {
         try {
             if (ModuleManager.modules == null || ModuleManager.modules.isEmpty()) return;
 
-            Module baseModule = ModuleManager.getModuleByName("FakeLag");
-            if (baseModule == null || !baseModule.enabled) return;
 
-            if (baseModule instanceof FakeLag fakeLag) {
-                if (packet instanceof ServerboundMovePlayerPacket) {
-                    fakeLag.packetQueue.add(packet);
-                    ci.cancel();
+            Module baseModule = ModuleManager.getModuleByName("FakeLag");
+            if (baseModule != null && baseModule.enabled) {
+                if (baseModule instanceof FakeLag fakeLag) {
+                    if (packet instanceof ServerboundMovePlayerPacket) {
+                        fakeLag.packetQueue.add(packet);
+                        ci.cancel();
+                        return;
+                    }
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+
         Module freecam = ModuleManager.getModuleByName("Freecam");
         if (freecam != null && freecam.enabled) {
-            if (packet instanceof net.minecraft.network.protocol.game.ServerboundMovePlayerPacket) {
+            if (packet instanceof ServerboundMovePlayerPacket) {
                 ci.cancel();
                 return;
             }
@@ -42,6 +46,5 @@ public class ClientConnectionMixin {
         if (Freecam.isActive && packet instanceof ServerboundMovePlayerPacket) {
             ci.cancel();
         }
-
     }
 }

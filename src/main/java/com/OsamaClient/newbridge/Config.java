@@ -49,11 +49,13 @@ public class Config {
                     }
                     settings.add(bp.getLabel(), blockMapObj);
                 } else if (c instanceof ItemPicker ip) {
-                    JsonArray itemsArr = new JsonArray();
-                    for (Item item : ip.selectedItems) {
-                        itemsArr.add(BuiltInRegistries.ITEM.getKey(item).toString());
+                    // NEU: Speichert Item + Farbe als JsonObject
+                    JsonObject itemMapObj = new JsonObject();
+                    for (Map.Entry<Item, Integer> entry : ip.selectedItems.entrySet()) {
+                        String itemId = BuiltInRegistries.ITEM.getKey(entry.getKey()).toString();
+                        itemMapObj.addProperty(itemId, entry.getValue());
                     }
-                    settings.add(ip.getLabel(), itemsArr);
+                    settings.add(ip.getLabel(), itemMapObj);
                 } else if (c instanceof EntityFilterPicker efp) {
                     JsonObject efpObj = new JsonObject();
 
@@ -206,10 +208,24 @@ public class Config {
 
             JsonElement el = settings.get(ip.getLabel());
 
-            if (el != null && el.isJsonArray()) {
+            // NEU: Lädt Items + Farben aus dem JsonObject
+            if (el != null && el.isJsonObject()) {
+                JsonObject itemMapObj = el.getAsJsonObject();
+                for (Map.Entry<String, JsonElement> entry : itemMapObj.entrySet()) {
+                    Identifier loc = Identifier.parse(entry.getKey());
+                    int savedColor = entry.getValue().getAsInt();
+
+                    BuiltInRegistries.ITEM.getOptional(loc).ifPresent(item -> {
+                        ip.selectedItems.put(item, savedColor);
+                    });
+                }
+            } else if (el != null && el.isJsonArray()) {
+                // Fallback für alte Configs (vor dem Farb-Update)
                 for (JsonElement itemEl : el.getAsJsonArray()) {
                     Identifier loc = Identifier.parse(itemEl.getAsString());
-                    BuiltInRegistries.ITEM.getOptional(loc).ifPresent(ip.selectedItems::add);
+                    BuiltInRegistries.ITEM.getOptional(loc).ifPresent(item -> {
+                        ip.selectedItems.put(item, 0xFFFFD700); // Standard-Gold für alte Einträge
+                    });
                 }
             }
         } else if (c instanceof EntityFilterPicker efp && settings.has(efp.getLabel())) {
