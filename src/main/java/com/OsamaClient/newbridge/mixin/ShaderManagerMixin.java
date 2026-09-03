@@ -1,6 +1,5 @@
 package com.OsamaClient.newbridge.mixin;
 
-import com.OsamaClient.newbridge.Utils.Render.OsamaRenderPipelines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiling.ProfilerFiller;

@@ -16,6 +16,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -26,11 +31,18 @@ import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import java.lang.reflect.Field;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 public class PlayerESP extends Module {
     public static PlayerESP INSTANCE;
@@ -40,7 +52,40 @@ public class PlayerESP extends Module {
     public double tracerWidth = 2.0;
     public String renderMode = "Both";
     public boolean renderTracers = false;
+    public boolean distanceColors = false;
     public EntityFilterPicker targetPicker;
+
+    // --- SKELETON CACHES & FIELDS ---
+    private static final Map<LivingEntityRenderer<?, ?, ?>, LivingEntityRenderState> STATE_CACHE = new IdentityHashMap<>();
+    private static final Map<ModelPart, Map<String, ModelPart>> CHILDREN_CACHE = new WeakHashMap<>();
+    private static final Map<ModelPart, Vector3f> LOCAL_CENTER_CACHE = new WeakHashMap<>();
+    private static final Map<String, Boolean> OVERLAY_CACHE = new HashMap<>();
+
+    private static final PoseStack CALC_STACK = new PoseStack();
+    private static final Vector3f SCRATCH_VEC = new Vector3f();
+    private static final Vector3f SCRATCH_NORMAL = new Vector3f();
+
+    private static final Field CHILDREN_FIELD;
+    private static final Field CUBES_FIELD;
+
+    static {
+        try {
+            CHILDREN_FIELD = ModelPart.class.getDeclaredField("children");
+            CHILDREN_FIELD.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+
+        Field cubesField = null;
+        for (String name : new String[]{"cubes", "cuboids"}) {
+            try {
+                cubesField = ModelPart.class.getDeclaredField(name);
+                cubesField.setAccessible(true);
+                break;
+            } catch (NoSuchFieldException ignored) {}
+        }
+        CUBES_FIELD = cubesField;
+    }
 
     public PlayerESP() {
         super("EntityESP", "Lets you See Entities by their Threatlevels", Category.VISUAL);
@@ -53,14 +98,17 @@ public class PlayerESP extends Module {
                 .withDescription("Sets the maximum distance at which entities are highlighted."));
 
         this.settings.add(new Slider("Outline Width", 0.5, 10.0, outlineWidth, val -> outlineWidth = val)
-                .withDescription("Sets the line thickness for entity box outlines."));
+                .withDescription("Sets the line thickness for entity box outlines & skeleton lines."));
 
         this.settings.add(new Slider("Tracer Width", 0.5, 10.0, tracerWidth, val -> tracerWidth = val)
                 .withDescription("Sets the line thickness for tracers."));
 
-        List<String> modes = List.of("Fill", "Outline", "Both", "None");
+        List<String> modes = List.of("Fill", "Outline", "Both", "Skeleton", "None");
         this.settings.add(new ModeButton("Mode", modes, modes.indexOf(renderMode), val -> renderMode = val)
-                .withDescription("Selects box rendering style (Fill, Outline, Both, None)."));
+                .withDescription("Selects rendering style (Fill, Outline, Both, Skeleton, None)."));
+
+        this.settings.add(new ToggleButton("Distance Colors", distanceColors, val -> distanceColors = val)
+                .withDescription("Uses distance-based colors for all ESP modes."));
 
         this.settings.add(new ToggleButton("Tracers", renderTracers, val -> renderTracers = val)
                 .withDescription("Draws tracer lines to entities."));
@@ -74,6 +122,7 @@ public class PlayerESP extends Module {
     }
 
     @Subscribe
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public void onRender3D(Render3DEvent event) {
         if (!this.enabled) return;
 
@@ -90,6 +139,7 @@ public class PlayerESP extends Module {
 
         boolean drawFill = (renderMode.equals("Fill") || renderMode.equals("Both")) && !renderMode.equals("None");
         boolean drawOutline = (renderMode.equals("Outline") || renderMode.equals("Both")) && !renderMode.equals("None");
+        boolean drawSkeleton = renderMode.equals("Skeleton");
 
         ChamsBufferSource bufferSource = new ChamsBufferSource();
 
@@ -116,14 +166,20 @@ public class PlayerESP extends Module {
                 if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
 
                 boolean isTrajTarget = (Trajectories.targetedEntity == entity);
-
                 if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
 
                 String filterKey = getFilterKey(entity);
                 boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
 
                 if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0x80FF0000 : getAdjustedColor(targetPicker.getColor(filterKey), 0.5f);
+                    int color;
+                    if (isTrajTarget) {
+                        color = 0x80FF0000;
+                    } else if (distanceColors) {
+                        color = getDistanceColor(client.player, living, 0.5f);
+                    } else {
+                        color = getAdjustedColor(targetPicker.getColor(filterKey), 0.5f);
+                    }
                     renderRotatedBox(poseStack, fillConsumer, living, tickDelta, camX, camY, camZ, color, true, (float) outlineWidth);
                 }
             }
@@ -142,13 +198,79 @@ public class PlayerESP extends Module {
                 boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
 
                 if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0xFFFF0000 : getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
+                    int color;
+                    if (isTrajTarget) {
+                        color = 0xFFFF0000;
+                    } else if (distanceColors) {
+                        color = getDistanceColor(client.player, living, 1.0f);
+                    } else {
+                        color = getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
+                    }
                     renderRotatedBox(poseStack, lineConsumer, living, tickDelta, camX, camY, camZ, color, false, (float) outlineWidth);
                 }
             }
         }
 
-        // --- SCHLEIFE 3: TRACERS ---
+        // --- SCHLEIFE 3: SKELETON ---
+        if (drawSkeleton) {
+            VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
+            for (Entity entity : client.level.entitiesForRendering()) {
+                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
+
+                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
+                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
+
+                String filterKey = getFilterKey(entity);
+                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
+
+                if (isTrajTarget || isEnabledInPicker) {
+                    int color;
+                    if (isTrajTarget) {
+                        color = 0xFFFF0000;
+                    } else if (distanceColors) {
+                        color = getDistanceColor(client.player, living, 1.0f);
+                    } else {
+                        color = getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
+                    }
+
+                    EntityRenderer<?, ?> renderer = client.getEntityRenderDispatcher().getRenderer(entity);
+                    if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> livingRenderer)) continue;
+                    EntityModel<?> model = livingRenderer.getModel();
+
+                    LivingEntityRenderer rawRenderer = (LivingEntityRenderer) renderer;
+                    LivingEntityRenderState state = STATE_CACHE.computeIfAbsent(rawRenderer,
+                            r -> (LivingEntityRenderState) r.createRenderState());
+
+                    rawRenderer.extractRenderState(living, state, tickDelta);
+                    ((EntityModel) model).setupAnim(state);
+
+                    Vec3 entityPos = new Vec3(
+                            Mth.lerp(tickDelta, entity.xo, entity.getX()),
+                            Mth.lerp(tickDelta, entity.yo, entity.getY()),
+                            Mth.lerp(tickDelta, entity.zo, entity.getZ())
+                    );
+
+                    PoseStack calcStack = CALC_STACK;
+                    calcStack.last().pose().identity();
+                    calcStack.last().normal().identity();
+
+                    calcStack.translate(entityPos.x - camX, entityPos.y - camY, entityPos.z - camZ);
+
+                    float yaw = Mth.rotLerp(tickDelta, living.yBodyRotO, living.yBodyRot);
+                    calcStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180.0F - yaw));
+
+                    calcStack.scale(-1.0F, -1.0F, 1.0F);
+                    calcStack.translate(0.0F, -1.501F, 0.0F);
+
+                    Matrix4f matrix = poseStack.last().pose();
+                    Matrix3f normalMatrix = poseStack.last().normal();
+
+                    renderSkeletonPart(calcStack, "root", model.root(), lineConsumer, matrix, normalMatrix, color, (float) outlineWidth, null);
+                }
+            }
+        }
+
+        // --- SCHLEIFE 4: TRACERS ---
         if (renderTracers) {
             VertexConsumer tracerConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
             for (Entity entity : client.level.entitiesForRendering()) {
@@ -161,7 +283,14 @@ public class PlayerESP extends Module {
                 boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
 
                 if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0xFFFF0000 : getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
+                    int color;
+                    if (isTrajTarget) {
+                        color = 0xFFFF0000;
+                    } else if (distanceColors) {
+                        color = getDistanceColor(client.player, living, 1.0f);
+                    } else {
+                        color = getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
+                    }
 
                     double x = Mth.lerp(tickDelta, living.xo, living.getX()) - camX;
                     double y = Mth.lerp(tickDelta, living.yo, living.getY()) - camY;
@@ -180,6 +309,153 @@ public class PlayerESP extends Module {
         }
 
         bufferSource.uploadAndDraw();
+    }
+
+    private void renderSkeletonPart(PoseStack calcStack, String name, ModelPart part,
+                                    VertexConsumer consumer, Matrix4f baseMatrix, Matrix3f normalMatrix,
+                                    int color, float lineWidth, Vec3 parentPos) {
+        if (isOverlayPart(name)) return;
+
+        calcStack.pushPose();
+        part.translateAndRotate(calcStack);
+
+        SCRATCH_VEC.set(0, 0, 0).mulPosition(calcStack.last().pose());
+        Vec3 currentPivot = new Vec3(SCRATCH_VEC.x(), SCRATCH_VEC.y(), SCRATCH_VEC.z());
+
+        Vector3f localCenter = getLocalCenter(part);
+        Vec3 currentCenter = currentPivot;
+        if (localCenter.lengthSquared() > 1.0E-6f) {
+            SCRATCH_VEC.set(localCenter).mulPosition(calcStack.last().pose());
+            currentCenter = new Vec3(SCRATCH_VEC.x(), SCRATCH_VEC.y(), SCRATCH_VEC.z());
+        }
+
+        if (parentPos != null && parentPos.distanceToSqr(currentPivot) > 1.0E-4) {
+            line(baseMatrix, normalMatrix, consumer,
+                    (float) parentPos.x, (float) parentPos.y, (float) parentPos.z,
+                    (float) currentPivot.x, (float) currentPivot.y, (float) currentPivot.z,
+                    color, lineWidth);
+        }
+
+        if (currentPivot.distanceToSqr(currentCenter) > 1.0E-4) {
+            line(baseMatrix, normalMatrix, consumer,
+                    (float) currentPivot.x, (float) currentPivot.y, (float) currentPivot.z,
+                    (float) currentCenter.x, (float) currentCenter.y, (float) currentCenter.z,
+                    color, lineWidth);
+        }
+
+        Vec3 nextParentPos = (currentCenter != currentPivot) ? currentCenter : currentPivot;
+        Map<String, ModelPart> children = getModelPartChildren(part);
+
+        Vec3 bodyCenterOverride = null;
+
+        ModelPart bodyPart = children.get("body");
+        if (bodyPart == null) bodyPart = children.get("body0");
+        if (bodyPart == null) bodyPart = children.get("spine");
+
+        if (bodyPart != null) {
+            calcStack.pushPose();
+            bodyPart.translateAndRotate(calcStack);
+
+            SCRATCH_VEC.set(0, 0, 0).mulPosition(calcStack.last().pose());
+            bodyCenterOverride = new Vec3(SCRATCH_VEC.x(), SCRATCH_VEC.y(), SCRATCH_VEC.z());
+
+            Vector3f bCenter = getLocalCenter(bodyPart);
+            if (bCenter.lengthSquared() > 1.0E-6f) {
+                SCRATCH_VEC.set(bCenter).mulPosition(calcStack.last().pose());
+                bodyCenterOverride = new Vec3(SCRATCH_VEC.x(), SCRATCH_VEC.y(), SCRATCH_VEC.z());
+            }
+            calcStack.popPose();
+        }
+
+        for (Map.Entry<String, ModelPart> entry : children.entrySet()) {
+            String childName = entry.getKey();
+            ModelPart childPart = entry.getValue();
+
+            Vec3 childParent = nextParentPos;
+
+            if (name.equals("root") && childPart == bodyPart) {
+                childParent = null;
+            } else if (bodyCenterOverride != null && !isOverlayPart(childName)) {
+                childParent = bodyCenterOverride;
+            }
+
+            renderSkeletonPart(calcStack, childName, childPart, consumer, baseMatrix, normalMatrix, color, lineWidth, childParent);
+        }
+
+        calcStack.popPose();
+    }
+
+    private boolean isOverlayPart(String name) {
+        if (name == null) return false;
+        return OVERLAY_CACHE.computeIfAbsent(name, this::computeIsOverlayPart);
+    }
+
+    private boolean computeIsOverlayPart(String name) {
+        String lower = name.toLowerCase();
+        return lower.contains("jacket") || lower.contains("sleeve") || lower.contains("pants")
+                || lower.contains("overlay") || lower.contains("outer") || lower.contains("cape")
+                || lower.contains("cloak") || lower.contains("ear") || lower.contains("mane")
+                || lower.contains("saddle") || lower.contains("rein") || lower.contains("bridle")
+                || lower.contains("mouth") || lower.contains("tail") || lower.contains("line")
+                || lower.contains("wrap") || lower.contains("hair") || lower.contains("armor")
+                || lower.contains("chest") || lower.contains("bag") || lower.contains("hat");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Vector3f getLocalCenter(ModelPart part) {
+        return LOCAL_CENTER_CACHE.computeIfAbsent(part, p -> {
+            try {
+                if (CUBES_FIELD == null) return new Vector3f(0, 0, 0);
+                List<ModelPart.Cube> cubes = (List<ModelPart.Cube>) CUBES_FIELD.get(p);
+                if (cubes == null || cubes.isEmpty()) return new Vector3f(0, 0, 0);
+
+                float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+                float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+
+                for (ModelPart.Cube cube : cubes) {
+                    minX = Math.min(minX, cube.minX); maxX = Math.max(maxX, cube.maxX);
+                    minY = Math.min(minY, cube.minY); maxY = Math.max(maxY, cube.maxY);
+                    minZ = Math.min(minZ, cube.minZ); maxZ = Math.max(maxZ, cube.maxZ);
+                }
+
+                return new Vector3f(
+                        ((minX + maxX) / 2.0f) * 0.0625f,
+                        ((minY + maxY) / 2.0f) * 0.0625f,
+                        ((minZ + maxZ) / 2.0f) * 0.0625f
+                );
+            } catch (Exception e) {
+                return new Vector3f(0, 0, 0);
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, ModelPart> getModelPartChildren(ModelPart part) {
+        return CHILDREN_CACHE.computeIfAbsent(part, p -> {
+            try {
+                return (Map<String, ModelPart>) CHILDREN_FIELD.get(p);
+            } catch (Exception e) {
+                return Collections.emptyMap();
+            }
+        });
+    }
+
+    private int getDistanceColor(Player clientPlayer, LivingEntity target, float alphaMultiplier) {
+        double distance = Math.sqrt(clientPlayer.distanceToSqr(target));
+        double percent = Math.min(1.0, distance / 60.0);
+        int r, g;
+        if (percent < 0.33) {
+            r = (int) (percent / 0.33 * 255);
+            g = 255;
+        } else if (percent < 0.66) {
+            r = 255;
+            g = 255 - (int) ((percent - 0.33) / 0.33 * 90);
+        } else {
+            r = 255;
+            g = 165 - (int) ((percent - 0.66) / 0.34 * 165);
+        }
+        int a = (int) (255 * alphaMultiplier);
+        return (a << 24) | (r << 16) | (g << 8) | 0;
     }
 
     private void renderRotatedBox(PoseStack poseStack, VertexConsumer consumer, LivingEntity entity, float tickDelta, double camX, double camY, double camZ, int color, boolean isFill, float lineWidth) {
@@ -261,19 +537,16 @@ public class PlayerESP extends Module {
     }
 
     private static void renderBoxOutline(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color, float lineWidth) {
-        // Unteres Quadrat
         line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y1, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z2, x1, y1, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y1, z1, color, lineWidth);
 
-        // Oberes Quadrat
         line(matrix, normalMatrix, consumer, x1, y2, z1, x2, y2, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y2, z1, x2, y2, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y2, z2, x1, y2, z2, color, lineWidth);
         line(matrix, normalMatrix, consumer, x1, y2, z2, x1, y2, z1, color, lineWidth);
 
-        // Vertikale Streben
         line(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, color, lineWidth);
         line(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, color, lineWidth);
@@ -304,10 +577,10 @@ public class PlayerESP extends Module {
             dy = 1.0f;
         }
 
-        Vector3f normal = new Vector3f(dx, dy, dz);
-        normal.mul(normalMatrix);
+        // Wiederverwendbarer Normalen-Vektor (GC Optimierung)
+        SCRATCH_NORMAL.set(dx, dy, dz).mul(normalMatrix);
 
-        consumer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a).setNormal(normal.x(), normal.y(), normal.z()).setLineWidth(lineWidth);
-        consumer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a).setNormal(normal.x(), normal.y(), normal.z()).setLineWidth(lineWidth);
+        consumer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a).setNormal(SCRATCH_NORMAL.x(), SCRATCH_NORMAL.y(), SCRATCH_NORMAL.z()).setLineWidth(lineWidth);
+        consumer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a).setNormal(SCRATCH_NORMAL.x(), SCRATCH_NORMAL.y(), SCRATCH_NORMAL.z()).setLineWidth(lineWidth);
     }
 }

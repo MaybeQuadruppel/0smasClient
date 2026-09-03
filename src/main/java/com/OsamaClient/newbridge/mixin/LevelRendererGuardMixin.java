@@ -26,8 +26,6 @@ public class LevelRendererGuardMixin {
 
         LevelRenderer renderer = (LevelRenderer) (Object) this;
         if (renderer.viewArea() == null || renderer.sectionRenderDispatcher() == null) {
-            // Hier stand früher der Refresh-Call vom alten Client.
-            // Der Cancel verhindert aber bereits den Crash.
             ci.cancel();
         }
     }
