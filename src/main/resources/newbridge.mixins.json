@@ -18,7 +18,9 @@
     "Connection.ClientPacketListenerMixin",
     "NoRender.NoGuiMixin",
     "NoRender.RenderEffectLocalPlayerMixin",
-    "NoRender.ScreenEffectRendererMixin"
+    "NoRender.ScreenEffectRendererMixin",
+    "EntityMixin",
+    "MinecraftMixin"
   ],
   "client": [
     "ONETAPMIXIN",

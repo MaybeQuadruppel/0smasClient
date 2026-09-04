@@ -9,10 +9,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class EventBus {
     private final Map<Class<?>, List<Listener>> listeners = new HashMap<>();
 
-    // Wird in den Modulen (z.B. BlockESP) aufgerufen: EventBus.subscribe(this);
     public void subscribe(Object subscriber) {
         for (Method method : subscriber.getClass().getDeclaredMethods()) {
             if (method.isAnnotationPresent(Subscribe.class) && method.getParameterCount() == 1) {
+                method.setAccessible(true); // WICHTIG: Erlaubt Aufruf von private & protected Methoden
                 Class<?> eventType = method.getParameterTypes()[0];
                 listeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>())
                         .add(new Listener(subscriber, method));
@@ -20,7 +20,6 @@ public class EventBus {
         }
     }
 
-    // Wird vom Mixin aufgerufen, um das Event zu feuern
     public void post(Object event) {
         List<Listener> eventListeners = listeners.get(event.getClass());
         if (eventListeners != null) {

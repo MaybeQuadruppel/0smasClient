@@ -576,8 +576,6 @@ public class PlayerESP extends Module {
         } else {
             dy = 1.0f;
         }
-
-        // Wiederverwendbarer Normalen-Vektor (GC Optimierung)
         SCRATCH_NORMAL.set(dx, dy, dz).mul(normalMatrix);
 
         consumer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a).setNormal(SCRATCH_NORMAL.x(), SCRATCH_NORMAL.y(), SCRATCH_NORMAL.z()).setLineWidth(lineWidth);

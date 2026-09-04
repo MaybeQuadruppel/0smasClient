@@ -69,7 +69,10 @@ public class ModuleManager {
         modules.add(new BoatFly());
         modules.add(new ItemESP());
         modules.add(new SafeAnchor());
-//        modules.add(new Nametags());
+        modules.add(new Nametags());
+        modules.add(new InvMove());
+        modules.add(new TrueSight());
+        modules.add(new AutoEat());
 
     }
 
