@@ -8,12 +8,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.function.Consumer;
 
-/**
- * Farb-Auswahl mit drei Reglern (Hue / Saturation / Brightness) statt nur
- * Hue. Mit reinem Hue (S=1, V=1 fix) waren Schwarz, Grau und Weiß nicht
- * erreichbar, da diese ausschließlich über Sättigung bzw. Helligkeit
- * entstehen - deshalb jetzt vollwertiges HSB.
- */
 public class ColorPicker extends Component {
 
     private final String label;
@@ -27,21 +21,25 @@ public class ColorPicker extends Component {
     private int draggingBar = 0;
 
     private static final int TRACK_H = 4;
-    private static final int PAD = 4;
-    private static final int BAR_STEP = 9; // vertikaler Abstand zwischen den drei Reglern
+    private static final int PAD = 6;
+    private static final int BAR_STEP = 11;
 
     public ColorPicker(String label, int defaultColor, Consumer<Integer> onChange) {
+        super(0, 0, 110, 48);
         this.label    = label;
         this.color    = defaultColor;
         this.onChange = onChange;
-        // Mindestgröße: genug Platz für Label + drei Regler (Hue/Sat/Bri),
-        // sonst überlappen sich die Balken bei kleiner Scale.
-        syncScaledSize(110, 42, 90, 38);
+        syncScaledSize(110, 48, 90, 44);
         decomposeColor(defaultColor);
     }
 
     public String getLabel() { return this.label; }
     public int getColor() { return this.color; }
+
+    public ColorPicker withDescription(String description) {
+        this.description = description;
+        return this;
+    }
 
     public void setColor(int newColor) {
         this.color = newColor;
@@ -63,17 +61,17 @@ public class ColorPicker extends Component {
         if (this.onChange != null) this.onChange.accept(this.color);
     }
 
-    private int trackX() { return x + UISettings.scaled(PAD) + UISettings.scaled(8); }
-    private int trackW() { return width - (UISettings.scaled(PAD) * 2) - UISettings.scaled(22); }
+    private int trackX() { return x + UISettings.scaled(PAD) + UISettings.scaled(12); }
+    private int trackW() { return width - (UISettings.scaled(PAD) * 2) - UISettings.scaled(14); }
 
-    private int hueY() { return y + UISettings.scaled(14); }
+    private int hueY() { return y + UISettings.scaled(16); }
     private int satY() { return hueY() + UISettings.scaled(BAR_STEP); }
     private int briY() { return satY() + UISettings.scaled(BAR_STEP); }
 
     private void applyDrag(int barTrackY, double mouseX, double mouseY, int which) {
         int tX = trackX(), tW = trackW();
         int barH = UISettings.scaled(TRACK_H);
-        if (mouseY < barTrackY - 2 || mouseY > barTrackY + barH + 2) return;
+        if (mouseY < barTrackY - 4 || mouseY > barTrackY + barH + 4) return;
         float pct = (float) Math.min(1.0, Math.max(0.0, (mouseX - tX) / (double) tW));
         switch (which) {
             case 1 -> hue = pct;
@@ -84,13 +82,10 @@ public class ColorPicker extends Component {
     }
 
     @Override
-    public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
-        // Größe bei jedem Frame neu aus UISettings.scale ableiten - trackX()/
-        // trackW() usw. hängen direkt von width/height ab, die sonst auf dem
-        // Stand beim Erzeugen eingefroren blieben und nicht mehr zu den live
-        // per UISettings.scaled(...) berechneten Innenabständen passen würden.
-        syncScaledSize(baseWidth, baseHeight, 90, 38);
+    public void render(Object graphics, int mouseX, int mouseY) {
+        if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
 
+        syncScaledSize(baseWidth, baseHeight, 90, 44);
         Theme.Palette p = Theme.getActive().palette;
 
         int tX = trackX(), tW = trackW();
@@ -101,43 +96,51 @@ public class ColorPicker extends Component {
         else if (draggingBar == 2) applyDrag(satY, mouseX, mouseY, 2);
         else if (draggingBar == 3) applyDrag(briY, mouseX, mouseY, 3);
 
+        // Panel Alpha Transparenz
         drawRoundedRect(guiGraphics, x, y, width, height, UISettings.withPanelAlpha(p.bg));
         drawRoundedOutline(guiGraphics, x, y, width, height, p.border);
 
-        // Scissor gegen Überlauf des Labels bei großer Font-Size/kleiner Scale.
-        guiGraphics.enableScissor(x + 1, y + 1, x + width - 1, hueY - 1);
+        // Label
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
-                x + UISettings.scaled(PAD), y + UISettings.scaled(3), p.textDim, false);
-        guiGraphics.disableScissor();
+                x + UISettings.scaled(PAD), y + UISettings.scaled(4), p.accent, false);
 
-        // Hue-Regler (Regenbogen, S=1/V=1)
+        // Farbmodus-Indikatoren (H, S, B)
+        int lblX = x + UISettings.scaled(PAD);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, "H", lblX, hueY - 1, p.textDim, false);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, "S", lblX, satY - 1, p.textDim, false);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, "B", lblX, briY - 1, p.textDim, false);
+
+        // Hue-Regler
         for (int i = 0; i < tW; i++) {
             int col = java.awt.Color.HSBtoRGB(i / (float) tW, 1f, 1f) | 0xFF000000;
             guiGraphics.fill(tX + i, hueY, tX + i + 1, hueY + barH, col);
         }
-        drawThumb(guiGraphics, tX, tW, hueY, barH, hue);
+        drawThumb(guiGraphics, tX, tW, hueY, barH, hue, p.accent);
 
-        // Saturation-Regler (aktueller Hue, 0 = grau -> 1 = volle Sättigung)
+        // Saturation-Regler
         for (int i = 0; i < tW; i++) {
             int col = java.awt.Color.HSBtoRGB(hue, i / (float) tW, 1f) | 0xFF000000;
             guiGraphics.fill(tX + i, satY, tX + i + 1, satY + barH, col);
         }
-        drawThumb(guiGraphics, tX, tW, satY, barH, saturation);
+        drawThumb(guiGraphics, tX, tW, satY, barH, saturation, p.accent);
 
-        // Brightness-Regler (aktueller Hue+Sat, 0 = schwarz -> 1 = hell)
+        // Brightness-Regler
         for (int i = 0; i < tW; i++) {
             int col = java.awt.Color.HSBtoRGB(hue, saturation, i / (float) tW) | 0xFF000000;
             guiGraphics.fill(tX + i, briY, tX + i + 1, briY + barH, col);
         }
-        drawThumb(guiGraphics, tX, tW, briY, barH, brightness);
+        drawThumb(guiGraphics, tX, tW, briY, barH, brightness, p.accent);
 
-        int previewX = x + width - UISettings.scaled(14);
-        int previewY = y + UISettings.scaled(5);
-        drawRoundedRect(guiGraphics, previewX, previewY, UISettings.scaled(10), UISettings.scaled(14), color | 0xFF000000);
-        drawRoundedOutline(guiGraphics, previewX, previewY, UISettings.scaled(10), UISettings.scaled(14), p.border);
+        // Vorschaufeld oben rechts
+        int previewW = UISettings.scaled(12);
+        int previewH = UISettings.scaled(10);
+        int previewX = x + width - previewW - UISettings.scaled(PAD);
+        int previewY = y + UISettings.scaled(4);
+        drawRoundedRect(guiGraphics, previewX, previewY, previewW, previewH, color | 0xFF000000);
+        drawRoundedOutline(guiGraphics, previewX, previewY, previewW, previewH, p.border);
     }
 
-    private void drawThumb(GuiGraphicsExtractor g, int trackX, int trackW, int trackY, int barH, float value) {
+    private void drawThumb(GuiGraphicsExtractor g, int trackX, int trackW, int trackY, int barH, float value, int accentColor) {
         int thumbX = trackX + (int) (value * trackW);
         thumbX = Math.max(trackX, Math.min(trackX + trackW - 2, thumbX));
         g.fill(thumbX - 1, trackY - 1, thumbX + 2, trackY + barH + 1, 0xFFFFFFFF);

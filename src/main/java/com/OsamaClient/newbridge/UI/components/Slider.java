@@ -15,7 +15,6 @@ public class Slider extends Component {
     private final double min;
     private final double max;
     private final double defaultValue;
-    /** 0 = stufenlos, sonst Schrittweite (z. B. 1.0, 0.5, 5.0). */
     private final double step;
     private double value;
     private final Consumer<Double> onChange;
@@ -25,17 +24,18 @@ public class Slider extends Component {
     private long lastClickMs = 0L;
     private static final long DOUBLE_CLICK_MS = 300L;
 
-    private static final int TRACK_INSET_X = 4;
-    private static final int TRACK_H       = 4;
+    private static final int BASE_HEIGHT = 20;
+    private static final int TRACK_INSET_X = 6;
+    private static final int TRACK_H = 4;
 
     public Slider(String label, double min, double max, double defaultValue,
                   Consumer<Double> onChange) {
         this(label, min, max, defaultValue, 0.0, onChange);
     }
 
-    /** Variante mit fester Schrittweite, z. B. für ganzzahlige oder gerasterte Werte. */
     public Slider(String label, double min, double max, double defaultValue, double step,
                   Consumer<Double> onChange) {
+        super(0, 0, 100, BASE_HEIGHT);
         this.label        = label;
         this.min          = min;
         this.max          = max;
@@ -43,10 +43,12 @@ public class Slider extends Component {
         this.step         = step;
         this.value        = snap(defaultValue);
         this.onChange     = onChange;
-        // Mindestgröße: verhindert, dass Label-Text und Track bei sehr
-        // kleiner UI-Scale übereinander gerendert werden ("Text clipped
-        // hinter dem Slider").
-        syncScaledSize(100, 15, 60, 16);
+        syncScaledSize(100, BASE_HEIGHT, 60, BASE_HEIGHT);
+    }
+
+    public Slider withDescription(String description) {
+        this.description = description;
+        return this;
     }
 
     private double snap(double raw) {
@@ -67,21 +69,16 @@ public class Slider extends Component {
     }
 
     @Override
-    public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
-        // Größe bei jedem Frame neu aus UISettings.scale ableiten (mit
-        // Mindestgröße), sonst bleiben Track/Thumb-Positionen auf dem Stand
-        // beim Erzeugen eingefroren, während der Rest der GUI schon
-        // umskaliert ist.
-        syncScaledSize(baseWidth, baseHeight, 60, 16);
+    public void render(Object graphics, int mouseX, int mouseY) {
+        if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
 
-        // Alle inneren Maße MITSKALIEREN statt fixer Pixelwerte - sonst nimmt
-        // z. B. der Track bei kleiner Scale relativ mehr Platz in der (dann
-        // kleineren) Box ein und überlappt mit dem Label-Text darüber.
+        syncScaledSize(baseWidth, BASE_HEIGHT, 60, BASE_HEIGHT);
+
         int insetX = Math.max(2, UISettings.scaled(TRACK_INSET_X));
         int trackH = Math.max(2, UISettings.scaled(TRACK_H));
-        int textPadX = Math.max(2, UISettings.scaled(5));
-        int textPadY = Math.max(1, UISettings.scaled(2));
-        int bottomGap = Math.max(1, UISettings.scaled(2));
+        int textPadX = Math.max(2, UISettings.scaled(6));
+        int textPadY = Math.max(1, UISettings.scaled(3));
+        int bottomGap = Math.max(1, UISettings.scaled(3));
 
         Theme.Palette p = Theme.getActive().palette;
 
@@ -102,11 +99,6 @@ public class Slider extends Component {
         int trackY = y + height - trackH - bottomGap;
         int trackW = width - insetX * 2;
 
-        // Scissor verhindert, dass der Label/Value-Text bei großer Font-Size
-        // oder kleiner Scale über den Rand der Box hinausläuft - UND begrenzt
-        // ihn zusätzlich nach unten auf den Bereich oberhalb des Tracks, damit
-        // Text und Track sich nie gegenseitig überzeichnen ("Text clipped
-        // hinter dem Slider").
         guiGraphics.enableScissor(x + 1, y + 1, x + width - 1, Math.max(y + 1, trackY - 1));
         String display = String.format("%s: %.1f", label, value);
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, display,
@@ -136,7 +128,6 @@ public class Slider extends Component {
             this.dragging = true;
 
             if (doubleClick) {
-                // Doppelklick setzt den Wert auf den ursprünglichen Default zurück.
                 applyValue(defaultValue);
                 Sounds.select();
                 return true;

@@ -12,31 +12,27 @@ import java.util.function.Consumer;
 
 public class TextBox extends Component {
 
-    private static final int PAD_X = 4;
+    private static final int PAD_X = 6;
 
     private final String label;
     private String text;
     private final Consumer<String> onResponder;
     private boolean focused = false;
 
-    /** Horizontaler Scroll-Offset in Pixeln, damit der Cursor bei langem Text sichtbar bleibt. */
     private int viewOffset = 0;
-
-    /** -1 = unbegrenzt. Verhindert, dass beliebig langer Text getippt werden kann. */
     private int maxLength = -1;
-
-    /** Erlaubt nur Ziffern (+ optional ein '.' und ein führendes '-'). Für Zahlen-Felder. */
     private boolean numericOnly = false;
-
     private float focusAnim = 0f;
 
+    private static final int BASE_BOX_HEIGHT = 16;
+    private static final int BASE_TOTAL_HEIGHT = 28; // Label + Input-Box
+
     public TextBox(String label, String defaultText, Consumer<String> onResponder) {
+        super(0, 0, 92, BASE_TOTAL_HEIGHT);
         this.label = label;
         this.text = defaultText != null ? defaultText : "";
         this.onResponder = onResponder;
-        // Mindestgröße: sonst wird das Eingabefeld bei kleiner Scale schmaler
-        // als der sichtbare Cursor/Rand-Puffer und der Text wirkt clipped.
-        syncScaledSize(92, 13, 50, 13);
+        syncScaledSize(92, BASE_TOTAL_HEIGHT, 50, BASE_TOTAL_HEIGHT);
     }
 
     public String getText() {
@@ -56,14 +52,12 @@ public class TextBox extends Component {
         return this;
     }
 
-    /** Begrenzt die maximale Zeichenanzahl. -1 = unbegrenzt (Standard). */
     public TextBox withMaxLength(int maxLength) {
         this.maxLength = maxLength;
         this.text = clampLength(this.text);
         return this;
     }
 
-    /** Beschränkt die Eingabe auf Ziffern (plus ein optionales '.' und führendes '-'). */
     public TextBox numericOnly() {
         this.numericOnly = true;
         return this;
@@ -92,42 +86,53 @@ public class TextBox extends Component {
         return false;
     }
 
-    /** Hält den Cursor (Textende) innerhalb der sichtbaren Box, indem der Text horizontal scrollt. */
     private void updateViewOffset() {
-        int innerW = Math.max(1, width - PAD_X * 2);
-        // WICHTIG: textWidth() statt font.width() - der Text wird über
-        // UISettings.drawText mit fontScale skaliert gezeichnet, daher muss
-        // auch der Scroll-Offset die skalierte Breite verwenden. Sonst scrollt
-        // die Box zu wenig/zu viel und der Cursor bzw. das Textende wirkt
-        // abgeschnitten, sobald fontScale != 1 ist.
+        int pad = UISettings.scaled(PAD_X);
+        int innerW = Math.max(1, width - pad * 2);
         int textW = UISettings.textWidth(Minecraft.getInstance().font, text);
         int maxOffset = Math.max(0, textW - innerW);
         viewOffset = Math.min(viewOffset, maxOffset);
-        // Cursor steht immer am Textende -> bei Bedarf ganz nach rechts scrollen.
         viewOffset = maxOffset;
     }
 
+    private int getBoxY() {
+        return y + UISettings.scaled(12);
+    }
+
+    private int getBoxHeight() {
+        return UISettings.scaled(BASE_BOX_HEIGHT);
+    }
+
+    private boolean isBoxHovered(int mouseX, int mouseY) {
+        int bY = getBoxY();
+        int bH = getBoxHeight();
+        return mouseX >= x && mouseX <= x + width && mouseY >= bY && mouseY <= bY + bH;
+    }
+
     @Override
-    public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
-        // Größe bei jedem Frame neu aus UISettings.scale ableiten, sonst
-        // bleibt die Box (und damit auch innerW/viewOffset) auf dem Stand
-        // beim Erzeugen eingefroren.
-        syncScaledSize(baseWidth, baseHeight, 50, 13);
+    public void render(Object graphics, int mouseX, int mouseY) {
+        if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
+
+        syncScaledSize(baseWidth, BASE_TOTAL_HEIGHT, 50, BASE_TOTAL_HEIGHT);
         updateViewOffset();
 
         Theme.Palette p = Theme.getActive().palette;
 
+        // Label über der Textbox
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label + ":",
-                x, y - 11, p.accent, false);
+                x, y + 1, p.accent, false);
 
-        boolean hov = isHovered(mouseX, mouseY);
+        int boxY = getBoxY();
+        int boxH = getBoxHeight();
+        boolean hov = isBoxHovered(mouseX, mouseY);
+
         focusAnim = focused
                 ? Math.min(1f, focusAnim + UISettings.animStep(0.2f))
                 : Math.max(0f, focusAnim - UISettings.animStep(0.2f));
 
         int bgCol = lerpColor(p.bg, p.bgHover, hov || focused ? 1f : 0f);
-        drawRoundedRect(guiGraphics, x, y, width, height, UISettings.withPanelAlpha(bgCol));
-        drawRoundedOutline(guiGraphics, x, y, width, height,
+        drawRoundedRect(guiGraphics, x, boxY, width, boxH, UISettings.withPanelAlpha(bgCol));
+        drawRoundedOutline(guiGraphics, x, boxY, width, boxH,
                 lerpColor(p.border, p.accent, focusAnim));
 
         boolean showCursor = focused && ((System.currentTimeMillis() / 500) % 2 == 0);
@@ -135,11 +140,10 @@ public class TextBox extends Component {
         String displayStr = text.isEmpty() && !focused ? "Type here..." : text + (focused ? cursorStr : "");
         int textColor = text.isEmpty() && !focused ? p.textDim : p.text;
 
-        // Scissor sorgt dafür, dass Text NIE über den Rand der Box hinausragt,
-        // egal wie lang die Eingabe ist.
-        guiGraphics.enableScissor(x + 1, y + 1, x + width - 1, y + height - 1);
+        int pad = UISettings.scaled(PAD_X);
+        guiGraphics.enableScissor(x + 1, boxY + 1, x + width - 1, boxY + boxH - 1);
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, displayStr,
-                x + PAD_X - viewOffset, y + (height / 2) - 4, textColor, false);
+                x + pad - viewOffset, boxY + (boxH / 2) - UISettings.scaled(4), textColor, false);
         guiGraphics.disableScissor();
     }
 
@@ -179,7 +183,7 @@ public class TextBox extends Component {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
             boolean wasFocused = focused;
-            focused = isHovered(mouseX, mouseY);
+            focused = isBoxHovered((int) mouseX, (int) mouseY);
 
             if (focused != wasFocused) {
                 if (focused) Sounds.select(); else Sounds.deselect();

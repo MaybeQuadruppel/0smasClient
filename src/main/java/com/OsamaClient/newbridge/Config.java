@@ -1,10 +1,13 @@
 package com.OsamaClient.newbridge;
 
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.RenderUtils;
+import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.Theme;
+import com.OsamaClient.newbridge.UI.UISettings;
+import com.OsamaClient.newbridge.UI.UISettingsModule;
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.google.gson.*;
-import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -16,240 +19,830 @@ import java.nio.file.Path;
 import java.util.Map;
 
 public class Config {
+
     private static final Path CONFIG_PATH =
-            FabricLoader.getInstance().getConfigDir().resolve("newbridge.json");
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+            FabricLoader.getInstance()
+                    .getConfigDir()
+                    .resolve("newbridge.json");
+
+    private static final Gson GSON =
+            new GsonBuilder()
+                    .setPrettyPrinting()
+                    .create();
+
+
+    // ========================================================================
+    // SAVE
+    // ========================================================================
 
     public static void save() {
-        JsonObject root = new JsonObject();
 
-        // 1. Module & Settings speichern
-        JsonObject modulesObj = new JsonObject();
-        for (Module module : ModuleManager.modules) {
-            JsonObject moduleObj = new JsonObject();
-            moduleObj.addProperty("enabled", module.enabled);
+        JsonObject root =
+                new JsonObject();
 
-            JsonObject settings = new JsonObject();
-            for (Component c : module.settings) {
+
+        // ====================================================================
+        // MODULES
+        // ====================================================================
+
+        JsonObject modulesObj =
+                new JsonObject();
+
+        for (Module module :
+                ModuleManager.modules) {
+
+            /*
+             * UISettingsModule ist ein GUI-Container und kein normales
+             * Modul. Es wird separat unter gui_settings gespeichert.
+             */
+            if (module instanceof UISettingsModule) {
+                continue;
+            }
+
+            JsonObject moduleObj =
+                    new JsonObject();
+
+            moduleObj.addProperty(
+                    "enabled",
+                    module.enabled
+            );
+
+            JsonObject settings =
+                    new JsonObject();
+
+            for (Component c :
+                    module.settings) {
+
                 if (c instanceof Slider s) {
-                    settings.addProperty(s.getLabel(), s.getValue());
+
+                    settings.addProperty(
+                            s.getLabel(),
+                            s.getValue()
+                    );
+
                 } else if (c instanceof ToggleButton t) {
-                    settings.addProperty(t.getLabel(), t.enabled);
+
+                    settings.addProperty(
+                            t.getLabel(),
+                            t.enabled
+                    );
+
                 } else if (c instanceof ModeButton m) {
-                    settings.addProperty(m.getLabel(), m.getIndex());
+
+                    settings.addProperty(
+                            m.getLabel(),
+                            m.getIndex()
+                    );
+
                 } else if (c instanceof ColorPicker cp) {
-                    settings.addProperty(cp.getLabel(), cp.getColor());
+
+                    settings.addProperty(
+                            cp.getLabel(),
+                            cp.getColor()
+                    );
+
                 } else if (c instanceof BlockPicker bp) {
-                    // Strukturierte Map für Blocks + ARGB (Farbe & Alpha)
-                    JsonObject blockMapObj = new JsonObject();
-                    for (Block block : bp.selectedBlocks) {
-                        String blockId = BuiltInRegistries.BLOCK.getKey(block).toString();
-                        int color = RenderUtils.BLOCK_COLORS.getOrDefault(block, 0x6600FFFF);
-                        blockMapObj.addProperty(blockId, color);
+
+                    JsonObject blockMap =
+                            new JsonObject();
+
+                    for (Block block :
+                            bp.selectedBlocks) {
+
+                        String id =
+                                BuiltInRegistries.BLOCK
+                                        .getKey(block)
+                                        .toString();
+
+                        int color =
+                                RenderUtils.BLOCK_COLORS
+                                        .getOrDefault(
+                                                block,
+                                                0x6600FFFF
+                                        );
+
+                        blockMap.addProperty(
+                                id,
+                                color
+                        );
                     }
-                    settings.add(bp.getLabel(), blockMapObj);
+
+                    settings.add(
+                            bp.getLabel(),
+                            blockMap
+                    );
+
                 } else if (c instanceof ItemPicker ip) {
-                    // NEU: Speichert Item + Farbe als JsonObject
-                    JsonObject itemMapObj = new JsonObject();
-                    for (Map.Entry<Item, Integer> entry : ip.selectedItems.entrySet()) {
-                        String itemId = BuiltInRegistries.ITEM.getKey(entry.getKey()).toString();
-                        itemMapObj.addProperty(itemId, entry.getValue());
+
+                    JsonObject itemMap =
+                            new JsonObject();
+
+                    for (Map.Entry<Item, Integer> entry :
+                            ip.selectedItems.entrySet()) {
+
+                        String id =
+                                BuiltInRegistries.ITEM
+                                        .getKey(
+                                                entry.getKey()
+                                        )
+                                        .toString();
+
+                        itemMap.addProperty(
+                                id,
+                                entry.getValue()
+                        );
                     }
-                    settings.add(ip.getLabel(), itemMapObj);
+
+                    settings.add(
+                            ip.getLabel(),
+                            itemMap
+                    );
+
                 } else if (c instanceof EntityFilterPicker efp) {
-                    JsonObject efpObj = new JsonObject();
 
-                    JsonObject filtersObj = new JsonObject();
-                    for (Map.Entry<String, Boolean> entry : efp.filters.entrySet()) {
-                        filtersObj.addProperty(entry.getKey(), entry.getValue());
+                    JsonObject filterObj =
+                            new JsonObject();
+
+                    JsonObject filters =
+                            new JsonObject();
+
+                    for (Map.Entry<String, Boolean> entry :
+                            efp.filters.entrySet()) {
+
+                        filters.addProperty(
+                                entry.getKey(),
+                                entry.getValue()
+                        );
                     }
-                    efpObj.add("filters", filtersObj);
 
-                    JsonObject colorsObj = new JsonObject();
-                    for (Map.Entry<String, Integer> entry : efp.colors.entrySet()) {
-                        colorsObj.addProperty(entry.getKey(), entry.getValue());
+                    JsonObject colors =
+                            new JsonObject();
+
+                    for (Map.Entry<String, Integer> entry :
+                            efp.colors.entrySet()) {
+
+                        colors.addProperty(
+                                entry.getKey(),
+                                entry.getValue()
+                        );
                     }
-                    efpObj.add("colors", colorsObj);
 
-                    settings.add(efp.getLabel(), efpObj);
+                    filterObj.add(
+                            "filters",
+                            filters
+                    );
+
+                    filterObj.add(
+                            "colors",
+                            colors
+                    );
+
+                    settings.add(
+                            efp.getLabel(),
+                            filterObj
+                    );
                 }
             }
-            moduleObj.add("settings", settings);
-            modulesObj.add(module.name, moduleObj);
+
+            moduleObj.add(
+                    "settings",
+                    settings
+            );
+
+            modulesObj.add(
+                    module.name,
+                    moduleObj
+            );
         }
-        root.add("modules", modulesObj);
 
-        // 2. Keybinds speichern
-        JsonObject bindsObj = new JsonObject();
-        for (Map.Entry<String, Integer> entry : ClickGuiScreen.keybinds.entrySet()) {
-            bindsObj.addProperty(entry.getKey(), entry.getValue());
+        root.add(
+                "modules",
+                modulesObj
+        );
+
+
+        // ====================================================================
+        // KEYBINDS
+        // ====================================================================
+
+        JsonObject bindsObj =
+                new JsonObject();
+
+        for (Map.Entry<String, Integer> entry :
+                ClickGuiScreen.keybinds.entrySet()) {
+
+            bindsObj.addProperty(
+                    entry.getKey(),
+                    entry.getValue()
+            );
         }
-        root.add("keybinds", bindsObj);
 
-        // 3. GUI Settings (Slider, Panel-Layout) speichern
-        JsonObject guiObj = new JsonObject();
-        guiObj.addProperty("panelWidth", ClickGuiScreen.dynColW);
-        guiObj.addProperty("rowHeight", ClickGuiScreen.dynModH);
+        root.add(
+                "keybinds",
+                bindsObj
+        );
 
-        JsonObject panelPosObj = new JsonObject();
-        for (Map.Entry<Module.Category, int[]> entry : ClickGuiScreen.panelPos.entrySet()) {
-            JsonObject posObj = new JsonObject();
-            posObj.addProperty("x", entry.getValue()[0]);
-            posObj.addProperty("y", entry.getValue()[1]);
-            panelPosObj.add(entry.getKey().name(), posObj);
-        }
-        guiObj.add("panelPositions", panelPosObj);
 
-        root.add("gui_settings", guiObj);
+        // ====================================================================
+        // NEW GUI SETTINGS
+        // ====================================================================
 
-        try (Writer w = new FileWriter(CONFIG_PATH.toFile())) {
-            GSON.toJson(root, w);
+        JsonObject gui =
+                new JsonObject();
+
+        gui.addProperty(
+                "scale",
+                UISettings.scale
+        );
+
+        gui.addProperty(
+                "fontScale",
+                UISettings.fontScale
+        );
+
+        gui.addProperty(
+                "compactMode",
+                UISettings.compactMode
+        );
+
+        gui.addProperty(
+                "sidebarWidthScale",
+                UISettings.sidebarWidthScale
+        );
+
+        gui.addProperty(
+                "columnWidthScale",
+                UISettings.columnWidthScale
+        );
+
+        gui.addProperty(
+                "moduleGapScale",
+                UISettings.moduleGapScale
+        );
+
+        gui.addProperty(
+                "panelAlpha",
+                UISettings.panelAlpha
+        );
+
+        gui.addProperty(
+                "animationsEnabled",
+                UISettings.animationsEnabled
+        );
+
+        gui.addProperty(
+                "roundedCorners",
+                UISettings.roundedCorners
+        );
+
+        gui.addProperty(
+                "soundVolume",
+                UISettings.soundVolume
+        );
+
+        gui.addProperty(
+                "soundEnabled",
+                UISettings.soundEnabled
+        );
+
+        gui.addProperty(
+                "theme",
+                Theme.getActive().ordinal()
+        );
+
+        root.add(
+                "gui_settings",
+                gui
+        );
+
+
+        // ====================================================================
+        // WRITE
+        // ====================================================================
+
+        try (
+                Writer writer =
+                        new FileWriter(
+                                CONFIG_PATH.toFile()
+                        )
+        ) {
+
+            GSON.toJson(
+                    root,
+                    writer
+            );
+
         } catch (IOException e) {
+
             e.printStackTrace();
         }
     }
 
+
+    // ========================================================================
+    // LOAD
+    // ========================================================================
+
     public static void load() {
-        File configFile = CONFIG_PATH.toFile();
-        if (!configFile.exists()) return;
 
-        try (Reader r = new FileReader(configFile)) {
-            JsonObject root = GSON.fromJson(r, JsonObject.class);
-            if (root == null) return;
+        File file =
+                CONFIG_PATH.toFile();
 
-            // 1. Module & Settings laden
+        if (!file.exists()) {
+            return;
+        }
+
+        try (
+                Reader reader =
+                        new FileReader(file)
+        ) {
+
+            JsonObject root =
+                    GSON.fromJson(
+                            reader,
+                            JsonObject.class
+                    );
+
+            if (root == null) {
+                return;
+            }
+
+
+            // ================================================================
+            // MODULES
+            // ================================================================
+
             if (root.has("modules")) {
-                JsonObject modulesObj = root.getAsJsonObject("modules");
-                for (Module module : ModuleManager.modules) {
-                    if (!modulesObj.has(module.name)) continue;
-                    JsonObject moduleObj = modulesObj.getAsJsonObject(module.name);
 
-                    // Status (Enabled/Disabled)
-                    boolean savedEnabled = moduleObj.has("enabled") && moduleObj.get("enabled").getAsBoolean();
-                    if (savedEnabled != module.enabled) {
+                JsonObject modules =
+                        root.getAsJsonObject(
+                                "modules"
+                        );
+
+                for (Module module :
+                        ModuleManager.modules) {
+
+                    if (module instanceof UISettingsModule) {
+                        continue;
+                    }
+
+                    if (!modules.has(module.name)) {
+                        continue;
+                    }
+
+                    JsonObject moduleObj =
+                            modules.getAsJsonObject(
+                                    module.name
+                            );
+
+                    boolean enabled =
+                            moduleObj.has("enabled")
+                                    && moduleObj
+                                    .get("enabled")
+                                    .getAsBoolean();
+
+                    if (enabled != module.enabled) {
                         module.toggle();
                     }
 
-                    // Settings
                     if (moduleObj.has("settings")) {
-                        JsonObject settings = moduleObj.getAsJsonObject("settings");
-                        for (Component c : module.settings) {
-                            loadComponentSetting(c, settings);
+
+                        JsonObject settings =
+                                moduleObj.getAsJsonObject(
+                                        "settings"
+                                );
+
+                        for (Component c :
+                                module.settings) {
+
+                            loadComponentSetting(
+                                    c,
+                                    settings
+                            );
                         }
                     }
                 }
             }
 
-            // 2. Keybinds laden
+
+            // ================================================================
+            // KEYBINDS
+            // ================================================================
+
             if (root.has("keybinds")) {
-                JsonObject bindsObj = root.getAsJsonObject("keybinds");
+
+                JsonObject binds =
+                        root.getAsJsonObject(
+                                "keybinds"
+                        );
+
                 ClickGuiScreen.keybinds.clear();
-                for (Map.Entry<String, JsonElement> entry : bindsObj.entrySet()) {
-                    ClickGuiScreen.keybinds.put(entry.getKey(), entry.getValue().getAsInt());
+
+                for (Map.Entry<String, JsonElement> entry :
+                        binds.entrySet()) {
+
+                    ClickGuiScreen.keybinds.put(
+                            entry.getKey(),
+                            entry.getValue().getAsInt()
+                    );
                 }
             }
 
-            // 3. GUI Settings laden
+
+            // ================================================================
+            // GUI SETTINGS
+            // ================================================================
+
             if (root.has("gui_settings")) {
-                JsonObject guiObj = root.getAsJsonObject("gui_settings");
-                if (guiObj.has("panelWidth")) ClickGuiScreen.dynColW = guiObj.get("panelWidth").getAsInt();
-                if (guiObj.has("rowHeight")) ClickGuiScreen.dynModH = guiObj.get("rowHeight").getAsInt();
 
-                if (guiObj.has("panelPositions")) {
-                    JsonObject panelPosObj = guiObj.getAsJsonObject("panelPositions");
-                    for (Map.Entry<String, JsonElement> entry : panelPosObj.entrySet()) {
-                        try {
-                            Module.Category cat = Module.Category.valueOf(entry.getKey());
-                            JsonObject posObj = entry.getValue().getAsJsonObject();
-                            ClickGuiScreen.panelPos.put(cat, new int[]{
-                                    posObj.get("x").getAsInt(),
-                                    posObj.get("y").getAsInt()
-                            });
-                        } catch (IllegalArgumentException ignored) {
-                            // unbekannte/veraltete Kategorie in der gespeicherten Config, überspringen
-                        }
-                    }
-                }
+                JsonObject gui =
+                        root.getAsJsonObject(
+                                "gui_settings"
+                        );
+
+                loadGuiSettings(gui);
             }
 
-        } catch (IOException e) {
+        } catch (Exception e) {
+
             e.printStackTrace();
         }
     }
 
-    private static void loadComponentSetting(Component c, JsonObject settings) {
-        if (c instanceof Slider s && settings.has(s.getLabel())) {
-            s.setValue(settings.get(s.getLabel()).getAsDouble());
-        } else if (c instanceof ToggleButton t && settings.has(t.getLabel())) {
-            t.setValue(settings.get(t.getLabel()).getAsBoolean());
-        } else if (c instanceof ModeButton m && settings.has(m.getLabel())) {
-            m.setIndex(settings.get(m.getLabel()).getAsInt());
-        } else if (c instanceof ColorPicker cp && settings.has(cp.getLabel())) {
-            cp.setColor(settings.get(cp.getLabel()).getAsInt());
-        } else if (c instanceof BlockPicker bp && settings.has(bp.getLabel())) {
+
+    // ========================================================================
+    // LOAD GUI
+    // ========================================================================
+
+    private static void loadGuiSettings(
+            JsonObject gui
+    ) {
+
+        if (gui.has("scale")) {
+
+            UISettings.scale =
+                    clamp(
+                            gui.get("scale").getAsFloat(),
+                            UISettings.SCALE_MIN,
+                            UISettings.SCALE_MAX
+                    );
+        }
+
+        if (gui.has("fontScale")) {
+
+            UISettings.fontScale =
+                    clamp(
+                            gui.get("fontScale").getAsFloat(),
+                            UISettings.FONT_SCALE_MIN,
+                            UISettings.FONT_SCALE_MAX
+                    );
+        }
+
+        if (gui.has("compactMode")) {
+
+            UISettings.compactMode =
+                    gui.get("compactMode")
+                            .getAsBoolean();
+        }
+
+        if (gui.has("sidebarWidthScale")) {
+
+            UISettings.sidebarWidthScale =
+                    clamp(
+                            gui.get("sidebarWidthScale").getAsFloat(),
+                            UISettings.SIDEBAR_WIDTH_MIN,
+                            UISettings.SIDEBAR_WIDTH_MAX
+                    );
+        }
+
+        if (gui.has("columnWidthScale")) {
+
+            UISettings.columnWidthScale =
+                    clamp(
+                            gui.get("columnWidthScale").getAsFloat(),
+                            UISettings.COLUMN_WIDTH_MIN,
+                            UISettings.COLUMN_WIDTH_MAX
+                    );
+        }
+
+        if (gui.has("moduleGapScale")) {
+
+            UISettings.moduleGapScale =
+                    clamp(
+                            gui.get("moduleGapScale").getAsFloat(),
+                            UISettings.MODULE_GAP_MIN,
+                            UISettings.MODULE_GAP_MAX
+                    );
+        }
+
+        if (gui.has("panelAlpha")) {
+
+            UISettings.panelAlpha =
+                    Math.max(
+                            0,
+                            Math.min(
+                                    255,
+                                    gui.get("panelAlpha")
+                                            .getAsInt()
+                            )
+                    );
+        }
+
+        if (gui.has("animationsEnabled")) {
+
+            UISettings.animationsEnabled =
+                    gui.get("animationsEnabled")
+                            .getAsBoolean();
+        }
+
+        if (gui.has("roundedCorners")) {
+
+            UISettings.roundedCorners =
+                    gui.get("roundedCorners")
+                            .getAsBoolean();
+        }
+
+        if (gui.has("soundVolume")) {
+
+            UISettings.soundVolume =
+                    clamp(
+                            gui.get("soundVolume")
+                                    .getAsFloat(),
+                            0f,
+                            1f
+                    );
+        }
+
+        if (gui.has("soundEnabled")) {
+
+            UISettings.soundEnabled =
+                    gui.get("soundEnabled")
+                            .getAsBoolean();
+        }
+
+        if (gui.has("theme")) {
+
+            int index =
+                    gui.get("theme")
+                            .getAsInt();
+
+            Theme[] themes =
+                    Theme.values();
+
+            if (index >= 0
+                    && index < themes.length) {
+
+                Theme.setActive(
+                        themes[index]
+                );
+            }
+        }
+
+        UISettings.applyToSounds();
+    }
+
+
+    // ========================================================================
+    // COMPONENT LOAD
+    // ========================================================================
+
+    private static void loadComponentSetting(
+            Component c,
+            JsonObject settings
+    ) {
+
+        if (c instanceof Slider s
+                && settings.has(s.getLabel())) {
+
+            s.setValue(
+                    settings
+                            .get(s.getLabel())
+                            .getAsDouble()
+            );
+
+        } else if (c instanceof ToggleButton t
+                && settings.has(t.getLabel())) {
+
+            t.setValue(
+                    settings
+                            .get(t.getLabel())
+                            .getAsBoolean()
+            );
+
+        } else if (c instanceof ModeButton m
+                && settings.has(m.getLabel())) {
+
+            m.setIndex(
+                    settings
+                            .get(m.getLabel())
+                            .getAsInt()
+            );
+
+        } else if (c instanceof ColorPicker cp
+                && settings.has(cp.getLabel())) {
+
+            cp.setColor(
+                    settings
+                            .get(cp.getLabel())
+                            .getAsInt()
+            );
+
+        } else if (c instanceof BlockPicker bp
+                && settings.has(bp.getLabel())) {
+
             bp.selectedBlocks.clear();
 
-            JsonElement el = settings.get(bp.getLabel());
+            JsonElement element =
+                    settings.get(bp.getLabel());
 
-            if (el != null && el.isJsonObject()) {
-                JsonObject blockMapObj = el.getAsJsonObject();
-                for (Map.Entry<String, JsonElement> entry : blockMapObj.entrySet()) {
-                    Identifier loc = Identifier.parse(entry.getKey());
-                    int savedColor = entry.getValue().getAsInt();
+            if (element != null
+                    && element.isJsonObject()) {
 
-                    BuiltInRegistries.BLOCK.getOptional(loc).ifPresent(block -> {
-                        bp.selectedBlocks.add(block);
-                        RenderUtils.BLOCK_COLORS.put(block, savedColor);
-                    });
+                JsonObject blocks =
+                        element.getAsJsonObject();
+
+                for (Map.Entry<String, JsonElement> entry :
+                        blocks.entrySet()) {
+
+                    Identifier id;
+
+                    try {
+                        id =
+                                Identifier.parse(
+                                        entry.getKey()
+                                );
+                    } catch (Exception ignored) {
+                        continue;
+                    }
+
+                    int color =
+                            entry.getValue()
+                                    .getAsInt();
+
+                    BuiltInRegistries.BLOCK
+                            .getOptional(id)
+                            .ifPresent(block -> {
+
+                                bp.selectedBlocks.add(
+                                        block
+                                );
+
+                                RenderUtils.BLOCK_COLORS.put(
+                                        block,
+                                        color
+                                );
+                            });
                 }
             }
-        } else if (c instanceof ItemPicker ip && settings.has(ip.getLabel())) {
+
+        } else if (c instanceof ItemPicker ip
+                && settings.has(ip.getLabel())) {
+
             ip.selectedItems.clear();
 
-            JsonElement el = settings.get(ip.getLabel());
+            JsonElement element =
+                    settings.get(ip.getLabel());
 
-            // NEU: Lädt Items + Farben aus dem JsonObject
-            if (el != null && el.isJsonObject()) {
-                JsonObject itemMapObj = el.getAsJsonObject();
-                for (Map.Entry<String, JsonElement> entry : itemMapObj.entrySet()) {
-                    Identifier loc = Identifier.parse(entry.getKey());
-                    int savedColor = entry.getValue().getAsInt();
+            if (element != null
+                    && element.isJsonObject()) {
 
-                    BuiltInRegistries.ITEM.getOptional(loc).ifPresent(item -> {
-                        ip.selectedItems.put(item, savedColor);
-                    });
+                JsonObject items =
+                        element.getAsJsonObject();
+
+                for (Map.Entry<String, JsonElement> entry :
+                        items.entrySet()) {
+
+                    Identifier id;
+
+                    try {
+                        id =
+                                Identifier.parse(
+                                        entry.getKey()
+                                );
+                    } catch (Exception ignored) {
+                        continue;
+                    }
+
+                    int color =
+                            entry.getValue()
+                                    .getAsInt();
+
+                    BuiltInRegistries.ITEM
+                            .getOptional(id)
+                            .ifPresent(item ->
+                                    ip.selectedItems.put(
+                                            item,
+                                            color
+                                    )
+                            );
                 }
-            } else if (el != null && el.isJsonArray()) {
-                // Fallback für alte Configs (vor dem Farb-Update)
-                for (JsonElement itemEl : el.getAsJsonArray()) {
-                    Identifier loc = Identifier.parse(itemEl.getAsString());
-                    BuiltInRegistries.ITEM.getOptional(loc).ifPresent(item -> {
-                        ip.selectedItems.put(item, 0xFFFFD700); // Standard-Gold für alte Einträge
-                    });
+
+            } else if (element != null
+                    && element.isJsonArray()) {
+
+                /*
+                 * Alte Config-Version.
+                 */
+                for (JsonElement itemElement :
+                        element.getAsJsonArray()) {
+
+                    Identifier id;
+
+                    try {
+                        id =
+                                Identifier.parse(
+                                        itemElement.getAsString()
+                                );
+                    } catch (Exception ignored) {
+                        continue;
+                    }
+
+                    BuiltInRegistries.ITEM
+                            .getOptional(id)
+                            .ifPresent(item ->
+                                    ip.selectedItems.put(
+                                            item,
+                                            0xFFFFD700
+                                    )
+                            );
                 }
             }
-        } else if (c instanceof EntityFilterPicker efp && settings.has(efp.getLabel())) {
-            JsonElement el = settings.get(efp.getLabel());
 
-            if (el != null && el.isJsonObject()) {
-                JsonObject efpObj = el.getAsJsonObject();
+        } else if (c instanceof EntityFilterPicker efp
+                && settings.has(efp.getLabel())) {
 
-                if (efpObj.has("filters")) {
-                    JsonObject filtersObj = efpObj.getAsJsonObject("filters");
-                    for (Map.Entry<String, JsonElement> entry : filtersObj.entrySet()) {
-                        if (efp.filters.containsKey(entry.getKey())) {
-                            efp.filters.put(entry.getKey(), entry.getValue().getAsBoolean());
+            JsonElement element =
+                    settings.get(
+                            efp.getLabel()
+                    );
+
+            if (element != null
+                    && element.isJsonObject()) {
+
+                JsonObject object =
+                        element.getAsJsonObject();
+
+                if (object.has("filters")) {
+
+                    JsonObject filters =
+                            object.getAsJsonObject(
+                                    "filters"
+                            );
+
+                    for (Map.Entry<String, JsonElement> entry :
+                            filters.entrySet()) {
+
+                        if (efp.filters.containsKey(
+                                entry.getKey()
+                        )) {
+
+                            efp.filters.put(
+                                    entry.getKey(),
+                                    entry.getValue()
+                                            .getAsBoolean()
+                            );
                         }
                     }
                 }
 
-                if (efpObj.has("colors")) {
-                    JsonObject colorsObj = efpObj.getAsJsonObject("colors");
-                    for (Map.Entry<String, JsonElement> entry : colorsObj.entrySet()) {
-                        efp.colors.put(entry.getKey(), entry.getValue().getAsInt());
+                if (object.has("colors")) {
+
+                    JsonObject colors =
+                            object.getAsJsonObject(
+                                    "colors"
+                            );
+
+                    for (Map.Entry<String, JsonElement> entry :
+                            colors.entrySet()) {
+
+                        efp.colors.put(
+                                entry.getKey(),
+                                entry.getValue()
+                                        .getAsInt()
+                        );
                     }
                 }
             }
         }
+    }
+
+
+    // ========================================================================
+    // HELPERS
+    // ========================================================================
+
+    private static float clamp(
+            float value,
+            float min,
+            float max
+    ) {
+
+        return Math.max(
+                min,
+                Math.min(
+                        max,
+                        value
+                )
+        );
     }
 }

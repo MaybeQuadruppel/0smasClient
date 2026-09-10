@@ -3,10 +3,10 @@ package com.OsamaClient.newbridge.UI;
 import com.OsamaClient.newbridge.Config;
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
-import com.OsamaClient.newbridge.UI.UISettingsModule; // TODO: Package anpassen, falls abweichend
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Style;
@@ -17,792 +17,1285 @@ import org.lwjgl.glfw.GLFW;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 0samaClient ClickGUI
+ */
 public class ClickGuiScreen extends Screen {
 
-    // ── View state ────────────────────────────────────────────────────────────
+    // ========================================================================
+    // STATE
+    // ========================================================================
+
     private Module selectedModule = null;
+    private Module.Category selectedCategory = null;
+    private boolean profilesSelected = false;
 
-    // ── Fade-in ───────────────────────────────────────────────────────────────
-    private long openTimeMs = -1;
-    private static final long FADE_MS = 200L;
-
-    // ── Hover animations & sound tracking ─────────────────────────────────────
-    private final Map<String, Float> moduleHover = new HashMap<>();
-    private float backBtnHover = 0f;
-    private String lastHoveredModule = null; // Verhindert Sound-Spamming beim Hovern
-
-    // ── Top-Bar: Gear-Button für UI-Settings ────────────────────────────────
-    private float settingsBtnHover = 0f;
-    private boolean settingsBtnHovered = false;
-    private static final int SETTINGS_BTN_SIZE = 18;
-    private static final int SETTINGS_BTN_Y    = 4;
-
-    // ── Draggable panels ──────────────────────────────────────────────────────
-    public static final Map<Module.Category, int[]> panelPos = new LinkedHashMap<>();
-    private Module.Category draggingCat = null;
-    private int dragOffX, dragOffY;
-    private int lastMouseX, lastMouseY;
-
-    // ── Panel scroll ──────────────────────────────────────────────────────────
-    private final Map<Module.Category, Integer> panelScroll = new HashMap<>();
-    private static final int PANEL_BOTTOM_PAD = 10;
-
-    // ── Dynamic layout (Adaptive layout) ──────────────────────────────────────
-    public static int dynColW = 88;
-    public static int dynModH = 15;
-
-    private static int HDR_H   = 18; // wird von updateAdaptiveLayout() an Compact-Mode/Skalierung angepasst
-    private static final int START_X = 10;
-    private static final int START_Y = 8;
-
-    // ── Search ──────────────────────────
     private boolean searchActive = false;
-    private String  searchQuery  = "";
+    private String searchQuery = "";
 
-    public static final Map<String, Integer> keybinds = new HashMap<>();
     private String bindingModule = null;
 
-    // ── Settings scroll ──────────────────────────────────────────────────────
-    private double settingsScrollOffset = 0;
+    private long openTimeMs = -1L;
+
+    private double categoryScroll = 0.0;
+    private double moduleScroll = 0.0;
+    private double settingsScroll = 0.0;
+
+    private int categoryMaxScroll = 0;
+    private int moduleMaxScroll = 0;
     private int settingsMaxScroll = 0;
-    private static final int SETTINGS_LIST_TOP   = 38;
-    private static final int SETTINGS_BOTTOM_PAD = 8;
-    private static final int SCROLL_STEP         = 18;
 
-    // ── Theme-Farben ─────────────────────────────────────────────────────────
-    // Werden jeden Frame in updateThemeColors() aus Theme.getActive().palette
-    // befüllt - dadurch reagiert die GESAMTE ClickGUI (nicht nur die Settings-
-    // Komponenten) sofort auf einen Theme-Wechsel.
-    private static final int C_OVERLAY      = 0xBB000000; // semi-transparent black (kein Theme-Wert)
-    private static int C_PANEL_BG     = 0xF20A0A0A;
-    private static int C_PANEL_HEADER = 0xFF181818;
-    private static int C_SEPARATOR    = 0xFF2C2C2C;
-    private static int C_ACCENT       = 0xFFFFFFFF;
-    private static int C_ACCENT_DIM   = 0xFF999999;
-    private static int C_TEXT         = 0xFFEEEEEE;
-    private static int C_TEXT_DIM     = 0xFF666666;
-    private static int C_ENABLED      = 0xFFFFFFFF;
-    private static int C_DISABLED     = 0xFF3A3A3A;
-    private static int C_KEYBIND      = 0xFFBBBBBB;
-    private static int C_BIND_PULSE   = 0xFFFFFFFF;
+    private String lastHoveredModule = null;
+    private String lastHoveredSidebarItem = null;
 
-    /** Synct die lokalen Anzeige-Farben mit dem aktuell aktiven Theme. Muss
-     *  einmal pro Frame VOR jeglichem Rendering aufgerufen werden. */
+    // ========================================================================
+    // SORTING & FILTERING
+    // ========================================================================
+
+    private enum SortMode { DEFAULT, A_Z, ACTIVE, BINDS }
+    private SortMode currentSortMode = SortMode.DEFAULT;
+    private float sortHover = 0f;
+
+    // ========================================================================
+    // KEYBINDS
+    // ========================================================================
+
+    public static final Map<String, Integer> keybinds = new HashMap<>();
+
+    // ========================================================================
+    // ANIMATION
+    // ========================================================================
+
+    private final Map<String, Float> moduleHover = new HashMap<>();
+    private final Map<Module.Category, Float> categoryHover = new EnumMap<>(Module.Category.class);
+
+    private float settingsHover = 0f;
+    private float profileHover = 0f;
+    private float backHover = 0f;
+
+    private static final long FADE_MS = 180L;
+
+    // ========================================================================
+    // LAYOUT
+    // ========================================================================
+
+    private static final int BASE_MARGIN = 10;
+    private static final int BASE_SIDEBAR_W = 104;
+    private static final int BASE_HEADER_H = 32;
+    private static final int BASE_MODULE_H = 30;
+    private static final int BASE_MODULE_GAP = 5;
+    private static final int BASE_CONTENT_PAD = 10;
+    private static final int BASE_SETTINGS_TOP = 42;
+
+    // ========================================================================
+    // THEME COLORS
+    // ========================================================================
+
+    private static int C_OVERLAY = 0x99000000;
+    private static int C_WINDOW = 0xF20A0A0A;
+    private static int C_WINDOW_BOTTOM = 0xF2060606;
+    private static int C_HEADER = 0xFF111111;
+    private static int C_SIDEBAR = 0xF20C0C0C;
+    private static int C_SIDEBAR_HOVER = 0xFF171717;
+    private static int C_CARD = 0xF2111111;
+    private static int C_CARD_HOVER = 0xFF191919;
+    private static int C_SEPARATOR = 0xFF292929;
+    private static int C_TEXT = 0xFFEDEDED;
+    private static int C_TEXT_DIM = 0xFF737373;
+    private static int C_ACCENT = 0xFFFFFFFF;
+    private static int C_ACCENT_DIM = 0xFFAAAAAA;
+    private static int C_ENABLED = 0xFFFFFFFF;
+    private static int C_DISABLED = 0xFF555555;
+    private static int C_KEYBIND = 0xFF999999;
+
     private static void updateThemeColors() {
         Theme.Palette p = Theme.getActive().palette;
-        C_PANEL_BG     = UISettings.withPanelAlpha(p.bg & 0x00FFFFFF);
-        C_PANEL_HEADER = p.bgHover | 0xFF000000;
-        C_SEPARATOR    = p.border  | 0xFF000000;
-        C_ACCENT       = p.accent  | 0xFF000000;
-        C_ACCENT_DIM   = p.textDim | 0xFF000000;
-        C_TEXT         = p.text    | 0xFF000000;
-        C_TEXT_DIM     = p.textDim | 0xFF000000;
-        C_ENABLED      = p.enabled | 0xFF000000;
-        C_DISABLED     = p.disabled| 0xFF000000;
-        C_KEYBIND      = p.keybind | 0xFF000000;
-        C_BIND_PULSE   = p.accent  | 0xFF000000;
+
+        int accent = p.accent | 0xFF000000;
+        int baseBg = p.bg | 0xFF000000;
+
+        int tintedBg = UISettings.getTintedBackground(baseBg, accent, 0.12f);
+        int tintedBgDark = UISettings.getTintedBackground(Theme.darken(baseBg, 0.35f), accent, 0.08f);
+
+        C_OVERLAY = 0x00000000;
+
+        C_WINDOW = UISettings.withPanelAlpha(tintedBg);
+        C_WINDOW_BOTTOM = UISettings.withPanelAlpha(tintedBgDark);
+        C_HEADER = UISettings.withPanelAlpha(UISettings.getTintedBackground(p.bgHover | 0xFF000000, accent, 0.15f));
+        C_SIDEBAR = UISettings.withPanelAlpha(UISettings.getTintedBackground(Theme.darken(baseBg, 0.15f), accent, 0.10f));
+        C_SIDEBAR_HOVER = UISettings.withPanelAlpha(UISettings.getTintedBackground(p.bgHover | 0xFF000000, accent, 0.20f));
+        C_CARD = UISettings.withPanelAlpha(UISettings.getTintedBackground(Theme.darken(baseBg, 0.08f), accent, 0.08f));
+        C_CARD_HOVER = UISettings.withPanelAlpha(UISettings.getTintedBackground(p.bgHover | 0xFF000000, accent, 0.18f));
+
+        C_SEPARATOR = p.border | 0xFF000000;
+        C_TEXT = p.text | 0xFF000000;
+        C_TEXT_DIM = p.textDim | 0xFF000000;
+        C_ACCENT = accent;
+        C_ACCENT_DIM = Theme.darken(accent, 0.35f);
+        C_ENABLED = p.enabled | 0xFF000000;
+        C_DISABLED = p.disabled | 0xFF000000;
+        C_KEYBIND = p.keybind | 0xFF000000;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ========================================================================
+    // CONSTRUCTOR
+    // ========================================================================
 
     public ClickGuiScreen() {
         super(net.minecraft.network.chat.Component.literal(""));
     }
 
-// ── Sound Utility ─────────────────────────────────────────────────────────
+    // ========================================================================
+    // SCALE HELPERS
+    // ========================================================================
+
+    private int s(int value) {
+        return UISettings.scaled(value);
+    }
+
+    private int sidebarWidth() {
+        return Math.max(s(105), Math.round(s(BASE_SIDEBAR_W) * UISettings.sidebarWidthScale));
+    }
+
+    private int headerHeight() {
+        return s(BASE_HEADER_H);
+    }
+
+    private int moduleHeight() {
+        return s(UISettings.compactMode ? 27 : BASE_MODULE_H);
+    }
+
+    private int moduleGap() {
+        return Math.max(1, Math.round(s(UISettings.compactMode ? 3 : BASE_MODULE_GAP) * UISettings.moduleGapScale));
+    }
+
+    private int contentPadding() {
+        return s(BASE_CONTENT_PAD);
+    }
+
+    private boolean isPickerComponent(Component c) {
+        if (c == null) return false;
+        String name = c.getClass().getSimpleName().toLowerCase(Locale.ROOT);
+        return name.contains("picker") || name.contains("target") || name.contains("color");
+    }
+
+    private void drawBox(GuiGraphicsExtractor g, int x, int y, int w, int h, int color) {
+        if (UISettings.roundedCorners) {
+            Component.drawRoundedRect(g, x, y, w, h, color);
+        } else {
+            g.fill(x, y, x + w, y + h, color);
+        }
+    }
+
+    private void drawOutline(GuiGraphicsExtractor g, int x, int y, int w, int h, int color) {
+        if (UISettings.roundedCorners) {
+            Component.drawRoundedOutline(g, x, y, w, h, color);
+        } else {
+            g.fill(x, y, x + w, y + 1, color);
+            g.fill(x, y + h - 1, x + w, y + h, color);
+            g.fill(x, y, x + 1, y + h, color);
+            g.fill(x + w - 1, y, x + w, y + h, color);
+        }
+    }
+
+    // ========================================================================
+    // SOUND
+    // ========================================================================
 
     public static void playGuiSound(float pitch, float volume) {
         try {
-            Minecraft.getInstance().getSoundManager().play(
-                    SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), pitch, volume)
-            );
-        } catch (Exception ignored) {}
+            if (!UISettings.soundEnabled) {
+                return;
+            }
+            float finalVolume = Math.max(0f, Math.min(1f, volume * UISettings.soundVolume));
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), pitch, finalVolume));
+        } catch (Exception ignored) {
+        }
     }
 
     public static void playGuiSound(float pitch) {
         playGuiSound(pitch, 0.25f);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ========================================================================
+    // INIT
+    // ========================================================================
 
     @Override
     public void init() {
         super.init();
+
         openTimeMs = System.currentTimeMillis();
-        updateAdaptiveLayout();
+        selectedCategory = getFirstCategory();
+        selectedModule = null;
+        profilesSelected = false;
+        categoryScroll = 0;
+        moduleScroll = 0;
+        settingsScroll = 0;
+        bindingModule = null;
 
-        // Sound beim Öffnen der ClickGUI
-        playGuiSound(1.4f, 0.35f);
+        playGuiSound(1.35f, 0.28f);
     }
 
-    /**
-     * Berechnet die Breite der Kategorien dynamisch anhand der Bildschirmbreite
-     * und ordnet sie so an, dass sie niemals rechts aus dem Bildschirm ragen.
-     */
-    private void updateAdaptiveLayout() {
-        List<Module.Category> activeCats = Arrays.stream(Module.Category.values())
-                .filter(cat -> !ModuleManager.getModulesByCategory(cat).isEmpty())
+    // ========================================================================
+    // CATEGORY LOGIC
+    // ========================================================================
+
+    private boolean isVisibleModule(Module module) {
+        return !(module instanceof UISettingsModule);
+    }
+
+    private List<Module> getCategoryModules(Module.Category category) {
+        return ModuleManager.getModulesByCategory(category).stream()
+                .filter(this::isVisibleModule)
                 .collect(Collectors.toList());
-
-        // Zeilen- und Header-Höhe an Compact-Mode / UI-Skalierung koppeln.
-        dynModH = UISettings.scaled(UISettings.compactMode ? 12 : 15);
-        HDR_H   = UISettings.scaled(UISettings.compactMode ? 15 : 18);
-
-        if (activeCats.isEmpty()) return;
-
-        int gap = UISettings.compactMode ? 5 : 8;
-        int totalAvail = this.width - (START_X * 2);
-
-        // Automatische Breite berechnen (Minimum/Maximum je nach Modus)
-        int minW = UISettings.compactMode ? 48 : 55;
-        int maxW = UISettings.compactMode ? 76 : 88;
-        int calculatedW = (totalAvail - (activeCats.size() - 1) * gap) / activeCats.size();
-        int autoW = Math.max(minW, Math.min(maxW, calculatedW));
-
-        // Manuelle Breiten-Vorgabe aus den UI-Settings hat Vorrang (0 = automatisch).
-        dynColW = UISettings.columnWidth(autoW);
-
-        int x = START_X;
-        for (Module.Category cat : activeCats) {
-            if (!panelPos.containsKey(cat)) {
-                panelPos.put(cat, new int[]{x, START_Y});
-            }
-
-            // Verhindern, dass Panels nach Bildschirm-Resize rechts raushängen
-            int[] pos = panelPos.get(cat);
-            if (pos != null) {
-                pos[0] = Math.min(pos[0], Math.max(0, this.width - dynColW - 4));
-            }
-            x += dynColW + gap;
-        }
     }
 
-    // ── Text Utility ──────────────────────────────────────────────────────────
-
-    private String trimToWidth(String text, int maxWidth) {
-        if (this.font.width(text) <= maxWidth) return text;
-        String dots = "..";
-        String trimmed = text;
-        while (!trimmed.isEmpty() && this.font.width(trimmed + dots) > maxWidth) {
-            trimmed = trimmed.substring(0, trimmed.length() - 1);
-        }
-        return trimmed.isEmpty() ? "" : trimmed + dots;
+    private boolean categoryHasModules(Module.Category category) {
+        return !getCategoryModules(category).isEmpty();
     }
 
-    // ── Animation ─────────────────────────────────────────────────────────────
+    private List<Module.Category> getVisibleCategories() {
+        List<Module.Category> result = new ArrayList<>();
+        for (Module.Category category : Module.Category.values()) {
+            if (categoryHasModules(category)) {
+                result.add(category);
+            }
+        }
+        return result;
+    }
+
+    private Module.Category getFirstCategory() {
+        for (Module.Category category : Module.Category.values()) {
+            if (categoryHasModules(category)) {
+                return category;
+            }
+        }
+        return null;
+    }
+
+    private void selectCategory(Module.Category category) {
+        if (category == null || !categoryHasModules(category)) {
+            return;
+        }
+
+        selectedCategory = category;
+        profilesSelected = false;
+        selectedModule = null;
+        moduleScroll = 0;
+        searchActive = false;
+        searchQuery = "";
+        bindingModule = null;
+
+        playGuiSound(1.05f, 0.20f);
+    }
+
+    // ========================================================================
+    // FADE
+    // ========================================================================
 
     private float rawFade() {
         if (openTimeMs < 0) return 1f;
         return Math.min(1f, (System.currentTimeMillis() - openTimeMs) / (float) FADE_MS);
     }
 
-    private static float easeOut(float t) { return 1f - (1f - t) * (1f - t); }
+    private static float easeOut(float t) {
+        return 1f - (1f - t) * (1f - t);
+    }
 
-    // ── Main render ───────────────────────────────────────────────────────────
+    // ========================================================================
+    // TEXT
+    // ========================================================================
+
+    private String trimToWidth(String text, int maxWidth) {
+        if (text == null) return "";
+        if (UISettings.textWidth(this.font, text) <= maxWidth) return text;
+
+        String dots = "...";
+        String result = text;
+
+        while (!result.isEmpty() && UISettings.textWidth(this.font, result + dots) > maxWidth) {
+            result = result.substring(0, result.length() - 1);
+        }
+
+        return result.isEmpty() ? dots : result + dots;
+    }
+
+    // ========================================================================
+    // MAIN RENDER
+    // ========================================================================
 
     @Override
-    public void extractRenderState(@NotNull GuiGraphicsExtractor guiGraphics,
-                                   int mouseX, int mouseY, float delta) {
-        updateThemeColors();   // Theme-Farben für diesen Frame synchronisieren
-        updateAdaptiveLayout(); // Sorgt jederzeit für korrekte Breiten & Positionen
+    public void extractRenderState(@NotNull GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
+        updateThemeColors();
 
         float fade = easeOut(rawFade());
 
-        lastMouseX = mouseX;
-        lastMouseY = mouseY;
-
-        if (draggingCat != null) {
-            int[] pos = panelPos.get(draggingCat);
-            if (pos != null) {
-                pos[0] = Math.max(0, Math.min(this.width  - dynColW - 4, mouseX - dragOffX));
-                pos[1] = Math.max(0, Math.min(this.height - 40,          mouseY - dragOffY));
-            }
+        if (C_OVERLAY != 0) {
+            g.fill(0, 0, this.width, this.height, Component.withAlpha(C_OVERLAY, fade));
         }
 
-        guiGraphics.fill(0, 0, this.width, this.height,
-                Component.withAlpha(C_OVERLAY, fade));
+        if (selectedModule != null) {
+            renderSettings(g, mouseX, mouseY);
+        } else {
+            renderMain(g, mouseX, mouseY, fade);
+        }
 
         if (selectedModule == null) {
-            renderModuleList(guiGraphics, mouseX, mouseY, fade);
-            renderTopBar(guiGraphics, mouseX, mouseY);
+            renderSearch(g, mouseX, mouseY);
+        }
+
+        renderBindingPrompt(g);
+
+        super.extractRenderState(g, mouseX, mouseY, delta);
+    }
+
+    private int[] getWindowRect() {
+        int margin = Math.max(s(BASE_MARGIN), 6);
+        return new int[]{margin, margin, this.width - margin * 2, this.height - margin * 2};
+    }
+
+    // ========================================================================
+    // MAIN
+    // ========================================================================
+
+    private void renderMain(GuiGraphicsExtractor g, int mouseX, int mouseY, float fade) {
+        int[] window = getWindowRect();
+        int wx = window[0], wy = window[1], ww = window[2], wh = window[3];
+
+        Component.drawShadow(g, wx, wy, ww, wh);
+        drawVerticalGradient(g, wx, wy, ww, wh, C_WINDOW, C_WINDOW_BOTTOM);
+
+        int headerH = headerHeight();
+        drawBox(g, wx, wy, ww, headerH, C_HEADER);
+
+        int sidebarW = sidebarWidth();
+        drawSidebar(g, wx, wy + headerH, sidebarW, wh - headerH, mouseX, mouseY);
+
+        g.fill(wx + sidebarW, wy + headerH, wx + sidebarW + 1, wy + wh, C_SEPARATOR);
+
+        renderHeader(g, wx, wy, ww, headerH, mouseX, mouseY);
+
+        int contentX = wx + sidebarW + contentPadding();
+        int contentY = wy + headerH + contentPadding();
+        int contentW = ww - sidebarW - contentPadding() * 2;
+        int contentH = wh - headerH - contentPadding() * 2;
+
+        if (profilesSelected) {
+            renderProfilesPlaceholder(g, contentX, contentY, contentW, contentH);
         } else {
-            renderSettingsView(guiGraphics, mouseX, mouseY);
+            renderModules(g, contentX, contentY, contentW, contentH, mouseX, mouseY);
         }
 
-        renderSearchBar(guiGraphics, mouseX, mouseY);
-        renderKeybindPrompt(guiGraphics);
-
-        if (fade < 1f)
-            guiGraphics.fill(0, 0, this.width, this.height,
-                    Component.withAlpha(0xFF000000, 1f - fade));
-
-        super.extractRenderState(guiGraphics, mouseX, mouseY, delta);
+        drawOutline(g, wx, wy, ww, wh, C_SEPARATOR);
     }
 
-    // ── Top-Bar (Gear-Button -> UI Settings) ────────────────────────────────
+    // ========================================================================
+    // HEADER
+    // ========================================================================
 
-    private void renderTopBar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        int size = UISettings.scaled(SETTINGS_BTN_SIZE);
-        int bx = this.width / 2 - size / 2;
-        int by = SETTINGS_BTN_Y;
+    private void renderHeader(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
+        int logoX = x + s(10);
+        int logoY = y + (height / 2) - s(4);
 
-        settingsBtnHovered = mouseX >= bx && mouseX <= bx + size
-                && mouseY >= by && mouseY <= by + size;
-        settingsBtnHover = settingsBtnHovered
-                ? Math.min(1f, settingsBtnHover + UISettings.animStep(0.2f))
-                : Math.max(0f, settingsBtnHover - UISettings.animStep(0.2f));
+        UISettings.drawText(g, this.font, "0samaClient", logoX, logoY, C_TEXT, false);
 
-        int bg  = Component.lerpColor(C_PANEL_BG, C_PANEL_HEADER, settingsBtnHover);
-        int bdr = Component.lerpColor(C_SEPARATOR, C_ACCENT,      settingsBtnHover);
-        int icon = Component.lerpColor(C_TEXT_DIM, C_ACCENT,      settingsBtnHover);
-
-        Component.drawShadow(g, bx, by, size, size);
-        Component.drawRoundedRect(   g, bx, by, size, size, bg);
-        Component.drawRoundedOutline(g, bx, by, size, size, bdr);
-
-        String gearIcon = "\u2699"; // ⚙
-        int iw = this.font.width(gearIcon);
-        UISettings.drawText(g, this.font, gearIcon,
-                bx + (size - iw) / 2, by + (size - 8) / 2, icon, false);
-
-        if (settingsBtnHovered) {
-            renderTooltip(g, "UI Settings", mouseX, mouseY);
+        int hintW = 0;
+        if (!searchActive) {
+            String hint = "CTRL+F";
+            hintW = UISettings.textWidth(this.font, hint) + s(10);
+            UISettings.drawText(g, this.font, hint, x + width - hintW, logoY, C_TEXT_DIM, false);
         }
+
+        // Sortier-Button mit Clipping-Schutz
+        int sortBtnW = 0;
+        if (!profilesSelected && selectedModule == null) {
+            String sortText = "Sort: " + currentSortMode.name();
+            sortBtnW = UISettings.textWidth(this.font, sortText) + s(16);
+            int sx = x + width - (searchActive ? s(195) : hintW) - sortBtnW - s(10);
+            int sy = y + (height - s(16)) / 2;
+
+            boolean hovered = mouseX >= sx && mouseX <= sx + sortBtnW && mouseY >= sy && mouseY <= sy + s(16);
+            sortHover = hovered ? Math.min(1f, sortHover + UISettings.animStep(0.2f)) : Math.max(0f, sortHover - UISettings.animStep(0.2f));
+
+            drawBox(g, sx, sy, sortBtnW, s(16), Component.lerpColor(C_CARD, C_CARD_HOVER, sortHover));
+            drawOutline(g, sx, sy, sortBtnW, s(16), hovered ? C_ACCENT : C_SEPARATOR);
+            UISettings.drawText(g, this.font, sortText, sx + s(8), sy + s(8) - s(4), hovered ? C_TEXT : C_TEXT_DIM, false);
+        }
+
+        String categoryName = searchActive && !searchQuery.isBlank() ? "Search Results" : (profilesSelected ? "Profiles" : (selectedCategory != null ? selectedCategory.name() : "Dashboard"));
+        int categoryX = logoX + UISettings.textWidth(this.font, "0samaClient") + s(8);
+
+        int reservedRight = searchActive ? s(195) : hintW;
+        reservedRight += sortBtnW + s(20);
+
+        int maxCatWidth = Math.max(s(20), width - (categoryX - x) - reservedRight);
+
+        String catText = trimToWidth("/ " + categoryName, maxCatWidth);
+        UISettings.drawText(g, this.font, catText, categoryX, logoY, C_TEXT_DIM, false);
+
+        g.fill(x, y + height - 1, x + width, y + height, C_SEPARATOR);
     }
 
-    // ── Module list ───────────────────────────────────────────────────────────
+    // ========================================================================
+    // SIDEBAR
+    // ========================================================================
 
-    private void renderModuleList(GuiGraphicsExtractor g,
-                                  int mouseX, int mouseY, float fade) {
-        Module hoveredModule = null;
-        boolean anyModuleHovered = false;
+    private void drawSidebar(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
+        drawBox(g, x, y, width, height, C_SIDEBAR);
 
-        for (Module.Category cat : Module.Category.values()) {
-            if (ModuleManager.getModulesByCategory(cat).isEmpty()) continue;
+        int itemH = s(UISettings.compactMode ? 24 : 27);
+        int itemGap = s(3);
 
-            List<Module> modules = getFilteredModules(cat);
-            int[] pos    = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
-            int   panelX = pos[0] + (int)((1f - fade) * -12);
-            int   panelY = pos[1];
+        int catStartY = y + s(10);
+        int catAvailH = height - s(15);
 
-            int visibleRows = computeVisibleRows(panelY, modules.size());
-            int frameH      = HDR_H + visibleRows * dynModH + 6;
+        List<Module.Category> visibleCategories = getVisibleCategories();
+        int categoriesH = visibleCategories.size() * (itemH + itemGap);
+        int separatorH = s(22);
+        int profilesH = itemH + itemGap;
+        int settingsH = itemH;
 
-            int maxScroll = Math.max(0, modules.size() - visibleRows);
-            int scroll    = Math.max(0, Math.min(panelScroll.getOrDefault(cat, 0), maxScroll));
-            panelScroll.put(cat, scroll);
+        int totalSidebarH = categoriesH + separatorH + profilesH + settingsH + s(10);
+        categoryMaxScroll = Math.max(0, totalSidebarH - catAvailH);
+        categoryScroll = Math.max(0, Math.min(categoryScroll, categoryMaxScroll));
 
-            Component.drawShadow(g, panelX - 2, panelY, dynColW + 4, frameH);
+        g.enableScissor(x, catStartY, x + width, catStartY + catAvailH);
 
-            Component.drawRoundedRect(g, panelX - 2, panelY, dynColW + 4, frameH, C_PANEL_BG);
-            Component.drawRoundedRect(g, panelX - 2, panelY, dynColW + 4, HDR_H, C_PANEL_HEADER);
+        int currentY = catStartY - (int) categoryScroll;
+        String currentHoveredItem = null;
 
-            boolean hdrHov = mouseX >= panelX - 2 && mouseX <= panelX + dynColW + 2
-                    && mouseY >= panelY      && mouseY <= panelY + HDR_H;
-            int topBarColor = draggingCat == cat ? C_ACCENT
-                    : hdrHov ? C_ACCENT
-                    : C_ACCENT_DIM;
-            g.fill(panelX, panelY, panelX + dynColW, panelY + 2, topBarColor);
+        for (Module.Category category : visibleCategories) {
+            if (currentY + itemH >= catStartY && currentY <= catStartY + catAvailH) {
+                boolean selected = !profilesSelected && selectedCategory == category && (!searchActive || searchQuery.isBlank());
+                float hover = categoryHover.getOrDefault(category, 0f);
 
-            // Titel adaptiv trimmen
-            String headerTitle = trimToWidth("\u2630 " + cat.name(), dynColW - 6);
-            UISettings.drawText(g, this.font, headerTitle,
-                    panelX + 4, panelY + (HDR_H / 2) - 4,
-                    hdrHov ? C_ACCENT : C_TEXT, false);
+                int bx = x + s(5);
+                int bw = width - s(10);
+                boolean hovered = mouseX >= bx && mouseX <= bx + bw && mouseY >= currentY && mouseY <= currentY + itemH;
 
-            g.fill(panelX, panelY + HDR_H, panelX + dynColW, panelY + HDR_H + 1, C_SEPARATOR);
-
-            int listTop    = panelY + HDR_H + 3;
-            int listBottom = listTop + visibleRows * dynModH;
-
-            g.enableScissor(panelX - 2, listTop, panelX + dynColW + 2, listBottom);
-
-            int rowY = listTop;
-
-            if (modules.isEmpty()) {
-                UISettings.drawText(g, this.font, "no results",
-                        panelX + 7, rowY + (dynModH / 2) - 4, C_TEXT_DIM, false);
-            } else {
-                for (int i = 0; i < visibleRows; i++) {
-                    int idx = i + scroll;
-                    if (idx >= modules.size()) break;
-                    Module module = modules.get(idx);
-
-                    boolean hov = mouseX >= panelX && mouseX <= panelX + dynColW
-                            && mouseY >= rowY   && mouseY <= rowY + dynModH;
-
-                    float hp = moduleHover.getOrDefault(module.name, 0f);
-                    hp = hov ? Math.min(1f, hp + 0.14f) : Math.max(0f, hp - 0.14f);
-                    moduleHover.put(module.name, hp);
-
-                    if (hov) {
-                        hoveredModule = module;
-                        anyModuleHovered = true;
-
-                        // Hover-Sound abspielen, falls neu darauf gezeigt wird
-                        if (!module.name.equals(lastHoveredModule)) {
-                            playGuiSound(1.8f, 0.12f);
-                            lastHoveredModule = module.name;
-                        }
-                    }
-
-                    if (hp > 0.01f)
-                        Component.drawRoundedRect(g, panelX + 1, rowY, dynColW - 2, dynModH - 1,
-                                Component.withAlpha(0xFFFFFFFF, hp * 0.07f));
-
-                    int barColor = module.enabled
-                            ? Component.lerpColor(C_DISABLED, C_ENABLED, 0.8f + hp * 0.2f)
-                            : Component.lerpColor(C_DISABLED, C_ACCENT_DIM, hp * 0.6f);
-                    g.fill(panelX + 1, rowY + 2, panelX + 3, rowY + dynModH - 2, barColor);
-
-                    boolean isBound   = keybinds.containsKey(module.name);
-                    boolean isBinding = module.name.equals(bindingModule);
-
-                    int keybindWidth = 0;
-                    String kStr = "";
-                    if (isBound || isBinding) {
-                        kStr = isBinding
-                                ? ((System.currentTimeMillis() / 400) % 2 == 0 ? "[?]" : "[ ]")
-                                : "[" + keyName(keybinds.get(module.name)) + "]";
-                        keybindWidth = this.font.width(kStr) + 2;
-                    }
-
-                    // Modulname adaptiv trimmen
-                    int maxNameWidth = dynColW - 10 - keybindWidth;
-                    String displayName = trimToWidth(module.name, maxNameWidth);
-
-                    int nameColor = module.enabled
-                            ? Component.lerpColor(C_ACCENT_DIM, C_ENABLED, 0.7f + hp * 0.3f)
-                            : Component.lerpColor(C_TEXT_DIM, C_TEXT, hp);
-                    UISettings.drawText(g, this.font, displayName,
-                            panelX + 7, rowY + (dynModH / 2) - 4, nameColor, false);
-
-                    if (isBound || isBinding) {
-                        int kColor = isBinding ? C_BIND_PULSE : C_KEYBIND;
-                        int kw = this.font.width(kStr);
-                        UISettings.drawText(g, this.font, kStr,
-                                panelX + dynColW - kw - 3, rowY + (dynModH / 2) - 4, kColor, false);
-                    }
-
-                    rowY += dynModH;
+                if (hovered) {
+                    currentHoveredItem = "cat_" + category.name();
                 }
+
+                hover = hovered ? Math.min(1f, hover + UISettings.animStep(0.16f)) : Math.max(0f, hover - UISettings.animStep(0.16f));
+                categoryHover.put(category, hover);
+
+                int bg = selected ? Component.lerpColor(C_SIDEBAR_HOVER, C_ACCENT, 0.13f) : Component.lerpColor(C_SIDEBAR, C_SIDEBAR_HOVER, hover);
+
+                if (selected || hover > 0.01f) {
+                    drawBox(g, bx, currentY, bw, itemH, bg);
+                }
+
+                if (selected) {
+                    g.fill(bx, currentY + s(4), bx + s(2), currentY + itemH - s(4), C_ACCENT);
+                }
+
+                int iconX = bx + s(7);
+                int textX = bx + s(22);
+                int textY = currentY + (itemH / 2) - s(4);
+
+                UISettings.drawText(g, this.font, categoryIcon(category), iconX, textY, selected ? C_ACCENT : C_TEXT_DIM, false);
+                UISettings.drawText(g, this.font, trimToWidth(prettyCategoryName(category), bw - s(28)), textX, textY, selected ? C_TEXT : Component.lerpColor(C_TEXT_DIM, C_TEXT, hover), false);
             }
-
-            g.disableScissor();
-
-            if (modules.size() > visibleRows) {
-                int sbX = panelX + dynColW - 1;
-                int listH = listBottom - listTop;
-                int thumbH = Math.max(10, (int) (listH * (visibleRows / (float) modules.size())));
-                int thumbY = listTop + (int) ((listH - thumbH) * (scroll / (float) maxScroll));
-                g.fill(sbX, listTop, sbX + 2, listBottom, C_SEPARATOR);
-                g.fill(sbX, thumbY, sbX + 2, thumbY + thumbH, C_ACCENT_DIM);
-            }
-
-            Component.drawRoundedOutline(g, panelX - 2, panelY, dynColW + 4, frameH, C_SEPARATOR);
+            currentY += itemH + itemGap;
         }
 
-        // Reset hover state, wenn über keinem Modul gehovert wird
-        if (!anyModuleHovered) {
-            lastHoveredModule = null;
+        if (currentY + separatorH >= catStartY && currentY <= catStartY + catAvailH) {
+            int sepY = currentY + s(4);
+            g.fill(x + s(10), sepY, x + width - s(10), sepY + 1, C_SEPARATOR);
+            UISettings.drawText(g, this.font, "UI", x + s(10), sepY + s(6), C_TEXT_DIM, false);
+        }
+        currentY += separatorH;
+
+        if (currentY + itemH >= catStartY && currentY <= catStartY + catAvailH) {
+            int profileX = x + s(5);
+            int profileW = width - s(10);
+            boolean profileHovered = mouseX >= profileX && mouseX <= profileX + profileW && mouseY >= currentY && mouseY <= currentY + itemH;
+
+            if (profileHovered) {
+                currentHoveredItem = "profiles";
+            }
+
+            profileHover = profileHovered ? Math.min(1f, profileHover + UISettings.animStep(0.16f)) : Math.max(0f, profileHover - UISettings.animStep(0.16f));
+            int profileBg = profilesSelected ? Component.lerpColor(C_SIDEBAR_HOVER, C_ACCENT, 0.13f) : Component.lerpColor(C_SIDEBAR, C_SIDEBAR_HOVER, profileHover);
+
+            if (profilesSelected || profileHover > 0.01f) {
+                drawBox(g, profileX, currentY, profileW, itemH, profileBg);
+            }
+            UISettings.drawText(g, this.font, "◉", profileX + s(7), currentY + (itemH / 2) - s(4), profilesSelected ? C_ACCENT : C_TEXT_DIM, false);
+            UISettings.drawText(g, this.font, "Profiles", profileX + s(22), currentY + (itemH / 2) - s(4), profilesSelected ? C_TEXT : C_TEXT_DIM, false);
+        }
+        currentY += itemH + itemGap;
+
+        if (currentY + itemH >= catStartY && currentY <= catStartY + catAvailH) {
+            int settingsX = x + s(5);
+            int settingsW = width - s(10);
+            boolean settingsHovered = mouseX >= settingsX && mouseX <= settingsX + settingsW && mouseY >= currentY && mouseY <= currentY + itemH;
+
+            if (settingsHovered) {
+                currentHoveredItem = "settings";
+            }
+
+            settingsHover = settingsHovered ? Math.min(1f, settingsHover + UISettings.animStep(0.18f)) : Math.max(0f, settingsHover - UISettings.animStep(0.18f));
+            int settingsBg = Component.lerpColor(C_SIDEBAR, C_SIDEBAR_HOVER, settingsHover);
+
+            if (settingsHovered || settingsHover > 0.01f) {
+                drawBox(g, settingsX, currentY, settingsW, itemH, settingsBg);
+            }
+            UISettings.drawText(g, this.font, "⚙", settingsX + s(7), currentY + (itemH / 2) - s(4), settingsHovered ? C_ACCENT : C_TEXT_DIM, false);
+            UISettings.drawText(g, this.font, "Settings", settingsX + s(22), currentY + (itemH / 2) - s(4), settingsHovered ? C_TEXT : C_TEXT_DIM, false);
         }
 
-        if (hoveredModule != null
-                && hoveredModule.description != null
-                && !hoveredModule.description.isEmpty())
-            renderTooltip(g, hoveredModule.description, mouseX, mouseY);
+        g.disableScissor();
+
+        if (currentHoveredItem != null && !currentHoveredItem.equals(lastHoveredSidebarItem)) {
+            playGuiSound(1.75f, 0.08f);
+            lastHoveredSidebarItem = currentHoveredItem;
+        } else if (currentHoveredItem == null) {
+            lastHoveredSidebarItem = null;
+        }
+
+        if (categoryMaxScroll > 0) {
+            renderScrollbar(g, x + width - s(3), catStartY, s(2), catAvailH, totalSidebarH, categoryScroll, categoryMaxScroll);
+        }
     }
 
-    private int computeVisibleRows(int panelY, int moduleCount) {
-        int availH  = this.height - panelY - HDR_H - 6 - PANEL_BOTTOM_PAD;
-        int maxRows = Math.max(1, availH / dynModH);
-        int display = Math.max(1, moduleCount);
-        return Math.min(display, maxRows);
+    private String categoryIcon(Module.Category category) {
+        return switch (category.name().toUpperCase(Locale.ROOT)) {
+            case "COMBAT" -> "⚔";
+            case "MOVEMENT" -> "↔";
+            case "VISUAL" -> "◉";
+            case "MISC" -> "⚙";
+            case "DONUT" -> "◈";
+            default -> "•";
+        };
     }
 
-    private List<Module> getFilteredModules(Module.Category cat) {
-        List<Module> all = ModuleManager.getModulesByCategory(cat);
-        if (!searchActive || searchQuery.isEmpty()) return all;
-        String q = searchQuery.toLowerCase();
-        return all.stream()
-                .filter(m -> m.name.toLowerCase().contains(q))
-                .collect(Collectors.toList());
+    private String prettyCategoryName(Module.Category category) {
+        String name = category.name().toLowerCase(Locale.ROOT);
+        return name.isEmpty() ? name : Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
 
-    // ── Settings view ─────────────────────────────────────────────────────────
+    // ========================================================================
+    // MODULES & FILTERING
+    // ========================================================================
 
-    private void renderSettingsView(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        boolean backHov = mouseX >= 8 && mouseX <= 94 && mouseY >= 8 && mouseY <= 28;
-        backBtnHover = backHov
-                ? Math.min(1f, backBtnHover + 0.15f)
-                : Math.max(0f, backBtnHover - 0.15f);
+    private List<Module> getFilteredModules() {
+        List<Module> baseList;
 
-        int backBg  = Component.lerpColor(0xFF0A0A0A, C_PANEL_HEADER, backBtnHover);
-        int backFg  = Component.lerpColor(C_TEXT_DIM,  C_ACCENT,      backBtnHover);
-        int backBdr = Component.lerpColor(C_SEPARATOR,  C_ACCENT,     backBtnHover);
+        if (searchActive && searchQuery != null && !searchQuery.isBlank()) {
+            String query = searchQuery.toLowerCase(Locale.ROOT);
+            baseList = new ArrayList<>();
+            for (Module.Category cat : Module.Category.values()) {
+                baseList.addAll(getCategoryModules(cat));
+            }
+            baseList = baseList.stream()
+                    .filter(module -> module.name.toLowerCase(Locale.ROOT).contains(query) ||
+                            (module.description != null && module.description.toLowerCase(Locale.ROOT).contains(query)))
+                    .collect(Collectors.toList());
+        } else if (selectedCategory == null) {
+            baseList = Collections.emptyList();
+        } else {
+            baseList = getCategoryModules(selectedCategory);
+        }
 
-        Component.drawRoundedRect(   g, 8, 8, 86, 20, backBg);
-        Component.drawRoundedOutline(g, 8, 8, 86, 20, backBdr);
-        UISettings.drawText(g, this.font, "< Back", 15, 14, backFg, false);
-        UISettings.drawText(g, this.font, "Settings  \u2014  " + selectedModule.name, 102, 14, C_TEXT, false);
-        g.fill(8, 32, this.width - 8, 33, C_SEPARATOR);
+        if (baseList.isEmpty() || currentSortMode == SortMode.DEFAULT) {
+            return baseList;
+        }
 
-        int rightX = 140;
-        Component hoveredComponent = null;
+        List<Module> sortedList = new ArrayList<>(baseList);
+        switch (currentSortMode) {
+            case A_Z -> sortedList.sort(Comparator.comparing(m -> m.name.toLowerCase(Locale.ROOT)));
+            case ACTIVE -> sortedList.sort(Comparator.comparing((Module m) -> !m.enabled).thenComparing(m -> m.name.toLowerCase(Locale.ROOT)));
+            case BINDS -> sortedList.sort(Comparator.comparing((Module m) -> !keybinds.containsKey(m.name)).thenComparing(m -> m.name.toLowerCase(Locale.ROOT)));
+        }
 
-        int leftHeight = 0;
-        int rightHeight = 0;
-        for (Component component : selectedModule.settings) {
-            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker || component instanceof EnchantmentPicker) {
-                rightHeight += component.height + 5;
-            } else {
-                leftHeight += component.height + 5;
+        return sortedList;
+    }
+
+    private void renderModules(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
+        List<Module> modules = getFilteredModules();
+
+        if (modules.isEmpty()) {
+            renderEmptyState(g, x, y, width, height);
+            moduleMaxScroll = 0;
+            moduleScroll = 0;
+            return;
+        }
+
+        int gap = moduleGap();
+        int availableW = width - gap;
+        int autoColumnW = availableW / 2;
+        int columnW = Math.max(s(65), Math.round(autoColumnW * UISettings.columnWidthScale));
+        columnW = Math.min(columnW, autoColumnW);
+
+        int moduleH = moduleHeight();
+        int rows = (modules.size() + 1) / 2;
+        int totalContentH = rows * moduleH + Math.max(0, rows - 1) * gap;
+
+        moduleMaxScroll = Math.max(0, totalContentH - height);
+        moduleScroll = Math.max(0, Math.min(moduleScroll, moduleMaxScroll));
+
+        g.enableScissor(x, y, x + width, y + height);
+        int startY = y - (int) moduleScroll;
+
+        String activeTooltip = null;
+
+        for (int index = 0; index < modules.size(); index++) {
+            Module module = modules.get(index);
+            int column = index % 2;
+            int row = index / 2;
+
+            int cardX = x + column * (columnW + gap);
+            int cardY = startY + row * (moduleH + gap);
+
+            if (cardY + moduleH < y || cardY > y + height) continue;
+
+            boolean hovered = mouseX >= cardX && mouseX <= cardX + columnW && mouseY >= cardY && mouseY <= cardY + moduleH;
+            renderModuleCard(g, module, cardX, cardY, columnW, moduleH, hovered);
+
+            if (hovered && module.description != null && !module.description.isEmpty()) {
+                activeTooltip = module.description;
+                if (!module.name.equals(lastHoveredModule)) {
+                    playGuiSound(1.75f, 0.08f);
+                    lastHoveredModule = module.name;
+                }
+            } else if (!hovered && Objects.equals(lastHoveredModule, module.name)) {
+                lastHoveredModule = null;
             }
         }
-        int contentHeight = Math.max(leftHeight, rightHeight);
 
-        int viewBottom = this.height - SETTINGS_BOTTOM_PAD;
-        int viewHeight = Math.max(0, viewBottom - SETTINGS_LIST_TOP);
-        settingsMaxScroll = Math.max(0, contentHeight - viewHeight);
-        settingsScrollOffset = Math.max(0, Math.min(settingsScrollOffset, settingsMaxScroll));
+        g.disableScissor();
 
-        g.enableScissor(0, SETTINGS_LIST_TOP, this.width, viewBottom);
+        if (moduleMaxScroll > 0) {
+            renderScrollbar(g, x + width - s(3), y, s(3), height, totalContentH, moduleScroll, moduleMaxScroll);
+        }
 
-        int leftY = SETTINGS_LIST_TOP - (int) settingsScrollOffset;
-        int rightY = SETTINGS_LIST_TOP - (int) settingsScrollOffset;
+        if (activeTooltip != null) {
+            renderTooltip(g, activeTooltip, mouseX, mouseY);
+        }
+    }
 
-        for (Component component : selectedModule.settings) {
-            if (component instanceof BlockPicker || component instanceof ItemPicker || component instanceof EntityFilterPicker || component instanceof EnchantmentPicker) {
+    private void renderModuleCard(GuiGraphicsExtractor g, Module module, int x, int y, int width, int height, boolean hovered) {
+        float hover = moduleHover.getOrDefault(module.name, 0f);
+        hover = hovered ? Math.min(1f, hover + UISettings.animStep(0.16f)) : Math.max(0f, hover - UISettings.animStep(0.16f));
+        moduleHover.put(module.name, hover);
+
+        int bg = Component.lerpColor(C_CARD, C_CARD_HOVER, hover);
+        drawBox(g, x, y, width, height, bg);
+
+        int statusColor = module.enabled ? C_ENABLED : C_DISABLED;
+        g.fill(x + s(1), y + s(5), x + s(3), y + height - s(5), statusColor);
+
+        int textX = x + s(8);
+        int textY = y + height / 2 - s(4);
+
+        String name = trimToWidth(module.name, width - s(45));
+        int nameColor = module.enabled ? C_TEXT : Component.lerpColor(C_TEXT_DIM, C_TEXT, hover);
+        UISettings.drawText(g, this.font, name, textX, textY, nameColor, false);
+
+        if (module.name.equals(bindingModule)) {
+            boolean blink = (System.currentTimeMillis() / 250) % 2 == 0;
+            String bindPrompt = blink ? "[ _ ]" : "[   ]";
+            int bindW = UISettings.textWidth(this.font, bindPrompt);
+            UISettings.drawText(g, this.font, bindPrompt, x + width - bindW - s(7), textY, C_ACCENT, false);
+        } else if (keybinds.containsKey(module.name)) {
+            String key = "[" + keyName(keybinds.get(module.name)) + "]";
+            int keyW = UISettings.textWidth(this.font, key);
+            UISettings.drawText(g, this.font, key, x + width - keyW - s(7), textY, C_KEYBIND, false);
+        } else if (searchActive && !searchQuery.isBlank() && module.category != null) {
+            String catBadge = "[" + prettyCategoryName(module.category) + "]";
+            int catW = UISettings.textWidth(this.font, catBadge);
+            UISettings.drawText(g, this.font, catBadge, x + width - catW - s(7), textY, C_TEXT_DIM, false);
+        }
+
+        drawOutline(g, x, y, width, height, hovered ? C_ACCENT : C_SEPARATOR);
+    }
+
+    // ========================================================================
+    // EMPTY / PROFILES
+    // ========================================================================
+
+    private void renderEmptyState(GuiGraphicsExtractor g, int x, int y, int width, int height) {
+        String title = searchActive && !searchQuery.isBlank() ? "No results" : "No modules";
+        String subtitle = searchActive && !searchQuery.isBlank() ? "\"" + searchQuery + "\"" : "This category is empty.";
+        int titleW = UISettings.textWidth(this.font, title);
+        int subW = UISettings.textWidth(this.font, subtitle);
+        int centerX = x + width / 2;
+        int centerY = y + height / 2;
+        UISettings.drawText(g, this.font, title, centerX - titleW / 2, centerY - s(8), C_TEXT, false);
+        UISettings.drawText(g, this.font, subtitle, centerX - subW / 2, centerY + s(6), C_TEXT_DIM, false);
+    }
+
+    private void renderProfilesPlaceholder(GuiGraphicsExtractor g, int x, int y, int width, int height) {
+        int boxW = Math.min(width - s(10), s(300));
+        int boxH = s(90);
+        int bx = x + (width - boxW) / 2;
+        int by = y + (height - boxH) / 2;
+
+        drawBox(g, bx, by, boxW, boxH, C_CARD);
+        drawOutline(g, bx, by, boxW, boxH, C_SEPARATOR);
+
+        String title = "Profiles";
+        int titleW = UISettings.textWidth(this.font, title);
+        UISettings.drawText(g, this.font, title, bx + (boxW - titleW) / 2, by + s(20), C_TEXT, false);
+
+        String text = "Profile system coming soon";
+        int textW = UISettings.textWidth(this.font, text);
+        UISettings.drawText(g, this.font, text, bx + (boxW - textW) / 2, by + s(43), C_TEXT_DIM, false);
+    }
+
+    // ========================================================================
+    // SETTINGS
+    // ========================================================================
+
+    private void renderSettings(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        int[] window = getWindowRect();
+        int wx = window[0], wy = window[1], ww = window[2], wh = window[3];
+
+        Component.drawShadow(g, wx, wy, ww, wh);
+        drawVerticalGradient(g, wx, wy, ww, wh, C_WINDOW, C_WINDOW_BOTTOM);
+
+        int headerH = headerHeight();
+        renderSettingsHeader(g, wx, wy, ww, headerH, mouseX, mouseY);
+
+        int contentX = wx + contentPadding();
+        int contentY = wy + headerH + contentPadding();
+        int contentW = ww - contentPadding() * 2;
+        int contentH = wh - headerH - contentPadding() * 2;
+
+        List<Component> components = selectedModule.settings;
+        int gap = s(UISettings.compactMode ? 3 : 5);
+        int colW = (contentW - gap) / 2;
+
+        int leftX = contentX;
+        int rightX = contentX + colW + gap;
+
+        int leftYOffset = 0;
+        int rightYOffset = 0;
+
+        for (Component component : components) {
+            component.width = colW;
+            if (isPickerComponent(component) || (rightYOffset < leftYOffset)) {
                 component.x = rightX;
-                component.y = rightY;
-                if (component.y + component.height >= SETTINGS_LIST_TOP && component.y <= viewBottom) {
-                    component.render(g, mouseX, mouseY);
-                    if (component.getDescription() != null && !component.getDescription().isEmpty()
-                            && mouseX >= component.x && mouseX <= component.x + component.width
-                            && mouseY >= Math.max(component.y, SETTINGS_LIST_TOP)
-                            && mouseY <= Math.min(component.y + component.height, viewBottom)) {
-                        hoveredComponent = component;
-                    }
-                }
-                rightY += component.height + 5;
+                rightYOffset += component.height + gap;
             } else {
-                component.x = 15;
-                component.y = leftY;
-                if (component.y + component.height >= SETTINGS_LIST_TOP && component.y <= viewBottom) {
-                    component.render(g, mouseX, mouseY);
-                    if (component.getDescription() != null && !component.getDescription().isEmpty()
-                            && mouseX >= component.x && mouseX <= component.x + component.width
-                            && mouseY >= Math.max(component.y, SETTINGS_LIST_TOP)
-                            && mouseY <= Math.min(component.y + component.height, viewBottom)) {
-                        hoveredComponent = component;
-                    }
+                component.x = leftX;
+                leftYOffset += component.height + gap;
+            }
+        }
+
+        int contentTotalH = Math.max(leftYOffset, rightYOffset);
+        settingsMaxScroll = Math.max(0, contentTotalH - contentH);
+        settingsScroll = Math.max(0, Math.min(settingsScroll, settingsMaxScroll));
+
+        leftYOffset = 0;
+        rightYOffset = 0;
+
+        for (Component component : components) {
+            if (component.x == rightX) {
+                component.y = contentY + rightYOffset - (int) settingsScroll;
+                rightYOffset += component.height + gap;
+            } else {
+                component.y = contentY + leftYOffset - (int) settingsScroll;
+                leftYOffset += component.height + gap;
+            }
+        }
+
+        g.enableScissor(contentX, contentY, contentX + contentW, contentY + contentH);
+
+        Component hovered = null;
+
+        for (int i = components.size() - 1; i >= 0; i--) {
+            Component component = components.get(i);
+            if (isPickerComponent(component)) continue;
+
+            boolean visible = component.y <= contentY + contentH + s(150) && component.y + component.height >= contentY;
+
+            if (visible) {
+                component.render(g, mouseX, mouseY);
+
+                if (component.getDescription() != null && !component.getDescription().isEmpty()
+                        && mouseX >= component.x && mouseX <= component.x + component.width
+                        && mouseY >= Math.max(component.y, contentY) && mouseY <= Math.min(component.y + component.height, contentY + contentH)) {
+                    hovered = component;
                 }
-                leftY += component.height + 5;
+            }
+        }
+
+        for (int i = components.size() - 1; i >= 0; i--) {
+            Component component = components.get(i);
+            if (!isPickerComponent(component)) continue;
+
+            boolean visible = component.y <= contentY + contentH + s(150) && component.y + component.height >= contentY;
+
+            if (visible) {
+                component.render(g, mouseX, mouseY);
+
+                if (component.getDescription() != null && !component.getDescription().isEmpty()
+                        && mouseX >= component.x && mouseX <= component.x + component.width
+                        && mouseY >= Math.max(component.y, contentY) && mouseY <= Math.min(component.y + component.height, contentY + contentH)) {
+                    hovered = component;
+                }
             }
         }
 
         g.disableScissor();
 
         if (settingsMaxScroll > 0) {
-            int trackX = this.width - 6;
-            Component.drawRoundedRect(g, trackX, SETTINGS_LIST_TOP, 3, viewHeight, 0xFF1A1A1A);
-            int thumbH = Math.max(20, (int) (viewHeight * (viewHeight / (float) contentHeight)));
-            int thumbY = SETTINGS_LIST_TOP
-                    + (int) ((viewHeight - thumbH) * (settingsScrollOffset / (float) settingsMaxScroll));
-            Component.drawRoundedRect(g, trackX, thumbY, 3, thumbH, C_ACCENT_DIM);
+            renderScrollbar(g, contentX + contentW - s(2), contentY, s(3), contentH, contentTotalH, settingsScroll, settingsMaxScroll);
         }
 
-        if (hoveredComponent != null)
-            renderTooltip(g, hoveredComponent.getDescription(), mouseX, mouseY);
+        if (hovered != null) {
+            renderTooltip(g, hovered.getDescription(), mouseX, mouseY);
+        }
+
+        drawOutline(g, wx, wy, ww, wh, C_SEPARATOR);
     }
 
-    private void renderSearchBar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        if (!searchActive) {
-            String hint = "CTRL+F  |  MMB = bind key";
-            UISettings.drawText(g, this.font, hint,
-                    this.width / 2 - this.font.width(hint) / 2,
-                    this.height - 11, C_TEXT_DIM, false);
+    private void renderSettingsHeader(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
+        drawBox(g, x, y, width, height, C_HEADER);
+
+        int backW = s(52), backH = s(21);
+        int backX = x + s(6), backY = y + (height - backH) / 2;
+
+        boolean hovered = mouseX >= backX && mouseX <= backX + backW && mouseY >= backY && mouseY <= backY + backH;
+        backHover = hovered ? Math.min(1f, backHover + UISettings.animStep(0.18f)) : Math.max(0f, backHover - UISettings.animStep(0.18f));
+
+        int bg = Component.lerpColor(C_HEADER, C_SIDEBAR_HOVER, backHover);
+        drawBox(g, backX, backY, backW, backH, bg);
+        UISettings.drawText(g, this.font, "< Back", backX + s(7), backY + backH / 2 - s(4), hovered ? C_TEXT : C_TEXT_DIM, false);
+
+        String title = selectedModule != null ? selectedModule.name : "Settings";
+        int titleX = backX + backW + s(9);
+        UISettings.drawText(g, this.font, trimToWidth(title, width - backW - s(35)), titleX, y + height / 2 - s(4), C_TEXT, false);
+
+        g.fill(x, y + height - 1, x + width, y + height, C_SEPARATOR);
+    }
+
+    // ========================================================================
+    // SEARCH & PROMPTS
+    // ========================================================================
+
+    private void renderSearch(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        if (!searchActive) return;
+
+        int[] window = getWindowRect();
+        int headerH = headerHeight();
+        int width = s(180);
+        int height = s(20);
+        int x = window[0] + window[2] - width - s(8);
+        int y = window[1] + (headerH - height) / 2;
+
+        drawBox(g, x, y, width, height, UISettings.withPanelAlpha(0x101010));
+        drawOutline(g, x, y, width, height, C_ACCENT);
+
+        String displayText = searchQuery.isEmpty() ? "Search..." : searchQuery;
+        String trimmed = trimToWidth(displayText, width - s(18));
+        UISettings.drawText(g, this.font, "⌕ " + trimmed, x + s(6), y + (height / 2) - s(4), searchQuery.isEmpty() ? C_TEXT_DIM : C_TEXT, false);
+    }
+
+    private void renderBindingPrompt(GuiGraphicsExtractor g) {
+        if (bindingModule == null) return;
+        String text = "Bind: " + bindingModule + "  |  press key  |  ESC clear";
+        int textW = UISettings.textWidth(this.font, text);
+        int width = textW + s(14), height = s(20);
+        int x = this.width / 2 - width / 2, y = s(5);
+
+        drawBox(g, x, y, width, height, C_HEADER);
+        drawOutline(g, x, y, width, height, C_ACCENT);
+        UISettings.drawText(g, this.font, text, x + s(7), y + s(6), C_ACCENT, false);
+    }
+
+    // ========================================================================
+    // SCROLLBAR & GRADIENT
+    // ========================================================================
+
+    private void renderScrollbar(GuiGraphicsExtractor g, int x, int y, int width, int height, int contentHeight, double scroll, int maxScroll) {
+        if (height <= 0 || contentHeight <= height) return;
+        g.fill(x, y, x + width, y + height, UISettings.withPanelAlpha(0x181818));
+        int thumbHeight = Math.max(s(18), Math.round(height * (height / (float) contentHeight)));
+        int available = height - thumbHeight;
+        int thumbY = y + (int) (available * (scroll / (double) maxScroll));
+        drawBox(g, x, thumbY, width, thumbHeight, C_ACCENT_DIM);
+    }
+
+    private void drawVerticalGradient(GuiGraphicsExtractor g, int x, int y, int width, int height, int top, int bottom) {
+        if (width <= 0 || height <= 0) return;
+        if (!UISettings.roundedCorners) {
+            int steps = Math.max(1, Math.min(height, 28));
+            int stepH = Math.max(1, height / steps);
+            int currentY = y;
+
+            for (int i = 0; i < steps; i++) {
+                float t = steps <= 1 ? 0f : i / (float) (steps - 1);
+                int color = Component.lerpColor(top, bottom, t);
+                int segmentH = (i == steps - 1) ? y + height - currentY : stepH;
+                g.fill(x, currentY, x + width, currentY + segmentH, color);
+                currentY += segmentH;
+            }
             return;
         }
 
-        int barW = 200, barH = 18;
-        int barX = this.width / 2 - barW / 2;
-        int barY = this.height - 30;
-
-        Component.drawRoundedRect(   g, barX, barY, barW, barH, 0xF00A0A0A);
-        Component.drawRoundedOutline(g, barX, barY, barW, barH, C_ACCENT);
-
-        boolean showCursor = searchActive && ((System.currentTimeMillis() / 500) % 2 == 0);
-        String cursor  = showCursor ? "|" : "";
-
-        String display = "\u26b2  " + searchQuery + cursor;
-        UISettings.drawText(g, this.font, display, barX + 6, barY + 5, C_TEXT, false);
-
-        String esc = "ESC";
-        UISettings.drawText(g, this.font, esc, barX + barW - this.font.width(esc) - 5, barY + 5, C_TEXT_DIM, false);
+        int avgColor = Component.lerpColor(top, bottom, 0.5f);
+        Component.drawRoundedRect(g, x, y, width, height, avgColor);
     }
 
-    private void renderKeybindPrompt(GuiGraphicsExtractor g) {
-        if (bindingModule == null) return;
-        String msg = "  Press a key to bind: " + bindingModule + "  (ESC = clear)  ";
-        int w  = this.font.width(msg) + 8;
-        int bx = this.width / 2 - w / 2, by = 4;
-        Component.drawRoundedRect(   g, bx, by, w, 15, 0xFF0A0A0A);
-        Component.drawRoundedOutline(g, bx, by, w, 15, C_ACCENT);
-        UISettings.drawText(g, this.font, msg, bx + 4, by + 4, C_BIND_PULSE, false);
+    // ========================================================================
+    // TOOLTIP
+    // ========================================================================
+
+    private void renderTooltip(GuiGraphicsExtractor g, String description, int mouseX, int mouseY) {
+        if (description == null || description.isEmpty()) return;
+
+        List<net.minecraft.network.chat.FormattedText> lines = this.font.getSplitter()
+                .splitLines(net.minecraft.network.chat.Component.literal(description), s(210), Style.EMPTY);
+
+        int textWidth = 0;
+        for (net.minecraft.network.chat.FormattedText line : lines) {
+            textWidth = Math.max(textWidth, UISettings.textWidth(this.font, line.getString()));
+        }
+
+        int lineHeight = s(this.font.lineHeight);
+        int padding = s(5);
+        int totalHeight = lines.size() * lineHeight + padding * 2;
+        int boxWidth = textWidth + padding * 2;
+        int tx = mouseX + s(12), ty = mouseY - s(10);
+
+        if (tx + boxWidth > this.width) tx = mouseX - boxWidth - s(12);
+        if (ty + totalHeight > this.height) ty = this.height - totalHeight - s(4);
+        if (ty < 0) ty = s(4);
+
+        Component.drawShadow(g, tx, ty, boxWidth, totalHeight);
+        drawBox(g, tx, ty, boxWidth, totalHeight, UISettings.withPanelAlpha(0x0A0A0A));
+        drawOutline(g, tx, ty, boxWidth, totalHeight, C_SEPARATOR);
+
+        int cy = ty + padding;
+        for (net.minecraft.network.chat.FormattedText line : lines) {
+            UISettings.drawText(g, this.font, line.getString(), tx + padding, cy, C_TEXT, false);
+            cy += lineHeight;
+        }
     }
 
-    private void renderTooltip(GuiGraphicsExtractor g, String desc, int mx, int my) {
-        List<net.minecraft.network.chat.FormattedText> lines =
-                this.font.getSplitter().splitLines(
-                        net.minecraft.network.chat.Component.literal(desc), 200, Style.EMPTY);
-
-        int tw = 0;
-        for (var l : lines) tw = Math.max(tw, this.font.width(l));
-
-        int lh = this.font.lineHeight, pad = 5;
-        int totalH = lines.size() * lh + pad * 2;
-        int tx = mx + 14, ty = my - 14;
-        if (tx + tw + pad * 2 > this.width)  tx = mx - tw - 18;
-        if (ty + totalH > this.height)       ty = my - totalH;
-
-        Component.drawShadow(        g, tx - pad, ty - pad, tw + pad * 2, totalH);
-        Component.drawRoundedRect(   g, tx - pad, ty - pad, tw + pad * 2, totalH, 0xF00A0A0A);
-        Component.drawRoundedOutline(g, tx - pad, ty - pad, tw + pad * 2, totalH, C_ACCENT);
-
-        int cy = ty;
-        for (var l : lines) { UISettings.drawText(g, this.font, l.getString(), tx, cy, C_TEXT); cy += lh; }
-    }
-
-    private static final Map<Integer, String> KEY_NAMES = new HashMap<>();
-    static {
-        for (int k = GLFW.GLFW_KEY_A; k <= GLFW.GLFW_KEY_Z; k++)
-            KEY_NAMES.put(k, String.valueOf((char) k));
-        for (int k = GLFW.GLFW_KEY_0; k <= GLFW.GLFW_KEY_9; k++)
-            KEY_NAMES.put(k, String.valueOf((char) k));
-        for (int f = 0; f < 12; f++)
-            KEY_NAMES.put(GLFW.GLFW_KEY_F1 + f, "F" + (f + 1));
-        KEY_NAMES.put(GLFW.GLFW_KEY_TAB,           "TAB");
-        KEY_NAMES.put(GLFW.GLFW_KEY_LEFT_SHIFT,    "LSHIFT");
-        KEY_NAMES.put(GLFW.GLFW_KEY_RIGHT_SHIFT,   "RSHIFT");
-        KEY_NAMES.put(GLFW.GLFW_KEY_LEFT_CONTROL,  "LCTRL");
-        KEY_NAMES.put(GLFW.GLFW_KEY_RIGHT_CONTROL, "RCTRL");
-        KEY_NAMES.put(GLFW.GLFW_KEY_LEFT_ALT,      "ALT");
-        KEY_NAMES.put(GLFW.GLFW_KEY_SPACE,         "SPC");
-        KEY_NAMES.put(GLFW.GLFW_KEY_INSERT,        "INS");
-        KEY_NAMES.put(GLFW.GLFW_KEY_DELETE,        "DEL");
-        KEY_NAMES.put(GLFW.GLFW_KEY_HOME,          "HOME");
-        KEY_NAMES.put(GLFW.GLFW_KEY_END,           "END");
-        KEY_NAMES.put(GLFW.GLFW_KEY_PAGE_UP,       "PGUP");
-        KEY_NAMES.put(GLFW.GLFW_KEY_PAGE_DOWN,     "PGDN");
-        KEY_NAMES.put(GLFW.GLFW_KEY_CAPS_LOCK,     "CAPS");
-    }
-    private static String keyName(int key) {
-        return KEY_NAMES.getOrDefault(key, "K" + key);
-    }
+    // ========================================================================
+    // MOUSE
+    // ========================================================================
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
-        int mx = (int) event.x(), my = (int) event.y(), btn = event.button();
+        int mx = (int) event.x(), my = (int) event.y(), button = event.button();
 
-        if (selectedModule == null) {
-            int gSize = UISettings.scaled(SETTINGS_BTN_SIZE);
-            int gx = this.width / 2 - gSize / 2;
-            int gy = SETTINGS_BTN_Y;
-            if (btn == 0 && mx >= gx && mx <= gx + gSize && my >= gy && my <= gy + gSize) {
-                selectedModule = UISettingsModule.getInstance();
-                bindingModule = null;
-                settingsScrollOffset = 0;
-                playGuiSound(1.2f, 0.3f);
-                return true;
-            }
-
-            if (btn == 0) {
-                for (Module.Category cat : Module.Category.values()) {
-                    int[] pos = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
-                    if (mx >= pos[0] - 2 && mx <= pos[0] + dynColW + 2
-                            && my >= pos[1]   && my <= pos[1] + HDR_H) {
-                        draggingCat = cat;
-                        dragOffX = mx - pos[0];
-                        dragOffY = my - pos[1];
-                        playGuiSound(1.1f, 0.2f);
-                        return true;
-                    }
-                }
-            }
-
-            for (Module.Category cat : Module.Category.values()) {
-                int[] pos = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
-                List<Module> modules = getFilteredModules(cat);
-                int visibleRows = computeVisibleRows(pos[1], modules.size());
-                int maxScroll   = Math.max(0, modules.size() - visibleRows);
-                int scroll      = Math.max(0, Math.min(panelScroll.getOrDefault(cat, 0), maxScroll));
-
-                int rowY = pos[1] + HDR_H + 3;
-                for (int i = 0; i < visibleRows; i++) {
-                    int idx = i + scroll;
-                    if (idx >= modules.size()) break;
-                    Module module = modules.get(idx);
-                    if (mx >= pos[0] && mx <= pos[0] + dynColW
-                            && my >= rowY && my <= rowY + dynModH) {
-                        if (btn == 1) {
-                            selectedModule = module;
-                            bindingModule = null;
-                            settingsScrollOffset = 0;
-                            playGuiSound(1.2f, 0.3f);
-                        }
-                        else if (btn == 0) {
-                            module.toggle();
-                            playGuiSound(module.enabled ? 1.0f : 0.8f, 0.3f);
-                        }
-                        else if (btn == 2) {
-                            bindingModule = module.name;
-                            playGuiSound(0.9f, 0.3f);
-                        }
-                        return true;
-                    }
-                    rowY += dynModH;
-                }
-            }
-        } else {
-            if (mx >= 8 && mx <= 94 && my >= 8 && my <= 28) {
+        if (selectedModule != null) {
+            if (isBackButtonHovered(mx, my)) {
                 selectedModule = null;
-                settingsScrollOffset = 0;
-                playGuiSound(0.85f, 0.3f);
+                settingsScroll = 0;
+                playGuiSound(0.85f, 0.25f);
                 return true;
             }
 
-            int viewBottom = this.height - SETTINGS_BOTTOM_PAD;
-
-            for (Component c : selectedModule.settings) {
-                if (c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker || c instanceof EnchantmentPicker) {
-                    if (c.y + c.height >= SETTINGS_LIST_TOP && c.y <= viewBottom) {
-                        if (c.mouseClicked(mx, my, btn)) return true;
-                    }
-                }
+            for (Component component : selectedModule.settings) {
+                if (component.mouseClicked(mx, my, button)) return true;
             }
-
-            for (Component c : selectedModule.settings) {
-                if (!(c instanceof BlockPicker || c instanceof ItemPicker || c instanceof EntityFilterPicker || c instanceof EnchantmentPicker)) {
-                    if (c.y + c.height >= SETTINGS_LIST_TOP && c.y <= viewBottom) {
-                        if (c.mouseClicked(mx, my, btn)) return true;
-                    }
-                }
-            }
+            return true;
         }
 
-        return super.mouseClicked(event, isDoubleClick);
-    }
+        int[] window = getWindowRect();
+        int wx = window[0], wy = window[1], ww = window[2], wh = window[3];
+        int headerH = headerHeight(), sidebarW = sidebarWidth();
 
-    @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
-        draggingCat = null;
-        if (selectedModule != null)
-            for (Component c : selectedModule.settings)
-                c.mouseReleased(event.x(), event.y(), event.button());
-        return super.mouseReleased(event);
-    }
+        // Klick auf den Sortier-Button abfangen
+        if (!profilesSelected && selectedModule == null) {
+            int hintW = searchActive ? s(195) : UISettings.textWidth(this.font, "CTRL+F") + s(10);
+            String sortText = "Sort: " + currentSortMode.name();
+            int sortBtnW = UISettings.textWidth(this.font, sortText) + s(16);
+            int sx = wx + ww - hintW - sortBtnW - s(10);
+            int sy = wy + (headerH - s(16)) / 2;
 
-    @Override
-    public boolean mouseScrolled(double mx, double my, double hAmt, double vAmt) {
-        if (selectedModule != null) {
-            for (Component c : selectedModule.settings) {
-                if (c instanceof BlockPicker bp && bp.mouseScrolled(mx, my, vAmt)) return true;
-                if (c instanceof ItemPicker ip && ip.mouseScrolled(mx, my, vAmt)) return true;
-                if (c instanceof EntityFilterPicker ep && ep.mouseScrolled(mx, my, vAmt)) return true;
-                if (c instanceof EnchantmentPicker enc && enc.mouseScrolled(mx, my, vAmt)) return true;
-            }
-            if (settingsMaxScroll > 0) {
-                settingsScrollOffset -= vAmt * SCROLL_STEP;
-                settingsScrollOffset = Math.max(0, Math.min(settingsScrollOffset, settingsMaxScroll));
-                return true;
-            }
-        } else {
-            for (Module.Category cat : Module.Category.values()) {
-                int[] pos = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});
-                List<Module> modules = getFilteredModules(cat);
-                int visibleRows = computeVisibleRows(pos[1], modules.size());
-                int frameH      = HDR_H + visibleRows * dynModH + 6;
-
-                if (mx >= pos[0] - 2 && mx <= pos[0] + dynColW + 2
-                        && my >= pos[1] && my <= pos[1] + frameH) {
-                    int maxScroll = Math.max(0, modules.size() - visibleRows);
-                    if (maxScroll <= 0) return true;
-                    int scroll = panelScroll.getOrDefault(cat, 0);
-                    if      (vAmt > 0 && scroll > 0)         scroll--;
-                    else if (vAmt < 0 && scroll < maxScroll) scroll++;
-                    panelScroll.put(cat, scroll);
+            if (mx >= sx && mx <= sx + sortBtnW && my >= sy && my <= sy + s(16)) {
+                if (button == 0) {
+                    SortMode[] modes = SortMode.values();
+                    currentSortMode = modes[(currentSortMode.ordinal() + 1) % modes.length];
+                    moduleScroll = 0;
+                    playGuiSound(1.1f, 0.20f);
                     return true;
                 }
             }
         }
-        return super.mouseScrolled(mx, my, hAmt, vAmt);
+
+        if (mx >= wx && mx <= wx + sidebarW && my >= wy + headerH && my <= wy + wh) {
+            if (handleSidebarClick(mx, my, wx, wy + headerH, sidebarW, wh - headerH, button)) return true;
+        }
+
+        if (!profilesSelected) {
+            List<Module> modules = getFilteredModules();
+            int contentX = wx + sidebarW + contentPadding();
+            int contentY = wy + headerH + contentPadding();
+            int contentW = ww - sidebarW - contentPadding() * 2;
+            int contentH = wh - headerH - contentPadding() * 2;
+
+            int gap = moduleGap();
+            int columnW = Math.max(s(65), Math.round((contentW - gap) / 2f * UISettings.columnWidthScale));
+            columnW = Math.min(columnW, (contentW - gap) / 2);
+            int moduleH = moduleHeight();
+
+            for (int index = 0; index < modules.size(); index++) {
+                Module module = modules.get(index);
+                int column = index % 2, row = index / 2;
+                int cardX = contentX + column * (columnW + gap);
+                int cardY = contentY - (int) moduleScroll + row * (moduleH + gap);
+
+                if (mx >= cardX && mx <= cardX + columnW && my >= cardY && my <= cardY + moduleH
+                        && cardY + moduleH >= contentY && cardY <= contentY + contentH) {
+                    if (button == 0) {
+                        module.toggle();
+                        playGuiSound(module.enabled ? 1.05f : 0.80f, 0.25f);
+                        return true;
+                    }
+                    if (button == 1) {
+                        selectedModule = module;
+                        settingsScroll = 0;
+                        bindingModule = null;
+                        playGuiSound(1.20f, 0.25f);
+                        return true;
+                    }
+                    if (button == 2) {
+                        bindingModule = module.name;
+                        playGuiSound(0.90f, 0.20f);
+                        return true;
+                    }
+                }
+            }
+        }
+        return super.mouseClicked(event, isDoubleClick);
+    }
+
+    private boolean handleSidebarClick(int mx, int my, int x, int y, int width, int height, int button) {
+        if (button != 0) return false;
+
+        int itemH = s(UISettings.compactMode ? 24 : 27);
+        int itemGap = s(3);
+        int catStartY = y + s(10);
+        int catAvailH = height - s(15);
+
+        if (mx < x || mx > x + width || my < catStartY || my > catStartY + catAvailH) {
+            return false;
+        }
+
+        int currentY = catStartY - (int) categoryScroll;
+
+        for (Module.Category category : getVisibleCategories()) {
+            if (mx >= x + s(5) && mx <= x + width - s(5) && my >= currentY && my <= currentY + itemH) {
+                selectCategory(category);
+                return true;
+            }
+            currentY += itemH + itemGap;
+        }
+
+        int separatorH = s(22);
+        currentY += separatorH;
+
+        int profileX = x + s(5);
+        int profileW = width - s(10);
+        if (mx >= profileX && mx <= profileX + profileW && my >= currentY && my <= currentY + itemH) {
+            profilesSelected = true;
+            selectedModule = null;
+            selectedCategory = null;
+            moduleScroll = 0;
+            playGuiSound(1.0f, 0.20f);
+            return true;
+        }
+        currentY += itemH + itemGap;
+
+        int settingsX = x + s(5);
+        int settingsW = width - s(10);
+        if (mx >= settingsX && mx <= settingsX + settingsW && my >= currentY && my <= currentY + itemH) {
+            selectedModule = UISettingsModule.getInstance();
+            settingsScroll = 0;
+            bindingModule = null;
+            playGuiSound(1.25f, 0.25f);
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean isBackButtonHovered(int mx, int my) {
+        int[] window = getWindowRect();
+        int x = window[0] + s(6), y = window[1] + (headerHeight() - s(21)) / 2;
+        int w = s(52), h = s(21);
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
-        int key  = event.key();
-        int mods = event.modifiers();
+    public boolean mouseReleased(MouseButtonEvent event) {
+        if (selectedModule != null) {
+            for (Component component : selectedModule.settings) {
+                component.mouseReleased(event.x(), event.y(), event.button());
+            }
+        }
+        return super.mouseReleased(event);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (selectedModule != null) {
+            for (Component component : selectedModule.settings) {
+                if (component.mouseScrolled(mouseX, mouseY, verticalAmount)) return true;
+            }
+            if (settingsMaxScroll > 0) {
+                settingsScroll -= verticalAmount * s(18);
+                settingsScroll = Math.max(0, Math.min(settingsScroll, settingsMaxScroll));
+                return true;
+            }
+            return true;
+        }
+
+        int[] window = getWindowRect();
+        int sidebarW = sidebarWidth();
+        int headerH = headerHeight();
+
+        int sidebarX = window[0];
+        int sidebarY = window[1] + headerH;
+        int sidebarAreaH = window[3] - headerH;
+
+        if (categoryMaxScroll > 0 && mouseX >= sidebarX && mouseX <= sidebarX + sidebarW && mouseY >= sidebarY && mouseY <= sidebarY + sidebarAreaH) {
+            categoryScroll -= verticalAmount * s(18);
+            categoryScroll = Math.max(0, Math.min(categoryScroll, categoryMaxScroll));
+            return true;
+        }
+
+        if (moduleMaxScroll > 0) {
+            int contentX = window[0] + sidebarW + contentPadding();
+            int contentY = window[1] + headerH + contentPadding();
+            int contentW = window[2] - sidebarW - contentPadding() * 2;
+            int contentH = window[3] - headerH - contentPadding() * 2;
+
+            if (mouseX >= contentX && mouseX <= contentX + contentW && mouseY >= contentY && mouseY <= contentY + contentH) {
+                moduleScroll -= verticalAmount * s(18);
+                moduleScroll = Math.max(0, Math.min(moduleScroll, moduleMaxScroll));
+                return true;
+            }
+        }
+
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        int key = event.key(), modifiers = event.modifiers();
 
         if (bindingModule != null) {
             if (key == GLFW.GLFW_KEY_ESCAPE) {
                 keybinds.remove(bindingModule);
-                playGuiSound(0.7f, 0.3f);
-            } else {
-                keybinds.put(bindingModule, key);
-                playGuiSound(1.3f, 0.3f);
+                bindingModule = null;
+                playGuiSound(0.70f, 0.20f);
+                return true;
             }
+            keybinds.put(bindingModule, key);
             bindingModule = null;
+            playGuiSound(1.25f, 0.25f);
             return true;
         }
 
-        if (key == GLFW.GLFW_KEY_F && (mods & GLFW.GLFW_MOD_CONTROL) != 0) {
+        if (key == GLFW.GLFW_KEY_F && (modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
             searchActive = !searchActive;
-            searchQuery  = "";
-            playGuiSound(searchActive ? 1.5f : 0.9f, 0.25f);
+            searchQuery = "";
+            moduleScroll = 0;
+            playGuiSound(searchActive ? 1.45f : 0.90f, 0.20f);
             return true;
         }
 
-        if (searchActive && key == GLFW.GLFW_KEY_BACKSPACE && !searchQuery.isEmpty()) {
-            searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+        if (searchActive && key == GLFW.GLFW_KEY_BACKSPACE) {
+            if (!searchQuery.isEmpty()) {
+                searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+                moduleScroll = 0;
+            }
+            return true;
+        }
+
+        if (searchActive && key == GLFW.GLFW_KEY_ESCAPE) {
+            searchActive = false;
+            searchQuery = "";
+            moduleScroll = 0;
+            playGuiSound(0.80f, 0.20f);
             return true;
         }
 
         if (selectedModule != null) {
-            for (Component c : selectedModule.settings) {
-                if (c.keyPressed(event)) return true;
+            for (Component component : selectedModule.settings) {
+                if (component.keyPressed(event)) return true;
             }
         }
 
         if (key == GLFW.GLFW_KEY_ESCAPE) {
-            if (searchActive) {
-                searchActive = false;
-                searchQuery = "";
-                playGuiSound(0.8f, 0.25f);
-                return true;
-            }
             if (selectedModule != null) {
                 selectedModule = null;
-                playGuiSound(0.85f, 0.3f);
+                settingsScroll = 0;
+                playGuiSound(0.85f, 0.25f);
                 return true;
             }
         }
-
         return super.keyPressed(event);
     }
 
     @Override
     public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
         if (searchActive && bindingModule == null) {
-            char ch = (char) event.codepoint();
-            if (ch >= 32) { searchQuery += ch; return true; }
+            char character = (char) event.codepoint();
+            if (character >= 32 && character != 127) {
+                searchQuery += character;
+                moduleScroll = 0;
+                return true;
+            }
         }
-        if (selectedModule != null)
-            for (Component c : selectedModule.settings)
-                if (c.charTyped(event)) return true;
+        if (selectedModule != null) {
+            for (Component component : selectedModule.settings) {
+                if (component.charTyped(event)) return true;
+            }
+        }
         return super.charTyped(event);
     }
 
-    @Override public void onClose()          { Config.save(); super.onClose(); }
-    @Override public boolean isPauseScreen() { return false; }
+    private static final Map<Integer, String> KEY_NAMES = new HashMap<>();
+    static {
+        for (int key = GLFW.GLFW_KEY_A; key <= GLFW.GLFW_KEY_Z; key++) KEY_NAMES.put(key, String.valueOf((char) key));
+        for (int key = GLFW.GLFW_KEY_0; key <= GLFW.GLFW_KEY_9; key++) KEY_NAMES.put(key, String.valueOf((char) key));
+        for (int f = 0; f < 12; f++) KEY_NAMES.put(GLFW.GLFW_KEY_F1 + f, "F" + (f + 1));
+        KEY_NAMES.put(GLFW.GLFW_KEY_TAB, "TAB");
+        KEY_NAMES.put(GLFW.GLFW_KEY_LEFT_SHIFT, "LSHIFT");
+        KEY_NAMES.put(GLFW.GLFW_KEY_RIGHT_SHIFT, "RSHIFT");
+        KEY_NAMES.put(GLFW.GLFW_KEY_LEFT_CONTROL, "LCTRL");
+        KEY_NAMES.put(GLFW.GLFW_KEY_RIGHT_CONTROL, "RCTRL");
+        KEY_NAMES.put(GLFW.GLFW_KEY_LEFT_ALT, "ALT");
+        KEY_NAMES.put(GLFW.GLFW_KEY_RIGHT_ALT, "RALT");
+        KEY_NAMES.put(GLFW.GLFW_KEY_SPACE, "SPACE");
+        KEY_NAMES.put(GLFW.GLFW_KEY_INSERT, "INS");
+        KEY_NAMES.put(GLFW.GLFW_KEY_DELETE, "DEL");
+        KEY_NAMES.put(GLFW.GLFW_KEY_HOME, "HOME");
+        KEY_NAMES.put(GLFW.GLFW_KEY_END, "END");
+        KEY_NAMES.put(GLFW.GLFW_KEY_PAGE_UP, "PGUP");
+        KEY_NAMES.put(GLFW.GLFW_KEY_PAGE_DOWN, "PGDN");
+        KEY_NAMES.put(GLFW.GLFW_KEY_CAPS_LOCK, "CAPS");
+        KEY_NAMES.put(GLFW.GLFW_KEY_ENTER, "ENTER");
+        KEY_NAMES.put(GLFW.GLFW_KEY_LEFT, "LEFT");
+        KEY_NAMES.put(GLFW.GLFW_KEY_RIGHT, "RIGHT");
+        KEY_NAMES.put(GLFW.GLFW_KEY_UP, "UP");
+        KEY_NAMES.put(GLFW.GLFW_KEY_DOWN, "DOWN");
+    }
+
+    private static String keyName(int key) {
+        return KEY_NAMES.getOrDefault(key, "K" + key);
+    }
+
+    @Override
+    public void onClose() {
+        Config.save();
+        super.onClose();
+    }
+
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
 }

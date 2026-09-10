@@ -47,8 +47,15 @@ public class Scaffold extends Module {
             float yaw = applyGCD(rotations[0], client.player.getYRot(), client);
             float pitch = applyGCD(rotations[1], client.player.getXRot(), client);
 
-            client.getConnection().send(new ServerboundMovePlayerPacket.Rot(yaw, pitch, client.player.onGround(), client.player.horizontalCollision));
+            // Alte Blickrichtung zwischenspeichern
+            float oldYaw = client.player.getYRot();
+            float oldPitch = client.player.getXRot();
 
+            // Clientseitige Rotation kurz anpassen für den Raycast / useItemOn
+            client.player.setYRot(yaw);
+            client.player.setXRot(pitch);
+
+            client.getConnection().send(new ServerboundMovePlayerPacket.Rot(yaw, pitch, client.player.onGround(), client.player.horizontalCollision));
 
             int slot = getBlockSlot(client);
             if (slot != -1) {
@@ -65,8 +72,14 @@ public class Scaffold extends Module {
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, hitResult);
                 client.player.swing(InteractionHand.MAIN_HAND);
 
+                client.player.getInventory().setSelectedSlot(oldSlot);
+
                 client.getConnection().send(new ServerboundMovePlayerPacket.Rot(client.player.getYRot(), client.player.getXRot(), client.player.onGround(), client.player.horizontalCollision));
             }
+
+            // Ursprüngliche Blickrichtung wiederherstellen
+            client.player.setYRot(oldYaw);
+            client.player.setXRot(oldPitch);
         }
     }
 

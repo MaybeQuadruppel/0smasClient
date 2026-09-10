@@ -16,6 +16,12 @@ public enum Theme {
             0xF20A0A0A, 0xFF181818, 0xFF2C2C2C, 0xFF999999,
             0xFFFFFFFF, 0xFFEEEEEE, 0xFF666666, 0xFFFFFFFF, 0xFF3A3A3A, 0xFFBBBBBB)),
 
+    /** Maximaler Kontrast, komplett ohne Farbstich: reines Schwarz/Weiß/Grau
+     *  statt der leicht warmen/kühlen Grautöne von MONOCHROME. */
+    BLACKWHITE("Black & White", "\u25D1", new Palette(
+            0xF2000000, 0xFF161616, 0xFF3A3A3A, 0xFFFFFFFF,
+            0xFFFFFFFF, 0xFFFFFFFF, 0xFFAAAAAA, 0xFFFFFFFF, 0xFF555555, 0xFFFFFFFF)),
+
     OCEAN("Ocean", "\u2248", new Palette(
             0xF2081018, 0xFF102030, 0xFF1E3346, 0xFF3E7CA6,
             0xFF39C0FF, 0xFFE8F6FF, 0xFF5C7A8C, 0xFF39C0FF, 0xFF1B2A36, 0xFF7FD0FF)),

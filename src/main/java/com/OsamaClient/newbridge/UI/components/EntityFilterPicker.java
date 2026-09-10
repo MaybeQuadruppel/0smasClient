@@ -22,13 +22,13 @@ public class EntityFilterPicker extends Component {
     private int draggingSlider = 0; // 0 = none, 1 = Hue, 2 = Alpha
 
     private static final int DEFAULT_COLOR = 0x6600FFFF;
-    private final int itemHeight;
+    private static final int BASE_BOX_HEIGHT = 16;
+    private static final int BASE_TOTAL_HEIGHT = 28; // 12px Label + 16px Box
 
     public EntityFilterPicker(String label) {
+        super(0, 0, 100, BASE_TOTAL_HEIGHT);
         this.label = label;
-        this.width = UISettings.scaled(100);
-        this.height = UISettings.scaled(14);
-        this.itemHeight = UISettings.scaled(14);
+        syncScaledSize(100, BASE_TOTAL_HEIGHT, 60, BASE_TOTAL_HEIGHT);
 
         filters.put("Players", true);
         filters.put("Hostiles", true);
@@ -38,6 +38,11 @@ public class EntityFilterPicker extends Component {
     }
 
     public String getLabel() { return this.label; }
+
+    public EntityFilterPicker withDescription(String description) {
+        this.description = description;
+        return this;
+    }
 
     public boolean isFilterEnabled(String key) {
         return filters.getOrDefault(key, false);
@@ -53,67 +58,97 @@ public class EntityFilterPicker extends Component {
         return count;
     }
 
+    private int getButtonY() {
+        return y + UISettings.scaled(12);
+    }
+
+    private int getButtonHeight() {
+        return UISettings.scaled(BASE_BOX_HEIGHT);
+    }
+
+    private boolean isButtonHovered(int mouseX, int mouseY) {
+        int btnY = getButtonY();
+        int btnH = getButtonHeight();
+        return mouseX >= x && mouseX <= x + width && mouseY >= btnY && mouseY <= btnY + btnH;
+    }
+
     @Override
-    public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+    public void render(Object graphics, int mouseX, int mouseY) {
+        if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
+
+        syncScaledSize(baseWidth, BASE_TOTAL_HEIGHT, 60, BASE_TOTAL_HEIGHT);
         Theme.Palette p = Theme.getActive().palette;
 
-        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, p.accent, false);
+        // 1. Label oberhalb der Box
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label + ":", x, y + 1, p.accent, false);
 
-        boolean hov = isHovered(mouseX, mouseY);
+        int btnY = getButtonY();
+        int btnH = getButtonHeight();
+        boolean hov = isButtonHovered(mouseX, mouseY);
+
+        // ZWINGE Opacity auf 255 (0xFF000000) für den geschlossenen Button, damit er solide ist
         int btnBg = lerpColor(p.bg, p.bgHover, hov ? 1f : 0f);
+        int solidBtnBg = (btnBg & 0x00FFFFFF) | 0xFF000000;
 
-        drawRoundedRect(guiGraphics, x, y, width, height, UISettings.withPanelAlpha(btnBg));
-        drawRoundedOutline(guiGraphics, x, y, width, height, open ? p.accent : p.border);
+        // 2. Haupt-Button (Massiv)
+        drawRoundedRect(guiGraphics, x, btnY, width, btnH, solidBtnBg);
+        drawRoundedOutline(guiGraphics, x, btnY, width, btnH, open ? p.accent : (p.border | 0xFF000000));
 
         String arrow = open ? " \u25b2" : " \u25bc";
         String btnLabel = getActiveCount() + " active" + arrow;
-        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? p.accent : p.text, false);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, btnLabel, x + UISettings.scaled(6), btnY + (btnH / 2) - UISettings.scaled(4), open ? p.accent : p.text, false);
 
         if (!open) return;
 
+        // 3. Dropdown Menü
         List<String> keys = new ArrayList<>(filters.keySet());
-
+        int itemH = UISettings.scaled(15);
         int dropW = width + UISettings.scaled(40);
-        int listH = keys.size() * itemHeight;
+        int listH = keys.size() * itemH;
 
         boolean showColorMenu = activeColorFilter != null && filters.getOrDefault(activeColorFilter, false);
-        int colorSliderH = showColorMenu ? UISettings.scaled(36) : 0;
+        int colorSliderH = showColorMenu ? UISettings.scaled(38) : 0;
         int dropH = listH + colorSliderH;
         int dropX = x;
-        int dropY = y + height + 3;
+        int dropY = btnY + btnH + UISettings.scaled(3);
+
+        // ZWINGE Opacity auf 255 für das offene Dropdown-Menü
+        int solidDropBg = (p.bg & 0x00FFFFFF) | 0xFF000000;
 
         drawShadow(guiGraphics, dropX, dropY, dropW, dropH);
-        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, UISettings.withPanelAlpha(p.bg));
+
+        // Hier wurde der Panel Alpha entfernt, das Menü ist jetzt zu 100% deckend!
+        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, solidDropBg);
         drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, p.accent);
 
-        int listY = dropY + 1;
-        int currentY = listY;
-        int selBgColor = (p.accent & 0x00FFFFFF) | 0x40000000;
+        int currentY = dropY + 2;
+        int selBgColor = (p.accent & 0x00FFFFFF) | 0x35000000;
 
         for (String key : keys) {
             boolean active = filters.getOrDefault(key, false);
-            boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= currentY && mouseY <= currentY + itemHeight;
+            boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= currentY && mouseY <= currentY + itemH;
 
+            // Hover-Effekt ebenfalls anpassen, damit es sich nicht komisch mit Transparenz vermischt
             if (active) {
-                guiGraphics.fill(dropX + 1, currentY, dropX + dropW - 1, currentY + itemHeight, selBgColor);
+                guiGraphics.fill(dropX + 2, currentY, dropX + dropW - 2, currentY + itemH, selBgColor);
             } else if (itemHov) {
-                guiGraphics.fill(dropX + 1, currentY, dropX + dropW - 1, currentY + itemHeight, 0x1AFFFFFF);
+                int solidHover = (p.bgHover & 0x00FFFFFF) | 0xFF000000;
+                guiGraphics.fill(dropX + 2, currentY, dropX + dropW - 2, currentY + itemH, solidHover);
             }
 
-            // Farbe abrufen und Alpha-Kanal für Text entfernen (immer 100% deckend)
             int filterColor = getColor(key);
-            int displayColor = active ? (filterColor | 0xFF000000) : (itemHov ? p.text : p.textDim);
+            int displayColor = active ? p.text : (itemHov ? p.text : p.textDim);
 
             if (active) {
-                guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, currentY + (itemHeight / 2) - 4, displayColor, false);
+                UISettings.drawText(guiGraphics, Minecraft.getInstance().font, "\u2714", dropX + UISettings.scaled(5), currentY + (itemH / 2) - UISettings.scaled(4), p.accent, false);
             }
 
-            guiGraphics.text(Minecraft.getInstance().font, key, dropX + (active ? 17 : 7), currentY + (itemHeight / 2) - 4, displayColor, false);
+            UISettings.drawText(guiGraphics, Minecraft.getInstance().font, key, dropX + UISettings.scaled(active ? 17 : 7), currentY + (itemH / 2) - UISettings.scaled(4), displayColor, false);
 
             if (active) {
-                int previewSize = UISettings.scaled(7);
+                int previewSize = UISettings.scaled(8);
                 int previewX = dropX + dropW - UISettings.scaled(14);
-                int previewY = currentY + (itemHeight / 2) - (previewSize / 2);
+                int previewY = currentY + (itemH / 2) - (previewSize / 2);
                 drawRoundedRect(guiGraphics, previewX, previewY, previewSize, previewSize, filterColor | 0xFF000000);
 
                 if (activeColorFilter != null && activeColorFilter.equals(key)) {
@@ -121,15 +156,16 @@ public class EntityFilterPicker extends Component {
                 }
             }
 
-            currentY += itemHeight;
+            currentY += itemH;
         }
 
+        // 4. Farbregler für aktiven Filter (Hue & Opacity)
         if (showColorMenu) {
-            int startSliderY = listY + listH + 4;
-            int sliderX = dropX + 6;
-            int sliderW = dropW - 12;
+            int startSliderY = dropY + listH + UISettings.scaled(4);
+            int sliderX = dropX + UISettings.scaled(6);
+            int sliderW = dropW - UISettings.scaled(12);
 
-            guiGraphics.fill(dropX + 1, startSliderY - 3, dropX + dropW - 1, startSliderY - 2, p.border);
+            guiGraphics.fill(dropX + 2, startSliderY - UISettings.scaled(3), dropX + dropW - 2, startSliderY - UISettings.scaled(2), p.border | 0xFF000000);
 
             int currentARGB = getColor(activeColorFilter);
             int currentAlpha = (currentARGB >> 24) & 0xFF;
@@ -153,25 +189,27 @@ public class EntityFilterPicker extends Component {
                 }
             }
 
+            // Hue Bar
             for (int i = 0; i < sliderW; i++) {
                 int col = java.awt.Color.HSBtoRGB(i / (float) sliderW, 1f, 1f) | 0xFF000000;
-                guiGraphics.fill(sliderX + i, startSliderY, sliderX + i + 1, startSliderY + 4, col);
+                guiGraphics.fill(sliderX + i, startSliderY, sliderX + i + 1, startSliderY + UISettings.scaled(4), col);
             }
             int thumbX1 = sliderX + (int) (currentHue * sliderW);
-            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX1 - 1)), startSliderY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX1 + 2)), startSliderY + 5, 0xFFFFFFFF);
+            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX1 - 1)), startSliderY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX1 + 2)), startSliderY + UISettings.scaled(5), 0xFFFFFFFF);
 
-            int alphaSliderY = startSliderY + 12;
-            guiGraphics.text(Minecraft.getInstance().font, "Opacity: " + (int) ((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, p.textDim, false);
-            int barY = alphaSliderY + 10;
+            // Opacity Bar
+            int alphaSliderY = startSliderY + UISettings.scaled(13);
+            UISettings.drawText(guiGraphics, Minecraft.getInstance().font, "Opacity: " + (int) ((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, p.textDim, false);
+            int barY = alphaSliderY + UISettings.scaled(10);
 
             for (int i = 0; i < sliderW; i++) {
                 float pct = i / (float) sliderW;
                 int alphaVal = (int) (pct * 255);
                 int gray = (alphaVal << 24) | 0xFFFFFF;
-                guiGraphics.fill(sliderX + i, barY, sliderX + i + 1, barY + 4, gray);
+                guiGraphics.fill(sliderX + i, barY, sliderX + i + 1, barY + UISettings.scaled(4), gray);
             }
             int thumbX2 = sliderX + (int) ((currentAlpha / 255f) * sliderW);
-            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX2 - 1)), barY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX2 + 2)), barY + 5, 0xFFFFFFFF);
+            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX2 - 1)), barY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX2 + 2)), barY + UISettings.scaled(5), 0xFFFFFFFF);
         } else {
             activeColorFilter = null;
         }
@@ -179,7 +217,9 @@ public class EntityFilterPicker extends Component {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY) && button == 0) {
+        int imx = (int) mouseX, imy = (int) mouseY;
+
+        if (isButtonHovered(imx, imy) && button == 0) {
             open = !open;
             activeColorFilter = null;
             if (open) Sounds.select(); else Sounds.deselect();
@@ -188,32 +228,32 @@ public class EntityFilterPicker extends Component {
 
         if (open) {
             List<String> keys = new ArrayList<>(filters.keySet());
+            int itemH = UISettings.scaled(15);
             int dropX = x;
             int dropW = width + UISettings.scaled(40);
-            int listH = keys.size() * itemHeight;
-            int dropY = y + height + 3;
-            int listY = dropY + 1;
+            int listH = keys.size() * itemH;
+            int dropY = getButtonY() + getButtonHeight() + UISettings.scaled(3);
 
             boolean showColorMenu = activeColorFilter != null && filters.getOrDefault(activeColorFilter, false);
             if (showColorMenu) {
-                int startSliderY = listY + listH + 4;
-                int sliderX = dropX + 6;
-                int sliderW = dropW - 12;
+                int startSliderY = dropY + listH + UISettings.scaled(4);
+                int sliderX = dropX + UISettings.scaled(6);
+                int sliderW = dropW - UISettings.scaled(12);
 
-                if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY - 2 && mouseY <= startSliderY + 7 && button == 0) {
+                if (imx >= sliderX && imx <= sliderX + sliderW && imy >= startSliderY - 2 && imy <= startSliderY + 8 && button == 0) {
                     this.draggingSlider = 1;
                     Sounds.select();
                     return true;
                 }
-                if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY + 20 && mouseY <= startSliderY + 28 && button == 0) {
+                if (imx >= sliderX && imx <= sliderX + sliderW && imy >= startSliderY + UISettings.scaled(20) && imy <= startSliderY + UISettings.scaled(28) && button == 0) {
                     this.draggingSlider = 2;
                     Sounds.select();
                     return true;
                 }
             }
 
-            if (mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= listY && mouseY <= listY + listH) {
-                int idx = (int) ((mouseY - listY) / itemHeight);
+            if (imx >= dropX && imx <= dropX + dropW && imy >= dropY && imy <= dropY + listH) {
+                int idx = (imy - dropY) / itemH;
 
                 if (idx >= 0 && idx < keys.size()) {
                     String key = keys.get(idx);
@@ -232,7 +272,7 @@ public class EntityFilterPicker extends Component {
                 return true;
             }
 
-            if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
+            if (imx < dropX || imx > dropX + dropW || imy < getButtonY() || imy > dropY + listH + (showColorMenu ? UISettings.scaled(38) : 0)) {
                 open = false;
                 activeColorFilter = null;
                 Sounds.deselect();
