@@ -1,6 +1,8 @@
 package com.OsamaClient.newbridge.UI.components;
 
-import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.Sounds;
+import com.OsamaClient.newbridge.UI.Theme;
+import com.OsamaClient.newbridge.UI.UISettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -14,46 +16,66 @@ public class ModeButton extends Component {
     private int index;
     private final Consumer<String> onChange;
 
-    // Schwarz-Weiß Palette
-    private static final int C_BG         = 0xF20A0A0A; // C_PANEL_BG
-    private static final int C_BG_HOV     = 0xFF181818; // C_PANEL_HEADER
-    private static final int C_BORDER     = 0xFF2C2C2C; // C_SEPARATOR
-    private static final int C_BORDER_HOV = 0xFF999999; // C_ACCENT_DIM
-    private static final int C_ACCENT     = 0xFFFFFFFF; // C_ACCENT
-    private static final int C_ACCENT_HOV = 0xFFEEEEEE; // C_TEXT
-    private static final int C_LABEL      = 0xFFEEEEEE; // C_TEXT
-    private static final int C_LABEL_DIM  = 0xFF666666; // C_TEXT_DIM
-
     public ModeButton(String label, List<String> modes, int startIndex,
                       Consumer<String> onChange) {
         this.label    = label;
         this.modes    = modes;
         this.index    = startIndex;
         this.onChange = onChange;
-        this.width    = 110;
-        this.height   = 16;
+        // Mindestgröße: verhindert, dass Label- und Value-Text bei sehr
+        // kleiner UI-Scale zu wenig Platz haben und ineinander clippen.
+        syncScaledSize(100, 14, 60, 14);
     }
 
     @Override
     public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        // Größe bei jedem Frame aus dem aktuellen UISettings.scale neu ableiten -
+        // sonst bleibt die Box beim Verschieben des Scale-Reglers auf der Größe
+        // stehen, mit der sie erzeugt wurde.
+        syncScaledSize(baseWidth, baseHeight, 60, 14);
+
+        Theme.Palette p = Theme.getActive().palette;
         float hover = stepHover(mouseX, mouseY);
 
         drawRoundedRect(   guiGraphics, x, y, width, height,
-                lerpColor(C_BG, C_BG_HOV, hover));
+                UISettings.withPanelAlpha(lerpColor(p.bg, p.bgHover, hover)));
         drawRoundedOutline(guiGraphics, x, y, width, height,
-                lerpColor(C_BORDER, C_BORDER_HOV, hover * 0.7f));
+                lerpColor(p.border, p.borderHover, hover * 0.7f));
 
-        guiGraphics.text(Minecraft.getInstance().font, label,
-                x + 6, y + (height / 2) - 4,
-                lerpColor(C_LABEL_DIM, C_LABEL, hover), false);
+        // Vertikale Zentrierung berücksichtigt fontScale (Glyphenhöhe skaliert
+        // mit) - sonst wirkt der Text bei anderer Font-Size zunehmend nach
+        // oben/unten "verschoben" statt mittig in der Box zu sitzen.
+        int textOffsetY = Math.round(4 * UISettings.fontScale);
 
-        String valText  = "\u25C4 " + modes.get(index) + " \u25BA";
-        int    valWidth = Minecraft.getInstance().font.width(valText);
-        guiGraphics.text(Minecraft.getInstance().font, valText,
-                x + width - valWidth - 5,
-                y + (height / 2) - 4,
-                lerpColor(C_LABEL_DIM, lerpColor(C_ACCENT, C_ACCENT_HOV, hover), hover),
+        // 1. Vorbereiten: Val-Text berechnen, um zu wissen, wo er beginnt
+        String valText = "\u25C4 " + modes.get(index) + " \u25BA";
+
+        // WICHTIG: nicht font.width(...) direkt verwenden - UISettings.drawText
+        // skaliert den Text per fontScale, die rohe Font-Breite passt dann nicht
+        // mehr zur tatsächlich gezeichneten Breite und der Text rutscht rechts
+        // aus der Box bzw. clippt in das Label hinein.
+        int valWidth = UISettings.textWidth(Minecraft.getInstance().font, valText);
+        int valStartX = x + width - valWidth - 5;
+
+        // 2. Scissor & Zeichnen: Label
+        guiGraphics.enableScissor(x + 1, y + 1, Math.max(x + 1, valStartX - 2), y + height - 1);
+
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
+                x + 6, y + (height / 2) - textOffsetY,
+                lerpColor(p.textDim, p.text, hover), false);
+
+        guiGraphics.disableScissor();
+
+        // 3. Scissor & Zeichnen: Value-Text
+        guiGraphics.enableScissor(Math.max(x + 1, valStartX - 2), y + 1, x + width - 1, y + height - 1);
+
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, valText,
+                valStartX,
+                y + (height / 2) - textOffsetY,
+                lerpColor(p.textDim, lerpColor(p.accent, p.text, hover), hover),
                 false);
+
+        guiGraphics.disableScissor();
     }
 
     @Override
@@ -61,10 +83,10 @@ public class ModeButton extends Component {
         if (isHovered(mouseX, mouseY)) {
             if (button == 0) {
                 index = (index + 1) % modes.size();
-                ClickGuiScreen.playGuiSound(1.1f, 0.25f);
+                Sounds.select();
             } else if (button == 1) {
                 index = (index - 1 + modes.size()) % modes.size();
-                ClickGuiScreen.playGuiSound(0.9f, 0.25f);
+                Sounds.deselect();
             } else {
                 return false;
             }

@@ -1,6 +1,8 @@
 package com.OsamaClient.newbridge.UI.components;
 
-import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.Sounds;
+import com.OsamaClient.newbridge.UI.Theme;
+import com.OsamaClient.newbridge.UI.UISettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -20,19 +22,13 @@ public class EntityFilterPicker extends Component {
     private int draggingSlider = 0; // 0 = none, 1 = Hue, 2 = Alpha
 
     private static final int DEFAULT_COLOR = 0x6600FFFF;
-
-    private static final int C_BG         = 0xF20A0A0A;
-    private static final int C_BG_HOV     = 0xFF181818;
-    private static final int C_SEPARATOR  = 0xFF2C2C2C;
-    private static final int C_ACCENT     = 0xFFFFFFFF;
-    private static final int C_TEXT       = 0xFFEEEEEE;
-    private static final int C_TEXT_DIM   = 0xFF666666;
-    private static final int C_SEL_BG     = 0x40FFFFFF;
+    private final int itemHeight;
 
     public EntityFilterPicker(String label) {
         this.label = label;
-        this.width = 100;
-        this.height = 14;
+        this.width = UISettings.scaled(100);
+        this.height = UISettings.scaled(14);
+        this.itemHeight = UISettings.scaled(14);
 
         filters.put("Players", true);
         filters.put("Hostiles", true);
@@ -59,70 +55,73 @@ public class EntityFilterPicker extends Component {
 
     @Override
     public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, C_ACCENT, false);
+        Theme.Palette p = Theme.getActive().palette;
+
+        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, p.accent, false);
 
         boolean hov = isHovered(mouseX, mouseY);
-        int btnBg = lerpColor(C_BG, C_BG_HOV, hov ? 1f : 0f);
+        int btnBg = lerpColor(p.bg, p.bgHover, hov ? 1f : 0f);
 
-        drawRoundedRect(guiGraphics, x, y, width, height, btnBg);
-        drawRoundedOutline(guiGraphics, x, y, width, height, open ? C_ACCENT : C_SEPARATOR);
+        drawRoundedRect(guiGraphics, x, y, width, height, UISettings.withPanelAlpha(btnBg));
+        drawRoundedOutline(guiGraphics, x, y, width, height, open ? p.accent : p.border);
 
         String arrow = open ? " \u25b2" : " \u25bc";
         String btnLabel = getActiveCount() + " active" + arrow;
-        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? C_ACCENT : C_TEXT, false);
+        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? p.accent : p.text, false);
 
         if (!open) return;
 
         List<String> keys = new ArrayList<>(filters.keySet());
 
-        int dropW = width + 40;
-        int itemH = 14;
-        int listH = keys.size() * itemH;
+        int dropW = width + UISettings.scaled(40);
+        int listH = keys.size() * itemHeight;
 
         boolean showColorMenu = activeColorFilter != null && filters.getOrDefault(activeColorFilter, false);
-        int colorSliderH = showColorMenu ? 36 : 0;
+        int colorSliderH = showColorMenu ? UISettings.scaled(36) : 0;
         int dropH = listH + colorSliderH;
         int dropX = x;
         int dropY = y + height + 3;
 
         drawShadow(guiGraphics, dropX, dropY, dropW, dropH);
-        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, C_BG);
-        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, C_ACCENT);
+        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, UISettings.withPanelAlpha(p.bg));
+        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, p.accent);
 
         int listY = dropY + 1;
         int currentY = listY;
+        int selBgColor = (p.accent & 0x00FFFFFF) | 0x40000000;
+
         for (String key : keys) {
             boolean active = filters.getOrDefault(key, false);
-            boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= currentY && mouseY <= currentY + itemH;
+            boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= currentY && mouseY <= currentY + itemHeight;
 
             if (active) {
-                guiGraphics.fill(dropX + 1, currentY, dropX + dropW - 1, currentY + itemH, C_SEL_BG);
+                guiGraphics.fill(dropX + 1, currentY, dropX + dropW - 1, currentY + itemHeight, selBgColor);
             } else if (itemHov) {
-                guiGraphics.fill(dropX + 1, currentY, dropX + dropW - 1, currentY + itemH, 0x1AFFFFFF);
+                guiGraphics.fill(dropX + 1, currentY, dropX + dropW - 1, currentY + itemHeight, 0x1AFFFFFF);
             }
 
             // Farbe abrufen und Alpha-Kanal für Text entfernen (immer 100% deckend)
             int filterColor = getColor(key);
-            int displayColor = active ? (filterColor | 0xFF000000) : (itemHov ? C_TEXT : C_TEXT_DIM);
+            int displayColor = active ? (filterColor | 0xFF000000) : (itemHov ? p.text : p.textDim);
 
             if (active) {
-                guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, currentY + (itemH / 2) - 4, displayColor, false);
+                guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, currentY + (itemHeight / 2) - 4, displayColor, false);
             }
 
-            guiGraphics.text(Minecraft.getInstance().font, key, dropX + (active ? 17 : 7), currentY + (itemH / 2) - 4, displayColor, false);
+            guiGraphics.text(Minecraft.getInstance().font, key, dropX + (active ? 17 : 7), currentY + (itemHeight / 2) - 4, displayColor, false);
 
             if (active) {
-                int previewSize = 7;
-                int previewX = dropX + dropW - 14;
-                int previewY = currentY + (itemH / 2) - (previewSize / 2);
+                int previewSize = UISettings.scaled(7);
+                int previewX = dropX + dropW - UISettings.scaled(14);
+                int previewY = currentY + (itemHeight / 2) - (previewSize / 2);
                 drawRoundedRect(guiGraphics, previewX, previewY, previewSize, previewSize, filterColor | 0xFF000000);
 
                 if (activeColorFilter != null && activeColorFilter.equals(key)) {
-                    drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, C_ACCENT);
+                    drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, p.accent);
                 }
             }
 
-            currentY += itemH;
+            currentY += itemHeight;
         }
 
         if (showColorMenu) {
@@ -130,7 +129,7 @@ public class EntityFilterPicker extends Component {
             int sliderX = dropX + 6;
             int sliderW = dropW - 12;
 
-            guiGraphics.fill(dropX + 1, startSliderY - 3, dropX + dropW - 1, startSliderY - 2, C_SEPARATOR);
+            guiGraphics.fill(dropX + 1, startSliderY - 3, dropX + dropW - 1, startSliderY - 2, p.border);
 
             int currentARGB = getColor(activeColorFilter);
             int currentAlpha = (currentARGB >> 24) & 0xFF;
@@ -151,10 +150,6 @@ public class EntityFilterPicker extends Component {
                 int finalARGB = (currentAlpha << 24) | rgb;
                 if (finalARGB != currentARGB) {
                     colors.put(activeColorFilter, finalARGB);
-                    float pitch = (draggingSlider == 1)
-                            ? 0.8f + (currentHue * 0.8f)
-                            : 0.8f + ((currentAlpha / 255f) * 0.8f);
-                    ClickGuiScreen.playGuiSound(pitch, 0.08f);
                 }
             }
 
@@ -166,7 +161,7 @@ public class EntityFilterPicker extends Component {
             guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX1 - 1)), startSliderY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX1 + 2)), startSliderY + 5, 0xFFFFFFFF);
 
             int alphaSliderY = startSliderY + 12;
-            guiGraphics.text(Minecraft.getInstance().font, "Opacity: " + (int) ((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, C_TEXT_DIM, false);
+            guiGraphics.text(Minecraft.getInstance().font, "Opacity: " + (int) ((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, p.textDim, false);
             int barY = alphaSliderY + 10;
 
             for (int i = 0; i < sliderW; i++) {
@@ -187,16 +182,15 @@ public class EntityFilterPicker extends Component {
         if (isHovered(mouseX, mouseY) && button == 0) {
             open = !open;
             activeColorFilter = null;
-            ClickGuiScreen.playGuiSound(open ? 1.1f : 0.85f, 0.25f);
+            if (open) Sounds.select(); else Sounds.deselect();
             return true;
         }
 
         if (open) {
             List<String> keys = new ArrayList<>(filters.keySet());
             int dropX = x;
-            int dropW = width + 40;
-            int itemH = 14;
-            int listH = keys.size() * itemH;
+            int dropW = width + UISettings.scaled(40);
+            int listH = keys.size() * itemHeight;
             int dropY = y + height + 3;
             int listY = dropY + 1;
 
@@ -208,18 +202,18 @@ public class EntityFilterPicker extends Component {
 
                 if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY - 2 && mouseY <= startSliderY + 7 && button == 0) {
                     this.draggingSlider = 1;
-                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
+                    Sounds.select();
                     return true;
                 }
                 if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY + 20 && mouseY <= startSliderY + 28 && button == 0) {
                     this.draggingSlider = 2;
-                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
+                    Sounds.select();
                     return true;
                 }
             }
 
             if (mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= listY && mouseY <= listY + listH) {
-                int idx = (int) ((mouseY - listY) / itemH);
+                int idx = (int) ((mouseY - listY) / itemHeight);
 
                 if (idx >= 0 && idx < keys.size()) {
                     String key = keys.get(idx);
@@ -227,11 +221,11 @@ public class EntityFilterPicker extends Component {
                         boolean newState = !filters.getOrDefault(key, false);
                         filters.put(key, newState);
                         if (!newState && key.equals(activeColorFilter)) activeColorFilter = null;
-                        ClickGuiScreen.playGuiSound(newState ? 1.15f : 0.85f, 0.25f);
+                        if (newState) Sounds.select(); else Sounds.deselect();
                     } else if (button == 1) {
                         if (filters.getOrDefault(key, false)) {
                             activeColorFilter = key.equals(activeColorFilter) ? null : key;
-                            ClickGuiScreen.playGuiSound(activeColorFilter != null ? 1.3f : 0.9f, 0.25f);
+                            if (activeColorFilter != null) Sounds.select(); else Sounds.deselect();
                         }
                     }
                 }
@@ -241,7 +235,7 @@ public class EntityFilterPicker extends Component {
             if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
                 open = false;
                 activeColorFilter = null;
-                ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+                Sounds.deselect();
             }
         }
         return false;

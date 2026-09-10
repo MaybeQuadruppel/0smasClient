@@ -35,6 +35,7 @@ public class Trajectories extends Module {
 
     private int trajColor = 0xFFA000FF;
     private boolean showPath = true;
+    private final ChamsBufferSource bufferSource = new ChamsBufferSource();
 
     public Trajectories() {
         super("Trajectories", "Predicts the flight path of arrows and targets", Category.VISUAL);
@@ -74,8 +75,6 @@ public class Trajectories extends Module {
         PoseStack poseStack = event.getPoseStack();
         Matrix4f matrix = poseStack.last().pose();
         Matrix3f normalMatrix = poseStack.last().normal();
-
-        ChamsBufferSource bufferSource = new ChamsBufferSource();
         Camera camera = client.gameRenderer.mainCamera();
         double camX = camera.position().x;
         double camY = camera.position().y;

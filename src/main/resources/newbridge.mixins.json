@@ -8,7 +8,6 @@
     "BowItemMixin",
     "FullBrightMixin",
     "HealthIndicatorMixin",
-    "LevelRendererGuardMixin",
     "LevelRendererMixin",
     "LevelRendererOutlineMixin",
     "LiquidBlockMixin",

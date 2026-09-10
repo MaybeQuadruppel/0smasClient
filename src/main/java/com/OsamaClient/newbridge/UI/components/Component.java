@@ -1,9 +1,18 @@
 package com.OsamaClient.newbridge.UI.components;
 
+import com.OsamaClient.newbridge.UI.UISettings;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
-public abstract class Component {
+public abstract class
+Component {
     public int x, y, width, height;
+
+    /** Unskalierte Basisgröße, aus der width/height per {@link #syncScaledSize}
+     *  neu berechnet werden. Ohne das würde eine Änderung von
+     *  {@link UISettings#scale} zur Laufzeit bereits erzeugte Komponenten nicht
+     *  mehr erreichen, da width/height sonst nur einmalig im Konstruktor
+     *  berechnet würden. */
+    protected int baseWidth, baseHeight;
 
     /** Internal hover animation state (0 = not hovered, 1 = fully hovered). */
     protected float hoverAnim = 0f;
@@ -43,11 +52,44 @@ public abstract class Component {
         return (T) this;
     }
 
+    /**
+     * Setzt {@link #baseWidth}/{@link #baseHeight} und berechnet width/height
+     * anhand des AKTUELLEN {@link UISettings#scale} neu. Muss im Konstruktor
+     * jeder Komponente mit fester Basisgröße aufgerufen werden UND erneut als
+     * erste Zeile in {@code render(...)} - sonst übernimmt eine bereits
+     * bestehende Komponente eine spätere Änderung des Scale-Reglers nie
+     * (width/height blieben sonst für immer auf dem Wert beim Erzeugen
+     * eingefroren, was zu falscher Hitbox-Größe und überlaufendem/
+     * abgeschnittenem Text führt).
+     */
+    protected void syncScaledSize(int baseWidth, int baseHeight) {
+        this.baseWidth = baseWidth;
+        this.baseHeight = baseHeight;
+        this.width = UISettings.scaled(baseWidth);
+        this.height = UISettings.scaled(baseHeight);
+    }
 
-    /** Filled rounded rectangle. */
+    /**
+     * Wie {@link #syncScaledSize(int, int)}, garantiert aber zusätzlich eine
+     * Mindestgröße in echten Pixeln, unabhängig von {@link UISettings#scale}.
+     * Ohne diese Grenze konnte eine Box bei sehr kleiner Scale so weit
+     * schrumpfen, dass Label-Text und interne Elemente (Track, Toggle, ...)
+     * sich gegenseitig überlappen bzw. der Text "hinter" ihnen verschwindet -
+     * genau der gemeldete Clipping-Bug. Jede Komponente kennt ihre eigene
+     * sinnvolle Mindestgröße (genug Platz für eine Zeile Text + ihre Regler).
+     */
+    protected void syncScaledSize(int baseWidth, int baseHeight, int minWidth, int minHeight) {
+        syncScaledSize(baseWidth, baseHeight);
+        this.width = Math.max(minWidth, this.width);
+        this.height = Math.max(minHeight, this.height);
+    }
+
+
+    /** Filled rounded rectangle. Fällt auf ein scharfkantiges Rechteck zurück,
+     *  wenn {@link UISettings#roundedCorners} deaktiviert ist. */
     public static void drawRoundedRect(GuiGraphicsExtractor g,
                                        int x, int y, int w, int h, int color) {
-        if (w < 4 || h < 4) { g.fill(x, y, x + w, y + h, color); return; }
+        if (!UISettings.roundedCorners || w < 4 || h < 4) { g.fill(x, y, x + w, y + h, color); return; }
         g.fill(x + 2,     y,         x + w - 2, y + h,     color); // centre column
         g.fill(x,         y + 2,     x + 2,     y + h - 2, color); // left strip
         g.fill(x + w - 2, y + 2,     x + w,     y + h - 2, color); // right strip
@@ -60,7 +102,7 @@ public abstract class Component {
 
     public static void drawRoundedOutline(GuiGraphicsExtractor g,
                                           int x, int y, int w, int h, int color) {
-        if (w < 4 || h < 4) { drawOutline(g, x, y, w, h, color); return; }
+        if (!UISettings.roundedCorners || w < 4 || h < 4) { drawOutline(g, x, y, w, h, color); return; }
         g.fill(x + 2,     y,         x + w - 2, y + 1,     color); // top
         g.fill(x + 2,     y + h - 1, x + w - 2, y + h,     color); // bottom
         g.fill(x,         y + 2,     x + 1,     y + h - 2, color); // left

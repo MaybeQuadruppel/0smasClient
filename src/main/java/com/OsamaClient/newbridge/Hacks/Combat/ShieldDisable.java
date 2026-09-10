@@ -4,6 +4,7 @@ import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
+import com.OsamaClient.newbridge.Utils.TeamUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -20,24 +21,25 @@ public class ShieldDisable extends Module {
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private boolean isExecuting = false;
 
-
     private boolean autoStrikeBack = true;
     private double range = 4.0;
     private int switchDelay = 50;
+    public boolean ignoreTeammates = true;
 
     public ShieldDisable() {
         super("ShieldDisable", "Breaks enemy shields automatically", Category.COMBAT);
         this.settings.add(new ToggleButton("Hit with prev. Item", true, val -> autoStrikeBack = val).withDescription("Automatically strikes the target using the previously held item."));
         this.settings.add(new Slider("Range", 1.0, 6.0, 3.5, val -> range = val).withDescription("Maximum distance to detect and disable shields."));
+        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents disabling shields of teammates."));
     }
 
     @Override
     public void onTick(Minecraft client) {
         if (client.player == null || client.level == null || isExecuting) return;
 
-
         HitResult hit = client.hitResult;
         if (hit instanceof EntityHitResult entityHit && entityHit.getEntity() instanceof Player target) {
+            if (ignoreTeammates && TeamUtils.isTeammate(target)) return;
 
             if (target.isBlocking() && client.player.distanceTo(target) <= range) {
                 executeShieldBreak(client, target);
@@ -53,9 +55,7 @@ public class ShieldDisable extends Module {
 
         isExecuting = true;
 
-
         client.player.getInventory().setSelectedSlot(axeSlot);
-
 
         scheduler.schedule(() -> {
             client.execute(() -> {

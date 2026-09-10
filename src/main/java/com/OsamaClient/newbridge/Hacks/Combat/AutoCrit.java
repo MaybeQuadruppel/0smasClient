@@ -3,6 +3,8 @@ package com.OsamaClient.newbridge.Hacks.Combat;
 import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
+import com.OsamaClient.newbridge.UI.components.ToggleButton;
+import com.OsamaClient.newbridge.Utils.TeamUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -15,6 +17,7 @@ import net.minecraft.world.phys.HitResult;
 public class AutoCrit extends Module {
 
     public double range = 3.5;
+    public boolean ignoreTeammates = true;
     public EntityFilterPicker entityFilter;
 
     private boolean waitingForDrop = false;
@@ -26,6 +29,7 @@ public class AutoCrit extends Module {
         this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
 
         this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val).withDescription("Maximum distance to execute critical hits."));
+        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents critical hits on teammates."));
         this.settings.add(this.entityFilter);
     }
 
@@ -88,6 +92,10 @@ public class AutoCrit extends Module {
 
         double dist = client.player.distanceTo(targetEntity);
         if (dist > range) return false;
+
+        if (ignoreTeammates && TeamUtils.isTeammate(targetEntity)) {
+            return false;
+        }
 
         if (targetEntity instanceof Player && !this.entityFilter.isFilterEnabled("Players")) {
             return false;

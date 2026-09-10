@@ -44,7 +44,6 @@ public final class ChamsBufferSource {
         } finally {
             draws.clear();
             drawTypes.clear();
-            stagedBuffer.close();
         }
     }
 

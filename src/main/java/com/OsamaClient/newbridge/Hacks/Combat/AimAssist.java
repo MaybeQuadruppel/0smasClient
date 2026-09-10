@@ -2,6 +2,7 @@ package com.OsamaClient.newbridge.Hacks.Combat;
 
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
+import com.OsamaClient.newbridge.Utils.TeamUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -31,6 +32,7 @@ public class AimAssist extends Module {
     public float fov = 40.0f;
     public boolean randomHeight = true;
     public float staticHeight = 0.5f;
+    public boolean ignoreTeammates = true;
 
     private float currentAimHeight = 0.5f;
     private UUID lockedTargetUUID = null;
@@ -43,6 +45,7 @@ public class AimAssist extends Module {
 
         this.settings.add(new ModeButton("Logic", List.of("Always", "On Hit"), mode, val -> mode = val.equals("Always") ? 0 : 1).withDescription("Determines when the aim assist should activate."));
         this.settings.add(this.entityFilter);
+        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents targeting teammates."));
         this.settings.add(new Slider("Range", 1.0, 6.0, (double) range, val -> range = val.floatValue()).withDescription("Maximum distance to target entities."));
         this.settings.add(new Slider("Smoothness", 0.01, 1.0, (double) smoothness, val -> smoothness = val.floatValue()).withDescription("Controls how smooth and human-like the aim movement is."));
         this.settings.add(new Slider("FOV", 10.0, 180.0, (double) fov, val -> fov = val.floatValue()).withDescription("Field of view restriction for valid targets."));
@@ -72,11 +75,12 @@ public class AimAssist extends Module {
         applyHumanizedAim(client, target);
     }
 
-    /**
-     * Prüft, ob eine Entität gemäß den Einstellungen im EntityFilterPicker anvisiert werden darf.
-     */
     public boolean isValidTarget(Entity entity) {
         if (!(entity instanceof LivingEntity) || entity == Minecraft.getInstance().player || !entity.isAlive()) {
+            return false;
+        }
+
+        if (ignoreTeammates && TeamUtils.isTeammate(entity)) {
             return false;
         }
 
@@ -90,7 +94,6 @@ public class AimAssist extends Module {
     }
 
     private void applyHumanizedAim(Minecraft client, LivingEntity target) {
-
         double dx = target.getX() - client.player.getX();
         double dz = target.getZ() - client.player.getZ();
         float heightToUse = randomHeight ? currentAimHeight : staticHeight;
@@ -107,7 +110,6 @@ public class AimAssist extends Module {
         float pitchDiff = Mth.wrapDegrees(targetPitch - client.player.getXRot());
 
         if (Math.abs(yawDiff) <= fov) {
-
             double sensitivity = client.options.sensitivity().get();
             float f = (float) (sensitivity * 0.6F + 0.2F);
             float gcd = f * f * f * 1.2F;
@@ -159,7 +161,7 @@ public class AimAssist extends Module {
     }
 
     public void setLockedTarget(Entity target) {
-        if (target instanceof LivingEntity) {
+        if (target instanceof LivingEntity && isValidTarget(target)) {
             lockedTargetUUID = target.getUUID();
             updateAimHeight();
         }

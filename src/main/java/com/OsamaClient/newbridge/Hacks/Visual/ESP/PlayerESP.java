@@ -9,6 +9,7 @@ import com.OsamaClient.newbridge.UI.components.ModeButton;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
+import com.OsamaClient.newbridge.Utils.TeamUtils;
 import com.OsamaClient.newbridge.event.Render3DEvent;
 import com.OsamaClient.newbridge.event.Subscribe;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -56,7 +57,8 @@ public class PlayerESP extends Module {
     public EntityFilterPicker targetPicker;
 
     // --- SKELETON CACHES & FIELDS ---
-    private static final Map<LivingEntityRenderer<?, ?, ?>, LivingEntityRenderState> STATE_CACHE = new IdentityHashMap<>();
+    private final ChamsBufferSource bufferSource = new ChamsBufferSource();
+    private static final Map<Entity, LivingEntityRenderState> STATE_CACHE = new WeakHashMap<>();
     private static final Map<ModelPart, Map<String, ModelPart>> CHILDREN_CACHE = new WeakHashMap<>();
     private static final Map<ModelPart, Vector3f> LOCAL_CENTER_CACHE = new WeakHashMap<>();
     private static final Map<String, Boolean> OVERLAY_CACHE = new HashMap<>();
@@ -141,7 +143,6 @@ public class PlayerESP extends Module {
         boolean drawOutline = (renderMode.equals("Outline") || renderMode.equals("Both")) && !renderMode.equals("None");
         boolean drawSkeleton = renderMode.equals("Skeleton");
 
-        ChamsBufferSource bufferSource = new ChamsBufferSource();
 
         float startX = 0f, startY = 0f, startZ = 0f;
         if (renderTracers) {
@@ -172,14 +173,7 @@ public class PlayerESP extends Module {
                 boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
 
                 if (isTrajTarget || isEnabledInPicker) {
-                    int color;
-                    if (isTrajTarget) {
-                        color = 0x80FF0000;
-                    } else if (distanceColors) {
-                        color = getDistanceColor(client.player, living, 0.5f);
-                    } else {
-                        color = getAdjustedColor(targetPicker.getColor(filterKey), 0.5f);
-                    }
+                    int color = isTrajTarget ? 0x80FF0000 : getEntityColor(client.player, living, filterKey, 0.5f);
                     renderRotatedBox(poseStack, fillConsumer, living, tickDelta, camX, camY, camZ, color, true, (float) outlineWidth);
                 }
             }
@@ -198,14 +192,7 @@ public class PlayerESP extends Module {
                 boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
 
                 if (isTrajTarget || isEnabledInPicker) {
-                    int color;
-                    if (isTrajTarget) {
-                        color = 0xFFFF0000;
-                    } else if (distanceColors) {
-                        color = getDistanceColor(client.player, living, 1.0f);
-                    } else {
-                        color = getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
-                    }
+                    int color = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
                     renderRotatedBox(poseStack, lineConsumer, living, tickDelta, camX, camY, camZ, color, false, (float) outlineWidth);
                 }
             }
@@ -224,22 +211,15 @@ public class PlayerESP extends Module {
                 boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
 
                 if (isTrajTarget || isEnabledInPicker) {
-                    int color;
-                    if (isTrajTarget) {
-                        color = 0xFFFF0000;
-                    } else if (distanceColors) {
-                        color = getDistanceColor(client.player, living, 1.0f);
-                    } else {
-                        color = getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
-                    }
+                    int color = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
 
                     EntityRenderer<?, ?> renderer = client.getEntityRenderDispatcher().getRenderer(entity);
                     if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> livingRenderer)) continue;
                     EntityModel<?> model = livingRenderer.getModel();
 
                     LivingEntityRenderer rawRenderer = (LivingEntityRenderer) renderer;
-                    LivingEntityRenderState state = STATE_CACHE.computeIfAbsent(rawRenderer,
-                            r -> (LivingEntityRenderState) r.createRenderState());
+                    LivingEntityRenderState state = STATE_CACHE.computeIfAbsent(living,
+                            e -> (LivingEntityRenderState) rawRenderer.createRenderState());
 
                     rawRenderer.extractRenderState(living, state, tickDelta);
                     ((EntityModel) model).setupAnim(state);
@@ -283,14 +263,7 @@ public class PlayerESP extends Module {
                 boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
 
                 if (isTrajTarget || isEnabledInPicker) {
-                    int color;
-                    if (isTrajTarget) {
-                        color = 0xFFFF0000;
-                    } else if (distanceColors) {
-                        color = getDistanceColor(client.player, living, 1.0f);
-                    } else {
-                        color = getAdjustedColor(targetPicker.getColor(filterKey), 1.0f);
-                    }
+                    int color = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
 
                     double x = Mth.lerp(tickDelta, living.xo, living.getX()) - camX;
                     double y = Mth.lerp(tickDelta, living.yo, living.getY()) - camY;
@@ -309,6 +282,29 @@ public class PlayerESP extends Module {
         }
 
         bufferSource.uploadAndDraw();
+    }
+
+    private int getEntityColor(Player clientPlayer, LivingEntity target, String filterKey, float alphaMultiplier) {
+        int color;
+        if (distanceColors) {
+            color = getDistanceColor(clientPlayer, target, alphaMultiplier);
+        } else {
+            color = getAdjustedColor(targetPicker.getColor(filterKey), alphaMultiplier);
+        }
+
+        if (TeamUtils.isTeammate(target)) {
+            color = invertColor(color);
+        }
+
+        return color;
+    }
+
+    private int invertColor(int argb) {
+        int a = (argb >> 24) & 0xFF;
+        int r = 255 - ((argb >> 16) & 0xFF);
+        int g = 255 - ((argb >> 8) & 0xFF);
+        int b = 255 - (argb & 0xFF);
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     private void renderSkeletonPart(PoseStack calcStack, String name, ModelPart part,

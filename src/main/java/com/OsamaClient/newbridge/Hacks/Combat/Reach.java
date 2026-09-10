@@ -1,10 +1,10 @@
 package com.OsamaClient.newbridge.Hacks.Combat;
 
-
 import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
+import com.OsamaClient.newbridge.Utils.TeamUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -22,21 +22,33 @@ import net.minecraft.world.phys.Vec3;
 
 public class Reach extends Module {
 
+    public static Reach INSTANCE;
+
     public double maxRange = 4.5;
+    public double maxInteraction = 5.0;
+    public boolean ignoreTeams = true;
     public boolean legitMode = false;
     public double legitChance = 20.0;
 
     public EntityFilterPicker entityFilter;
 
     public Reach() {
-        super("Reach", "Lets you hit further", Category.COMBAT);
+        super("Reach", "Lets you hit and interact further", Category.COMBAT);
+        INSTANCE = this;
 
         this.entityFilter = new EntityFilterPicker("Targets");
         this.settings.add(this.entityFilter.withDescription("Selects which types of entities to target."));
 
         this.settings.add(new Slider("Range", 3.5, 10.0, maxRange, val -> maxRange = val).withDescription("Sets the extended attack reach distance."));
-        this.settings.add(new ToggleButton("Legit Mode", legitMode, val -> legitMode = val).withDescription("Only applies reach by the Probability to look more natural."));
-        this.settings.add(new Slider("Legit Chance %", 10.0, 30.0, legitChance, val -> legitChance = val).withDescription("Probability percentage for the reach to apply in Legit Mode."));
+        this.settings.add(new Slider("Max Interaction", 4.5, 10.0, maxInteraction, val -> maxInteraction = val).withDescription("Sets maximum interaction and block reach distance."));
+        this.settings.add(new ToggleButton("Ignore Teams", ignoreTeams, val -> ignoreTeams = val).withDescription("Prevents targeting teammates."));
+        this.settings.add(new ToggleButton("Legit Mode", legitMode, val -> legitMode = val).withDescription("Only applies reach by probability to look more natural."));
+        this.settings.add(new Slider("Legit Chance %", 10.0, 30.0, legitChance, val -> legitChance = val).withDescription("Probability percentage for reach to apply in Legit Mode."));
+    }
+
+    public static Reach getInstance() {
+        if (INSTANCE == null) INSTANCE = new Reach();
+        return INSTANCE;
     }
 
     @Override
@@ -90,6 +102,7 @@ public class Reach extends Module {
     public boolean isTargetValid(LivingEntity targetEntity, Minecraft client) {
         if (targetEntity == client.player) return false;
         if (!targetEntity.isAlive()) return false;
+        if (ignoreTeams && TeamUtils.isTeammate(targetEntity)) return false;
 
         String filterKey = null;
         if (targetEntity instanceof Player) {
@@ -109,5 +122,13 @@ public class Reach extends Module {
         }
 
         return true;
+    }
+
+    public double getMaxInteraction() {
+        return this.enabled ? maxInteraction : 4.5;
+    }
+
+    public double getMaxRange() {
+        return this.enabled ? maxRange : 3.0;
     }
 }

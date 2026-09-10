@@ -1,6 +1,8 @@
 package com.OsamaClient.newbridge.UI.components;
 
-import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.Sounds;
+import com.OsamaClient.newbridge.UI.Theme;
+import com.OsamaClient.newbridge.UI.UISettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -22,29 +24,19 @@ public class ItemPicker extends Component {
     private boolean open = false;
     private int scrollOffset = 0;
     private final int maxVisible = 12;
-    private final int itemHeight = 13;
+    private final int itemHeight;
     private String searchQuery = "";
 
-    // -- NEU: Slider & Color State --
+    // -- Slider & Color State --
     private Item activeColorItem = null;
     private int draggingSlider = 0; // 0 = none, 1 = Hue, 2 = Alpha
     private static final int DEFAULT_COLOR = 0xFFFFD700; // Gold
 
-    private static final int C_BG         = 0xF20A0A0A;
-    private static final int C_BG_HOV     = 0xFF181818;
-    private static final int C_SEPARATOR  = 0xFF2C2C2C;
-    private static final int C_ACCENT     = 0xFFFFFFFF;
-    private static final int C_TEXT       = 0xFFEEEEEE;
-    private static final int C_TEXT_DIM   = 0xFF666666;
-    private static final int C_SEL_BG     = 0x40FFFFFF;
-    private static final int C_SEARCH_BG  = 0xFF000000;
-    private static final int C_SCROLLBAR  = 0xFF2C2C2C;
-    private static final int C_SCROLLTHM  = 0xFF999999;
-
     public ItemPicker(String label) {
         this.label = label;
-        this.width  = 100;
-        this.height = 14;
+        this.width = UISettings.scaled(100);
+        this.height = UISettings.scaled(14);
+        this.itemHeight = UISettings.scaled(13); // Skaliere auch die Listenelemente
     }
 
     public String getLabel() { return this.label; }
@@ -69,45 +61,49 @@ public class ItemPicker extends Component {
 
     @Override
     public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        Theme.Palette p = Theme.getActive().palette;
+
         String title = label + (open ? " (R-Click: Color):" : ":");
-        guiGraphics.text(Minecraft.getInstance().font, title, x, y - 11, C_ACCENT, false);
+        guiGraphics.text(Minecraft.getInstance().font, title, x, y - 11, p.accent, false);
 
         boolean hov = isHovered(mouseX, mouseY);
-        int btnBg  = lerpColor(C_BG, C_BG_HOV, hov ? 1f : 0f);
-        drawRoundedRect(guiGraphics, x, y, width, height, btnBg);
-        drawRoundedOutline(guiGraphics, x, y, width, height, open ? C_ACCENT : C_SEPARATOR);
+        int btnBg = lerpColor(p.bg, p.bgHover, hov ? 1f : 0f);
+        drawRoundedRect(guiGraphics, x, y, width, height, UISettings.withPanelAlpha(btnBg));
+        drawRoundedOutline(guiGraphics, x, y, width, height, open ? p.accent : p.border);
 
         String arrow = open ? " \u25b2" : " \u25bc";
         int selCount = selectedItems.size();
         String btnLabel = selCount > 0 ? selCount + " selected" + arrow : "Choose items" + arrow;
-        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? C_ACCENT : C_TEXT, false);
+        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? p.accent : p.text, false);
 
         if (!open) return;
 
         List<Item> items = getFilteredItems();
         boolean showColorMenu = activeColorItem != null && selectedItems.containsKey(activeColorItem);
 
-        int dropW = width + 50;
-        int searchH = 14;
+        int dropW = width + UISettings.scaled(50);
+        int searchH = UISettings.scaled(14);
         int listH   = maxVisible * itemHeight;
-        int colorSliderH = showColorMenu ? 36 : 0;
+        int colorSliderH = showColorMenu ? UISettings.scaled(36) : 0;
         int dropH   = searchH + 2 + listH + colorSliderH;
         int dropX   = x;
         int dropY   = y + height + 3;
 
         drawShadow(guiGraphics, dropX, dropY, dropW, dropH);
-        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, C_BG);
-        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, C_ACCENT);
+        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, UISettings.withPanelAlpha(p.bg));
+        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, p.accent);
 
-        drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, C_SEARCH_BG);
-        guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, C_SEPARATOR);
+        drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, p.bgHover);
+        guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, p.border);
 
         boolean showCursor = open && ((System.currentTimeMillis() / 500) % 2 == 0);
         String cursor = showCursor ? "|" : "";
         String display = searchQuery.isEmpty() ? "\u26b2 Search..." : "\u26b2 " + searchQuery + cursor;
-        guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? C_TEXT_DIM : C_TEXT, false);
+        guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? p.textDim : p.text, false);
 
         int listY = dropY + searchH + 2;
+        int selBgColor = (p.accent & 0x00FFFFFF) | 0x40000000; // Semi-transparenter Akzent
+
         for (int i = 0; i < maxVisible; i++) {
             int index = i + scrollOffset;
             if (index >= items.size()) break;
@@ -117,10 +113,10 @@ public class ItemPicker extends Component {
             int itemY = listY + i * itemHeight;
             boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= itemY && mouseY <= itemY + itemHeight;
 
-            if (selected) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, C_SEL_BG);
+            if (selected) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, selBgColor);
             else if (itemHov) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, 0x1AFFFFFF);
 
-            int itemColor = selected ? selectedItems.get(item) : (itemHov ? C_TEXT : C_TEXT_DIM);
+            int itemColor = selected ? selectedItems.get(item) : (itemHov ? p.text : p.textDim);
 
             if (selected) guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, itemY + (itemHeight / 2) - 4, itemColor, false);
 
@@ -130,13 +126,13 @@ public class ItemPicker extends Component {
 
             // Farbbox für selektierte Items
             if (selected) {
-                int previewSize = 7;
-                int previewX = dropX + dropW - 16;
+                int previewSize = UISettings.scaled(7);
+                int previewX = dropX + dropW - UISettings.scaled(16);
                 int previewY = itemY + (itemHeight / 2) - (previewSize / 2);
                 drawRoundedRect(guiGraphics, previewX, previewY, previewSize, previewSize, itemColor | 0xFF000000);
 
                 if (activeColorItem != null && activeColorItem.equals(item)) {
-                    drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, C_ACCENT);
+                    drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, p.accent);
                 }
             }
         }
@@ -146,8 +142,8 @@ public class ItemPicker extends Component {
             float tp = scrollOffset / (float)(items.size() - maxVisible);
             int th = Math.max(16, (int)((maxVisible / (float) items.size()) * listH));
             int ty = listY + (int)(tp * (listH - th));
-            guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, C_SCROLLBAR);
-            guiGraphics.fill(sbX, ty, sbX + 3, ty + th, C_SCROLLTHM);
+            guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, p.bgHover);
+            guiGraphics.fill(sbX, ty, sbX + 3, ty + th, p.border);
         }
 
         // Color Menu Rendering
@@ -156,7 +152,7 @@ public class ItemPicker extends Component {
             int sliderX = dropX + 6;
             int sliderW = dropW - 12;
 
-            guiGraphics.fill(dropX + 1, startSliderY - 3, dropX + dropW - 1, startSliderY - 2, C_SEPARATOR);
+            guiGraphics.fill(dropX + 1, startSliderY - 3, dropX + dropW - 1, startSliderY - 2, p.border);
 
             int currentARGB = selectedItems.get(activeColorItem);
             int currentAlpha = (currentARGB >> 24) & 0xFF;
@@ -177,10 +173,6 @@ public class ItemPicker extends Component {
                 int finalARGB = (currentAlpha << 24) | rgb;
                 if (finalARGB != currentARGB) {
                     selectedItems.put(activeColorItem, finalARGB);
-                    float pitch = (draggingSlider == 1)
-                            ? 0.8f + (currentHue * 0.8f)
-                            : 0.8f + ((currentAlpha / 255f) * 0.8f);
-                    ClickGuiScreen.playGuiSound(pitch, 0.08f);
                 }
             }
 
@@ -194,7 +186,7 @@ public class ItemPicker extends Component {
 
             // Alpha Slider
             int alphaSliderY = startSliderY + 12;
-            guiGraphics.text(Minecraft.getInstance().font, "Opacity: " + (int) ((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, C_TEXT_DIM, false);
+            guiGraphics.text(Minecraft.getInstance().font, "Opacity: " + (int) ((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, p.textDim, false);
             int barY = alphaSliderY + 10;
 
             for (int i = 0; i < sliderW; i++) {
@@ -217,7 +209,7 @@ public class ItemPicker extends Component {
         if (c >= 32 && c != 127) {
             searchQuery += c;
             scrollOffset = 0;
-            ClickGuiScreen.playGuiSound(1.2f, 0.15f);
+            Sounds.select();
             return true;
         }
         return false;
@@ -227,16 +219,16 @@ public class ItemPicker extends Component {
     public boolean keyPressed(KeyEvent event) {
         if (!open) return false;
         int key = event.key();
-        if (key == 256 || key == 257 || key == 335) {
+        if (key == 256 || key == 257 || key == 335) { // ESC / Enter / NumPad Enter
             open = false;
             activeColorItem = null;
-            ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+            Sounds.deselect();
             return true;
         }
-        if (key == 259 && !searchQuery.isEmpty()) {
+        if (key == 259 && !searchQuery.isEmpty()) { // Backspace
             searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
             scrollOffset = 0;
-            ClickGuiScreen.playGuiSound(0.9f, 0.15f);
+            Sounds.select();
             return true;
         }
         return false;
@@ -244,13 +236,13 @@ public class ItemPicker extends Component {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        if (open && mouseX >= x && mouseX <= x + width + 50) {
+        if (open && mouseX >= x && mouseX <= x + width + UISettings.scaled(50)) {
             int oldScroll = scrollOffset;
             if (amount > 0 && scrollOffset > 0) scrollOffset--;
             else if (amount < 0 && scrollOffset < Math.max(0, getFilteredItems().size() - maxVisible)) scrollOffset++;
 
             if (scrollOffset != oldScroll) {
-                ClickGuiScreen.playGuiSound(1.3f, 0.1f);
+                Sounds.select();
             }
             return true;
         }
@@ -262,12 +254,12 @@ public class ItemPicker extends Component {
         if (isHovered(mouseX, mouseY) && button == 0) {
             open = !open;
             activeColorItem = null;
-            ClickGuiScreen.playGuiSound(open ? 1.1f : 0.85f, 0.25f);
+            if (open) Sounds.select(); else Sounds.deselect();
             return true;
         }
 
         if (open) {
-            int dropX = x, dropW = width + 50, listY = y + height + 5 + 14;
+            int dropX = x, dropW = width + UISettings.scaled(50), listY = y + height + 5 + UISettings.scaled(14);
             int listH = maxVisible * itemHeight;
 
             boolean showColorMenu = activeColorItem != null && selectedItems.containsKey(activeColorItem);
@@ -280,12 +272,12 @@ public class ItemPicker extends Component {
 
                 if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY - 2 && mouseY <= startSliderY + 7 && button == 0) {
                     this.draggingSlider = 1;
-                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
+                    Sounds.select();
                     return true;
                 }
                 if (mouseX >= sliderX && mouseX <= sliderX + sliderW && mouseY >= startSliderY + 20 && mouseY <= startSliderY + 28 && button == 0) {
                     this.draggingSlider = 2;
-                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
+                    Sounds.select();
                     return true;
                 }
             }
@@ -302,16 +294,16 @@ public class ItemPicker extends Component {
                         if (selectedItems.containsKey(item)) {
                             selectedItems.remove(item);
                             if (item.equals(activeColorItem)) activeColorItem = null;
-                            ClickGuiScreen.playGuiSound(0.85f, 0.25f);
+                            Sounds.deselect();
                         } else {
                             selectedItems.put(item, DEFAULT_COLOR);
-                            ClickGuiScreen.playGuiSound(1.15f, 0.25f);
+                            Sounds.select();
                         }
                     }
                     else if (button == 1) { // Rechtsklick = Color Slider ein/ausklappen
                         if (selectedItems.containsKey(item)) {
                             activeColorItem = item.equals(activeColorItem) ? null : item;
-                            ClickGuiScreen.playGuiSound(activeColorItem != null ? 1.3f : 0.9f, 0.25f);
+                            if (activeColorItem != null) Sounds.select(); else Sounds.deselect();
                         }
                     }
                 }
@@ -321,7 +313,7 @@ public class ItemPicker extends Component {
             if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
                 open = false;
                 activeColorItem = null;
-                ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+                Sounds.deselect();
             }
         }
         return false;

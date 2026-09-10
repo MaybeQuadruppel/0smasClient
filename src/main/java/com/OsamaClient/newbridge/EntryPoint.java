@@ -5,6 +5,7 @@ import com.OsamaClient.newbridge.Hacks.Combat.AutoDihhTap;
 import com.OsamaClient.newbridge.Hacks.Misc.ModuleList;
 import com.OsamaClient.newbridge.Hacks.Misc.Scaffold;
 import com.OsamaClient.newbridge.Hacks.Visual.Nametags;
+import com.OsamaClient.newbridge.Hacks.Visual.TeammateList;
 import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
@@ -35,6 +36,7 @@ public class EntryPoint implements ClientModInitializer {
 
     public static final EventBus EVENT_BUS = new EventBus();
 
+    private static final Identifier TEAMMATE_LIST_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "teammate_list");
     private static final Identifier MODULE_LIST_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "module_list");
     private static final Identifier RENDER_2D_INVOKER_ID = Identifier.fromNamespaceAndPath("newbridge", "render_2d_invoker");
     private static final Identifier NAMETAGS_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "nametags"); // <-- NEU
@@ -150,6 +152,7 @@ public class EntryPoint implements ClientModInitializer {
         });
 
         // Bestehendes HUD-Element (ModuleList)
+        HudElementRegistry.addLast(TEAMMATE_LIST_HUD_ID, (guiGraphics, deltaTracker) -> TeammateList.draw(guiGraphics));
         HudElementRegistry.addLast(MODULE_LIST_HUD_ID, (guiGraphics, deltaTracker) -> ModuleList.draw(guiGraphics));
         HudElementRegistry.addLast(NAMETAGS_HUD_ID, (guiGraphics, deltaTracker) -> Nametags.draw(guiGraphics));
         // Triggert das Render2DEvent für Tracers und andere 2D-Elemente bei jedem Frame

@@ -34,6 +34,7 @@ public class ItemESP extends Module {
     public String renderMode = "Both";
     public boolean renderTracers = false;
     public ItemPicker itemPicker;
+    private final ChamsBufferSource bufferSource = new ChamsBufferSource();
 
     public ItemESP() {
         super("ItemESP", "Highlights dropped items on the ground.", Category.VISUAL);
@@ -83,8 +84,6 @@ public class ItemESP extends Module {
 
         boolean drawFill = (renderMode.equals("Fill") || renderMode.equals("Both")) && !renderMode.equals("None");
         boolean drawOutline = (renderMode.equals("Outline") || renderMode.equals("Both")) && !renderMode.equals("None");
-
-        ChamsBufferSource bufferSource = new ChamsBufferSource();
 
         float startX = 0f, startY = 0f, startZ = 0f;
         if (renderTracers) {

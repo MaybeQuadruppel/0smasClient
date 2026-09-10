@@ -23,7 +23,7 @@ public class NoRender extends Module {
     public boolean fire = true;
 
     public NoRender() {
-        super("NoRender", "Deaktiviert verschiedene Overlays", Category.VISUAL);
+        super("NoRender", "Deactivates mutiple Renderfeatures.", Category.VISUAL);
         INSTANCE = this;
 
         // ToggleButtons für die ClickGUI über 'this.settings.add' hinzufügen

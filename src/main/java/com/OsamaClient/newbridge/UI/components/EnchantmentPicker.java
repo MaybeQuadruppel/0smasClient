@@ -1,6 +1,8 @@
 package com.OsamaClient.newbridge.UI.components;
 
-import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.Sounds;
+import com.OsamaClient.newbridge.UI.Theme;
+import com.OsamaClient.newbridge.UI.UISettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -19,14 +21,13 @@ public class EnchantmentPicker extends Component {
 
     private boolean open = false;
     private int scrollOffset = 0;
-    private final int maxVisible = 10; // Etwas kleiner für mehr Platz unten
-    private final int itemHeight = 13;
+    private final int maxVisible = 10;
+    private final int itemHeight;
     private String searchQuery = "";
 
     private String activePriceEnchant = null;
     private boolean draggingPriceSlider = false;
 
-    // Vollständige Liste gängiger Verzauberungen
     private static final List<String> ENCHANTMENTS = List.of(
             "Mending", "Unbreaking", "Efficiency", "Silk Touch", "Fortune",
             "Protection", "Fire Protection", "Feather Falling", "Blast Protection", "Projectile Protection",
@@ -39,25 +40,13 @@ public class EnchantmentPicker extends Component {
             "Lure", "Luck of the Sea"
     );
 
-    // Farben
-    private static final int C_BG         = 0xF20A0A0A;
-    private static final int C_BG_HOV     = 0xFF181818;
-    private static final int C_SEPARATOR  = 0xFF2C2C2C;
-    private static final int C_ACCENT     = 0xFFFFFFFF;
-    private static final int C_TEXT       = 0xFFEEEEEE;
-    private static final int C_TEXT_DIM   = 0xFF666666;
-    private static final int C_SELECTED   = 0xFFFFFFFF;
-    private static final int C_SEL_BG     = 0x40FFFFFF;
-    private static final int C_SEARCH_BG  = 0xFF000000;
-    private static final int C_SCROLLBAR  = 0xFF2C2C2C;
-    private static final int C_SCROLLTHM  = 0xFF999999;
-    private static final int C_SLIDER_BG  = 0xFF222222;
-    private static final int C_GREEN      = 0xFF55FF55;
+    private static final int C_GREEN = 0xFF55FF55; // Preis-Indikator (Kann bleiben, da es eine spezifische Signal-Farbe ist)
 
     public EnchantmentPicker(String label) {
         this.label = label;
-        this.width  = 100;
-        this.height = 14;
+        this.width  = UISettings.scaled(100);
+        this.height = UISettings.scaled(14);
+        this.itemHeight = UISettings.scaled(13);
     }
 
     public String getLabel() { return this.label; }
@@ -77,43 +66,47 @@ public class EnchantmentPicker extends Component {
 
     @Override
     public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, C_ACCENT, false);
+        Theme.Palette p = Theme.getActive().palette;
+
+        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, p.accent, false);
 
         boolean hov = isHovered(mouseX, mouseY);
-        int btnBg  = lerpColor(C_BG, C_BG_HOV, hov ? 1f : 0f);
-        drawRoundedRect(guiGraphics, x, y, width, height, btnBg);
-        drawRoundedOutline(guiGraphics, x, y, width, height, open ? C_ACCENT : C_SEPARATOR);
+        int btnBg = lerpColor(p.bg, p.bgHover, hov ? 1f : 0f);
+        drawRoundedRect(guiGraphics, x, y, width, height, UISettings.withPanelAlpha(btnBg));
+        drawRoundedOutline(guiGraphics, x, y, width, height, open ? p.accent : p.border);
 
         String arrow = open ? " \u25b2" : " \u25bc";
         int selCount = selectedEnchantments.size();
         String btnLabel = selCount > 0 ? selCount + " selected" + arrow : "Choose enchants" + arrow;
-        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? C_ACCENT : C_TEXT, false);
+        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? p.accent : p.text, false);
 
         if (!open) return;
 
         List<String> items = getFilteredEnchantments();
-        int dropW = width + 50;
-        int searchH = 14;
+        int dropW = width + UISettings.scaled(50);
+        int searchH = UISettings.scaled(14);
         int listH   = maxVisible * itemHeight;
 
-        int priceSliderH = (activePriceEnchant != null && selectedEnchantments.containsKey(activePriceEnchant)) ? 24 : 0;
+        int priceSliderH = (activePriceEnchant != null && selectedEnchantments.containsKey(activePriceEnchant)) ? UISettings.scaled(24) : 0;
         int dropH   = searchH + 2 + listH + priceSliderH;
         int dropX   = x;
         int dropY   = y + height + 3;
 
         drawShadow(guiGraphics, dropX, dropY, dropW, dropH);
-        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, C_BG);
-        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, C_ACCENT);
+        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, UISettings.withPanelAlpha(p.bg));
+        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, p.accent);
 
-        drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, C_SEARCH_BG);
-        guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, C_SEPARATOR);
+        drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, p.bgHover);
+        guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, p.border);
 
         boolean showCursor = open && ((System.currentTimeMillis() / 500) % 2 == 0);
         String cursor = showCursor ? "|" : "";
         String display = searchQuery.isEmpty() ? "\u26b2 Search..." : "\u26b2 " + searchQuery + cursor;
-        guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? C_TEXT_DIM : C_TEXT, false);
+        guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? p.textDim : p.text, false);
 
         int listY = dropY + searchH + 2;
+        int selBgColor = (p.accent & 0x00FFFFFF) | 0x40000000;
+
         for (int i = 0; i < maxVisible; i++) {
             int index = i + scrollOffset;
             if (index >= items.size()) break;
@@ -123,10 +116,10 @@ public class EnchantmentPicker extends Component {
             int itemY = listY + i * itemHeight;
             boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= itemY && mouseY <= itemY + itemHeight;
 
-            if (selected) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, C_SEL_BG);
+            if (selected) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, selBgColor);
             else if (itemHov) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, 0x1AFFFFFF);
 
-            if (selected) guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, itemY + (itemHeight / 2) - 4, C_SELECTED, false);
+            if (selected) guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, itemY + (itemHeight / 2) - 4, p.text, false);
 
             if (selected) {
                 int price = selectedEnchantments.get(item);
@@ -137,7 +130,7 @@ public class EnchantmentPicker extends Component {
 
             String name = item;
             if (name.length() > 14) name = name.substring(0, 12) + "\u2026";
-            guiGraphics.text(Minecraft.getInstance().font, name, dropX + (selected ? 17 : 7), itemY + (itemHeight / 2) - 4, selected ? C_SELECTED : (itemHov ? C_TEXT : C_TEXT_DIM), false);
+            guiGraphics.text(Minecraft.getInstance().font, name, dropX + (selected ? 17 : 7), itemY + (itemHeight / 2) - 4, selected ? p.text : (itemHov ? p.text : p.textDim), false);
         }
 
         if (items.size() > maxVisible) {
@@ -145,17 +138,16 @@ public class EnchantmentPicker extends Component {
             float tp = scrollOffset / (float)(items.size() - maxVisible);
             int th = Math.max(16, (int)((maxVisible / (float) items.size()) * listH));
             int ty = listY + (int)(tp * (listH - th));
-            guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, C_SCROLLBAR);
-            guiGraphics.fill(sbX, ty, sbX + 3, ty + th, C_SCROLLTHM);
+            guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, p.bgHover);
+            guiGraphics.fill(sbX, ty, sbX + 3, ty + th, p.border);
         }
 
-        // --- PREIS SLIDER MENÜ (Wenn ausgewählt) ---
         if (activePriceEnchant != null && selectedEnchantments.containsKey(activePriceEnchant)) {
             int startSliderY = listY + listH + 3;
             int sliderX = dropX + 6;
             int sliderW = dropW - 12;
 
-            guiGraphics.fill(dropX + 1, startSliderY - 2, dropX + dropW - 1, startSliderY - 1, C_SEPARATOR);
+            guiGraphics.fill(dropX + 1, startSliderY - 2, dropX + dropW - 1, startSliderY - 1, p.border);
 
             int currentPrice = selectedEnchantments.get(activePriceEnchant);
 
@@ -166,21 +158,20 @@ public class EnchantmentPicker extends Component {
                 if (newPrice != currentPrice) {
                     selectedEnchantments.put(activePriceEnchant, newPrice);
                     currentPrice = newPrice;
-                    ClickGuiScreen.playGuiSound(0.8f + (newPrice / 64f) * 0.8f, 0.08f);
                 }
             }
 
-            guiGraphics.text(Minecraft.getInstance().font, activePriceEnchant + " Max Price: " + currentPrice, sliderX, startSliderY, C_ACCENT, false);
+            guiGraphics.text(Minecraft.getInstance().font, activePriceEnchant + " Max Price: " + currentPrice, sliderX, startSliderY, p.accent, false);
 
             int barY = startSliderY + 11;
-            drawRoundedRect(guiGraphics, sliderX, barY, sliderW, 4, C_SLIDER_BG);
+            drawRoundedRect(guiGraphics, sliderX, barY, sliderW, 4, p.bgHover);
 
             float pct = (currentPrice - 1) / 63f;
             int fillW = (int) (pct * sliderW);
             drawRoundedRect(guiGraphics, sliderX, barY, fillW, 4, C_GREEN);
 
             int thumbX = sliderX + fillW;
-            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX - 1)), barY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX + 2)), barY + 5, C_ACCENT);
+            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX - 1)), barY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX + 2)), barY + 5, p.text);
         } else {
             activePriceEnchant = null;
         }
@@ -193,7 +184,7 @@ public class EnchantmentPicker extends Component {
         if (c >= 32 && c != 127) {
             searchQuery += c;
             scrollOffset = 0;
-            ClickGuiScreen.playGuiSound(1.2f, 0.15f);
+            Sounds.select();
             return true;
         }
         return false;
@@ -202,19 +193,17 @@ public class EnchantmentPicker extends Component {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (!open) return false;
-
         int key = event.key();
-        if (key == 256 || key == 257 || key == 335) {
+        if (key == 256 || key == 257 || key == 335) { // ESC / Enter
             open = false;
             activePriceEnchant = null;
-            ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+            Sounds.deselect();
             return true;
         }
-
-        if (key == 259 && !searchQuery.isEmpty()) {
+        if (key == 259 && !searchQuery.isEmpty()) { // Backspace
             searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
             scrollOffset = 0;
-            ClickGuiScreen.playGuiSound(0.9f, 0.15f);
+            Sounds.select();
             return true;
         }
         return false;
@@ -222,13 +211,13 @@ public class EnchantmentPicker extends Component {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        if (open && mouseX >= x && mouseX <= x + width + 50) {
+        if (open && mouseX >= x && mouseX <= x + width + UISettings.scaled(50)) {
             int oldScroll = scrollOffset;
             if (amount > 0 && scrollOffset > 0) scrollOffset--;
             else if (amount < 0 && scrollOffset < Math.max(0, getFilteredEnchantments().size() - maxVisible)) scrollOffset++;
 
             if (scrollOffset != oldScroll) {
-                ClickGuiScreen.playGuiSound(1.3f, 0.1f);
+                Sounds.select();
             }
             return true;
         }
@@ -240,47 +229,45 @@ public class EnchantmentPicker extends Component {
         if (isHovered(mouseX, mouseY) && button == 0) {
             open = !open;
             activePriceEnchant = null;
-            ClickGuiScreen.playGuiSound(open ? 1.1f : 0.85f, 0.25f);
+            if (open) Sounds.select(); else Sounds.deselect();
             return true;
         }
 
         if (open) {
-            int dropX = x, dropW = width + 50, listY = y + height + 5 + 14;
+            int dropX = x, dropW = width + UISettings.scaled(50), listY = y + height + 5 + UISettings.scaled(14);
             int listH = maxVisible * itemHeight;
 
-            // Slider Klick-Erkennung
             if (activePriceEnchant != null && selectedEnchantments.containsKey(activePriceEnchant)) {
                 int startSliderY = listY + listH + 3;
                 int barY = startSliderY + 11;
 
                 if (mouseX >= dropX + 6 && mouseX <= dropX + dropW - 6 && mouseY >= barY - 3 && mouseY <= barY + 7 && button == 0) {
                     this.draggingPriceSlider = true;
-                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
+                    Sounds.select();
                     return true;
                 }
             }
 
-            // Listen Klick-Erkennung
             if (mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= listY && mouseY <= listY + listH) {
                 int idx = (int)((mouseY - listY) / itemHeight) + scrollOffset;
                 List<String> items = getFilteredEnchantments();
 
                 if (idx >= 0 && idx < items.size()) {
                     String item = items.get(idx);
-                    if (button == 0) { // Linksklick: Auswählen / Abwählen
+                    if (button == 0) {
                         if (selectedEnchantments.containsKey(item)) {
                             selectedEnchantments.remove(item);
                             if (activePriceEnchant != null && activePriceEnchant.equals(item)) activePriceEnchant = null;
-                            ClickGuiScreen.playGuiSound(0.85f, 0.25f);
+                            Sounds.deselect();
                         } else {
-                            selectedEnchantments.put(item, 20); // Standard-Maximalpreis 20
-                            activePriceEnchant = item; // Direkt Slider öffnen
-                            ClickGuiScreen.playGuiSound(1.15f, 0.25f);
+                            selectedEnchantments.put(item, 20);
+                            activePriceEnchant = item;
+                            Sounds.select();
                         }
-                    } else if (button == 1) { // Rechtsklick: Preis-Slider öffnen
+                    } else if (button == 1) {
                         if (selectedEnchantments.containsKey(item)) {
                             activePriceEnchant = (item.equals(activePriceEnchant)) ? null : item;
-                            ClickGuiScreen.playGuiSound(activePriceEnchant != null ? 1.3f : 0.9f, 0.25f);
+                            if (activePriceEnchant != null) Sounds.select(); else Sounds.deselect();
                         }
                     }
                 }
@@ -290,7 +277,7 @@ public class EnchantmentPicker extends Component {
             if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
                 open = false;
                 activePriceEnchant = null;
-                ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+                Sounds.deselect();
             }
         }
         return false;

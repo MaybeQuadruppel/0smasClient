@@ -1,7 +1,9 @@
 package com.OsamaClient.newbridge.UI.components;
 
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.RenderUtils;
-import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.Sounds;
+import com.OsamaClient.newbridge.UI.Theme;
+import com.OsamaClient.newbridge.UI.UISettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -22,27 +24,17 @@ public class BlockPicker extends Component {
     private boolean open = false;
     private int scrollOffset = 0;
     private final int maxVisible = 12;
-    private final int itemHeight = 13;
+    private final int itemHeight;
     private String searchQuery = "";
 
     private Block activeColorBlock = null;
     private int draggingSlider = 0; // 0 = none, 1 = Hue, 2 = Alpha
 
-    private static final int C_BG         = 0xF20A0A0A;
-    private static final int C_BG_HOV     = 0xFF181818;
-    private static final int C_SEPARATOR  = 0xFF2C2C2C;
-    private static final int C_ACCENT     = 0xFFFFFFFF;
-    private static final int C_TEXT       = 0xFFEEEEEE;
-    private static final int C_TEXT_DIM   = 0xFF666666;
-    private static final int C_SEL_BG     = 0x40FFFFFF;
-    private static final int C_SEARCH_BG  = 0xFF000000;
-    private static final int C_SCROLLBAR  = 0xFF2C2C2C;
-    private static final int C_SCROLLTHM  = 0xFF999999;
-
     public BlockPicker(String label) {
         this.label = label;
-        this.width  = 100;
-        this.height = 14;
+        this.width  = UISettings.scaled(100);
+        this.height = UISettings.scaled(14);
+        this.itemHeight = UISettings.scaled(13);
     }
 
     public String getLabel() { return this.label; }
@@ -63,43 +55,47 @@ public class BlockPicker extends Component {
 
     @Override
     public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, C_ACCENT, false);
+        Theme.Palette p = Theme.getActive().palette;
+
+        guiGraphics.text(Minecraft.getInstance().font, label + ":", x, y - 11, p.accent, false);
 
         boolean hov = isHovered(mouseX, mouseY);
-        int btnBg  = lerpColor(C_BG, C_BG_HOV, hov ? 1f : 0f);
-        drawRoundedRect(   guiGraphics, x, y, width, height, btnBg);
-        drawRoundedOutline(guiGraphics, x, y, width, height, open ? C_ACCENT : C_SEPARATOR);
+        int btnBg  = lerpColor(p.bg, p.bgHover, hov ? 1f : 0f);
+        drawRoundedRect(guiGraphics, x, y, width, height, UISettings.withPanelAlpha(btnBg));
+        drawRoundedOutline(guiGraphics, x, y, width, height, open ? p.accent : p.border);
 
         String arrow = open ? " \u25b2" : " \u25bc";
         int selCount = selectedBlocks.size();
         String btnLabel = selCount > 0 ? selCount + " selected" + arrow : "Choose blocks" + arrow;
-        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? C_ACCENT : C_TEXT, false);
+        guiGraphics.text(Minecraft.getInstance().font, btnLabel, x + 4, y + (height / 2) - 4, open ? p.accent : p.text, false);
 
         if (!open) return;
 
         List<Block> blocks   = getFilteredBlocks();
-        int dropW = width + 50;
-        int searchH = 14;
+        int dropW = width + UISettings.scaled(50);
+        int searchH = UISettings.scaled(14);
         int listH   = maxVisible * itemHeight;
 
-        int colorSliderH = (activeColorBlock != null) ? 36 : 0;
+        int colorSliderH = (activeColorBlock != null) ? UISettings.scaled(36) : 0;
         int dropH   = searchH + 2 + listH + colorSliderH;
         int dropX   = x;
         int dropY   = y + height + 3;
 
         drawShadow(guiGraphics, dropX, dropY, dropW, dropH);
-        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, C_BG);
-        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, C_ACCENT);
+        drawRoundedRect(guiGraphics, dropX, dropY, dropW, dropH + 2, UISettings.withPanelAlpha(p.bg));
+        drawRoundedOutline(guiGraphics, dropX, dropY, dropW, dropH + 2, p.accent);
 
-        drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, C_SEARCH_BG);
-        guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, C_SEPARATOR);
+        drawRoundedRect(guiGraphics, dropX + 1, dropY + 1, dropW - 2, searchH, p.bgHover);
+        guiGraphics.fill(dropX + 1, dropY + searchH, dropX + dropW - 1, dropY + searchH + 1, p.border);
 
         boolean showCursor = open && ((System.currentTimeMillis() / 500) % 2 == 0);
         String cursor = showCursor ? "|" : "";
         String display = searchQuery.isEmpty() ? "\u26b2 Search..." : "\u26b2 " + searchQuery + cursor;
-        guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? C_TEXT_DIM : C_TEXT, false);
+        guiGraphics.text(Minecraft.getInstance().font, display, dropX + 5, dropY + (searchH / 2) - 4, searchQuery.isEmpty() ? p.textDim : p.text, false);
 
         int listY = dropY + searchH + 2;
+        int selBgColor = (p.accent & 0x00FFFFFF) | 0x40000000;
+
         for (int i = 0; i < maxVisible; i++) {
             int index = i + scrollOffset;
             if (index >= blocks.size()) break;
@@ -109,23 +105,22 @@ public class BlockPicker extends Component {
             int itemY = listY + i * itemHeight;
             boolean itemHov = mouseX >= dropX && mouseX <= dropX + dropW && mouseY >= itemY && mouseY <= itemY + itemHeight;
 
-            if (selected) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, C_SEL_BG);
+            if (selected) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, selBgColor);
             else if (itemHov) guiGraphics.fill(dropX + 1, itemY, dropX + dropW - 1, itemY + itemHeight, 0x1AFFFFFF);
 
-            // Farbe abrufen und Alpha-Kanal für Text entfernen (immer 100% deckend)
             int blockColor = RenderUtils.BLOCK_COLORS.getOrDefault(block, 0x6600FFFF);
-            int displayColor = selected ? (blockColor | 0xFF000000) : (itemHov ? C_TEXT : C_TEXT_DIM);
+            int displayColor = selected ? (blockColor | 0xFF000000) : (itemHov ? p.text : p.textDim);
 
             if (selected) {
                 guiGraphics.text(Minecraft.getInstance().font, "\u2714", dropX + 5, itemY + (itemHeight / 2) - 4, displayColor, false);
 
-                int previewSize = 7;
-                int previewX = dropX + dropW - 14;
+                int previewSize = UISettings.scaled(7);
+                int previewX = dropX + dropW - UISettings.scaled(14);
                 int previewY = itemY + (itemHeight / 2) - (previewSize / 2);
                 drawRoundedRect(guiGraphics, previewX, previewY, previewSize, previewSize, blockColor | 0xFF000000);
 
                 if (activeColorBlock == block) {
-                    drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, C_ACCENT);
+                    drawRoundedOutline(guiGraphics, previewX - 1, previewY - 1, previewSize + 2, previewSize + 2, p.accent);
                 }
             }
 
@@ -139,16 +134,16 @@ public class BlockPicker extends Component {
             float tp = scrollOffset / (float)(blocks.size() - maxVisible);
             int th = Math.max(16, (int)((maxVisible / (float) blocks.size()) * listH));
             int ty = listY + (int)(tp * (listH - th));
-            guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, C_SCROLLBAR);
-            guiGraphics.fill(sbX, ty, sbX + 3, ty + th, C_SCROLLTHM);
+            guiGraphics.fill(sbX, listY, sbX + 3, listY + listH, p.bgHover);
+            guiGraphics.fill(sbX, ty, sbX + 3, ty + th, p.border);
         }
 
         if (activeColorBlock != null && selectedBlocks.contains(activeColorBlock)) {
-            int startSliderY = listY + listH + 4;
-            int sliderX = dropX + 6;
-            int sliderW = dropW - 12;
+            int startSliderY = listY + listH + UISettings.scaled(4);
+            int sliderX = dropX + UISettings.scaled(6);
+            int sliderW = dropW - UISettings.scaled(12);
 
-            guiGraphics.fill(dropX + 1, startSliderY - 3, dropX + dropW - 1, startSliderY - 2, C_SEPARATOR);
+            guiGraphics.fill(dropX + 1, startSliderY - 3, dropX + dropW - 1, startSliderY - 2, p.border);
 
             int currentARGB = RenderUtils.BLOCK_COLORS.getOrDefault(activeColorBlock, 0x6600FFFF);
             int currentAlpha = (currentARGB >> 24) & 0xFF;
@@ -170,10 +165,6 @@ public class BlockPicker extends Component {
 
                 if (finalARGB != currentARGB) {
                     RenderUtils.BLOCK_COLORS.put(activeColorBlock, finalARGB);
-                    float pitch = (draggingSlider == 1)
-                            ? 0.8f + (currentHue * 0.8f)
-                            : 0.8f + ((currentAlpha / 255f) * 0.8f);
-                    ClickGuiScreen.playGuiSound(pitch, 0.08f);
                 }
             }
 
@@ -182,11 +173,11 @@ public class BlockPicker extends Component {
                 guiGraphics.fill(sliderX + i, startSliderY, sliderX + i + 1, startSliderY + 4, col);
             }
             int thumbX1 = sliderX + (int) (currentHue * sliderW);
-            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX1 - 1)), startSliderY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX1 + 2)), startSliderY + 5, 0xFFFFFFFF);
+            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX1 - 1)), startSliderY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX1 + 2)), startSliderY + 5, p.text);
 
-            int alphaSliderY = startSliderY + 12;
-            guiGraphics.text(Minecraft.getInstance().font, "Opacity: " + (int)((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, C_TEXT_DIM, false);
-            int barY = alphaSliderY + 10;
+            int alphaSliderY = startSliderY + UISettings.scaled(12);
+            guiGraphics.text(Minecraft.getInstance().font, "Opacity: " + (int)((currentAlpha / 255f) * 100) + "%", sliderX, alphaSliderY, p.textDim, false);
+            int barY = alphaSliderY + UISettings.scaled(10);
 
             for (int i = 0; i < sliderW; i++) {
                 float pct = i / (float) sliderW;
@@ -195,7 +186,7 @@ public class BlockPicker extends Component {
                 guiGraphics.fill(sliderX + i, barY, sliderX + i + 1, barY + 4, gray);
             }
             int thumbX2 = sliderX + (int) ((currentAlpha / 255f) * sliderW);
-            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX2 - 1)), barY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX2 + 2)), barY + 5, 0xFFFFFFFF);
+            guiGraphics.fill(Math.max(sliderX, Math.min(sliderX + sliderW - 2, thumbX2 - 1)), barY - 1, Math.max(sliderX, Math.min(sliderX + sliderW - 1, thumbX2 + 2)), barY + 5, p.text);
         } else {
             activeColorBlock = null;
         }
@@ -208,7 +199,7 @@ public class BlockPicker extends Component {
         if (c >= 32 && c != 127) {
             searchQuery += c;
             scrollOffset = 0;
-            ClickGuiScreen.playGuiSound(1.2f, 0.15f);
+            Sounds.select();
             return true;
         }
         return false;
@@ -221,13 +212,13 @@ public class BlockPicker extends Component {
         if (key == 256 || key == 257 || key == 335) {
             open = false;
             activeColorBlock = null;
-            ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+            Sounds.deselect();
             return true;
         }
         if (key == 259 && !searchQuery.isEmpty()) {
             searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
             scrollOffset = 0;
-            ClickGuiScreen.playGuiSound(0.9f, 0.15f);
+            Sounds.select();
             return true;
         }
         return false;
@@ -235,13 +226,13 @@ public class BlockPicker extends Component {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        if (open && mouseX >= x && mouseX <= x + width + 50) {
+        if (open && mouseX >= x && mouseX <= x + width + UISettings.scaled(50)) {
             int oldScroll = scrollOffset;
             if (amount > 0 && scrollOffset > 0) scrollOffset--;
             else if (amount < 0 && scrollOffset < Math.max(0, getFilteredBlocks().size() - maxVisible)) scrollOffset++;
 
             if (scrollOffset != oldScroll) {
-                ClickGuiScreen.playGuiSound(1.3f, 0.1f);
+                Sounds.select();
             }
             return true;
         }
@@ -253,24 +244,24 @@ public class BlockPicker extends Component {
         if (isHovered(mouseX, mouseY) && button == 0) {
             open = !open;
             activeColorBlock = null;
-            ClickGuiScreen.playGuiSound(open ? 1.1f : 0.85f, 0.25f);
+            if (open) Sounds.select(); else Sounds.deselect();
             return true;
         }
 
         if (open) {
-            int dropX = x, dropW = width + 50, listY = y + height + 5 + 14;
+            int dropX = x, dropW = width + UISettings.scaled(50), listY = y + height + 5 + UISettings.scaled(14);
             int listH = maxVisible * itemHeight;
 
             if (activeColorBlock != null && selectedBlocks.contains(activeColorBlock)) {
-                int startSliderY = listY + listH + 4;
-                if (mouseX >= dropX + 6 && mouseX <= dropX + dropW - 6 && mouseY >= startSliderY - 2 && mouseY <= startSliderY + 7 && button == 0) {
+                int startSliderY = listY + listH + UISettings.scaled(4);
+                if (mouseX >= dropX + UISettings.scaled(6) && mouseX <= dropX + dropW - UISettings.scaled(6) && mouseY >= startSliderY - 2 && mouseY <= startSliderY + 7 && button == 0) {
                     this.draggingSlider = 1;
-                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
+                    Sounds.select();
                     return true;
                 }
-                if (mouseX >= dropX + 6 && mouseX <= dropX + dropW - 6 && mouseY >= startSliderY + 20 && mouseY <= startSliderY + 28 && button == 0) {
+                if (mouseX >= dropX + UISettings.scaled(6) && mouseX <= dropX + dropW - UISettings.scaled(6) && mouseY >= startSliderY + UISettings.scaled(20) && mouseY <= startSliderY + UISettings.scaled(28) && button == 0) {
                     this.draggingSlider = 2;
-                    ClickGuiScreen.playGuiSound(1.0f, 0.2f);
+                    Sounds.select();
                     return true;
                 }
             }
@@ -285,15 +276,15 @@ public class BlockPicker extends Component {
                         if (selectedBlocks.contains(b)) {
                             selectedBlocks.remove(b);
                             if (activeColorBlock == b) activeColorBlock = null;
-                            ClickGuiScreen.playGuiSound(0.85f, 0.25f);
+                            Sounds.deselect();
                         } else {
                             selectedBlocks.add(b);
-                            ClickGuiScreen.playGuiSound(1.15f, 0.25f);
+                            Sounds.select();
                         }
                     } else if (button == 1) {
                         if (selectedBlocks.contains(b)) {
                             activeColorBlock = (activeColorBlock == b) ? null : b;
-                            ClickGuiScreen.playGuiSound(activeColorBlock != null ? 1.3f : 0.9f, 0.25f);
+                            if (activeColorBlock != null) Sounds.select(); else Sounds.deselect();
                         }
                     }
                 }
@@ -303,7 +294,7 @@ public class BlockPicker extends Component {
             if (mouseX < dropX || mouseX > dropX + dropW || mouseY < y + height) {
                 open = false;
                 activeColorBlock = null;
-                ClickGuiScreen.playGuiSound(0.85f, 0.2f);
+                Sounds.deselect();
             }
         }
         return false;

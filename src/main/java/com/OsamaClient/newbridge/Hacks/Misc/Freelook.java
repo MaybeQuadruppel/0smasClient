@@ -11,7 +11,7 @@ public class Freelook extends Module {
     public float maxYaw = 360.0f;
 
     public Freelook() {
-        super("Freelook", "free third person perspective (hold Left Alt)", Category.MISC);
+        super("Freelook", "Free third person perspective (hold Left Alt)", Category.MISC);
         instance = this;
     }
 

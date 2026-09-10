@@ -35,7 +35,7 @@ public class BlockESP extends Module {
     public double scanDelay = 2.0;
     public double outlineWidth = 2.0;
     public double tracerWidth = 2.0;
-
+    private final ChamsBufferSource bufferSource = new ChamsBufferSource();
     public String renderMode = "Fill";
     public boolean renderTracers = false;
 
@@ -151,7 +151,6 @@ public class BlockESP extends Module {
         boolean drawFill = (renderMode.equals("Fill") || renderMode.equals("Both")) && !renderMode.equals("None");
         boolean drawOutline = (renderMode.equals("Outline") || renderMode.equals("Both")) && !renderMode.equals("None");
 
-        ChamsBufferSource bufferSource = new ChamsBufferSource();
         Camera camera = mc.gameRenderer.mainCamera();
         double camX = camera.position().x;
         double camY = camera.position().y;

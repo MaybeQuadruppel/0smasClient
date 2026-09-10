@@ -3,6 +3,7 @@ package com.OsamaClient.newbridge.UI;
 import com.OsamaClient.newbridge.Config;
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
+import com.OsamaClient.newbridge.UI.UISettingsModule; // TODO: Package anpassen, falls abweichend
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
@@ -30,6 +31,12 @@ public class ClickGuiScreen extends Screen {
     private float backBtnHover = 0f;
     private String lastHoveredModule = null; // Verhindert Sound-Spamming beim Hovern
 
+    // ── Top-Bar: Gear-Button für UI-Settings ────────────────────────────────
+    private float settingsBtnHover = 0f;
+    private boolean settingsBtnHovered = false;
+    private static final int SETTINGS_BTN_SIZE = 18;
+    private static final int SETTINGS_BTN_Y    = 4;
+
     // ── Draggable panels ──────────────────────────────────────────────────────
     public static final Map<Module.Category, int[]> panelPos = new LinkedHashMap<>();
     private Module.Category draggingCat = null;
@@ -44,7 +51,7 @@ public class ClickGuiScreen extends Screen {
     public static int dynColW = 88;
     public static int dynModH = 15;
 
-    private static final int HDR_H   = 18;
+    private static int HDR_H   = 18; // wird von updateAdaptiveLayout() an Compact-Mode/Skalierung angepasst
     private static final int START_X = 10;
     private static final int START_Y = 8;
 
@@ -62,19 +69,39 @@ public class ClickGuiScreen extends Screen {
     private static final int SETTINGS_BOTTOM_PAD = 8;
     private static final int SCROLL_STEP         = 18;
 
-    // ── Black & White Palette ─────────────────────────────────────────────────
-    private static final int C_OVERLAY      = 0xBB000000; // semi-transparent black
-    private static final int C_PANEL_BG     = 0xF20A0A0A; // near-black panel
-    private static final int C_PANEL_HEADER = 0xFF181818; // dark grey header
-    private static final int C_SEPARATOR    = 0xFF2C2C2C; // subtle divider
-    private static final int C_ACCENT       = 0xFFFFFFFF; // white accent
-    private static final int C_ACCENT_DIM   = 0xFF999999; // grey accent
-    private static final int C_TEXT         = 0xFFEEEEEE; // near-white text
-    private static final int C_TEXT_DIM     = 0xFF666666; // muted grey text
-    private static final int C_ENABLED      = 0xFFFFFFFF; // white = on
-    private static final int C_DISABLED     = 0xFF3A3A3A; // dark grey = off
-    private static final int C_KEYBIND      = 0xFFBBBBBB; // light grey badge
-    private static final int C_BIND_PULSE   = 0xFFFFFFFF; // white pulse
+    // ── Theme-Farben ─────────────────────────────────────────────────────────
+    // Werden jeden Frame in updateThemeColors() aus Theme.getActive().palette
+    // befüllt - dadurch reagiert die GESAMTE ClickGUI (nicht nur die Settings-
+    // Komponenten) sofort auf einen Theme-Wechsel.
+    private static final int C_OVERLAY      = 0xBB000000; // semi-transparent black (kein Theme-Wert)
+    private static int C_PANEL_BG     = 0xF20A0A0A;
+    private static int C_PANEL_HEADER = 0xFF181818;
+    private static int C_SEPARATOR    = 0xFF2C2C2C;
+    private static int C_ACCENT       = 0xFFFFFFFF;
+    private static int C_ACCENT_DIM   = 0xFF999999;
+    private static int C_TEXT         = 0xFFEEEEEE;
+    private static int C_TEXT_DIM     = 0xFF666666;
+    private static int C_ENABLED      = 0xFFFFFFFF;
+    private static int C_DISABLED     = 0xFF3A3A3A;
+    private static int C_KEYBIND      = 0xFFBBBBBB;
+    private static int C_BIND_PULSE   = 0xFFFFFFFF;
+
+    /** Synct die lokalen Anzeige-Farben mit dem aktuell aktiven Theme. Muss
+     *  einmal pro Frame VOR jeglichem Rendering aufgerufen werden. */
+    private static void updateThemeColors() {
+        Theme.Palette p = Theme.getActive().palette;
+        C_PANEL_BG     = UISettings.withPanelAlpha(p.bg & 0x00FFFFFF);
+        C_PANEL_HEADER = p.bgHover | 0xFF000000;
+        C_SEPARATOR    = p.border  | 0xFF000000;
+        C_ACCENT       = p.accent  | 0xFF000000;
+        C_ACCENT_DIM   = p.textDim | 0xFF000000;
+        C_TEXT         = p.text    | 0xFF000000;
+        C_TEXT_DIM     = p.textDim | 0xFF000000;
+        C_ENABLED      = p.enabled | 0xFF000000;
+        C_DISABLED     = p.disabled| 0xFF000000;
+        C_KEYBIND      = p.keybind | 0xFF000000;
+        C_BIND_PULSE   = p.accent  | 0xFF000000;
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -117,14 +144,23 @@ public class ClickGuiScreen extends Screen {
                 .filter(cat -> !ModuleManager.getModulesByCategory(cat).isEmpty())
                 .collect(Collectors.toList());
 
+        // Zeilen- und Header-Höhe an Compact-Mode / UI-Skalierung koppeln.
+        dynModH = UISettings.scaled(UISettings.compactMode ? 12 : 15);
+        HDR_H   = UISettings.scaled(UISettings.compactMode ? 15 : 18);
+
         if (activeCats.isEmpty()) return;
 
-        int gap = 8;
+        int gap = UISettings.compactMode ? 5 : 8;
         int totalAvail = this.width - (START_X * 2);
 
-        // Dynamische Breite berechnen (Minimum 55px, Maximum 88px)
+        // Automatische Breite berechnen (Minimum/Maximum je nach Modus)
+        int minW = UISettings.compactMode ? 48 : 55;
+        int maxW = UISettings.compactMode ? 76 : 88;
         int calculatedW = (totalAvail - (activeCats.size() - 1) * gap) / activeCats.size();
-        dynColW = Math.max(55, Math.min(88, calculatedW));
+        int autoW = Math.max(minW, Math.min(maxW, calculatedW));
+
+        // Manuelle Breiten-Vorgabe aus den UI-Settings hat Vorrang (0 = automatisch).
+        dynColW = UISettings.columnWidth(autoW);
 
         int x = START_X;
         for (Module.Category cat : activeCats) {
@@ -167,6 +203,7 @@ public class ClickGuiScreen extends Screen {
     @Override
     public void extractRenderState(@NotNull GuiGraphicsExtractor guiGraphics,
                                    int mouseX, int mouseY, float delta) {
+        updateThemeColors();   // Theme-Farben für diesen Frame synchronisieren
         updateAdaptiveLayout(); // Sorgt jederzeit für korrekte Breiten & Positionen
 
         float fade = easeOut(rawFade());
@@ -187,6 +224,7 @@ public class ClickGuiScreen extends Screen {
 
         if (selectedModule == null) {
             renderModuleList(guiGraphics, mouseX, mouseY, fade);
+            renderTopBar(guiGraphics, mouseX, mouseY);
         } else {
             renderSettingsView(guiGraphics, mouseX, mouseY);
         }
@@ -199,6 +237,37 @@ public class ClickGuiScreen extends Screen {
                     Component.withAlpha(0xFF000000, 1f - fade));
 
         super.extractRenderState(guiGraphics, mouseX, mouseY, delta);
+    }
+
+    // ── Top-Bar (Gear-Button -> UI Settings) ────────────────────────────────
+
+    private void renderTopBar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        int size = UISettings.scaled(SETTINGS_BTN_SIZE);
+        int bx = this.width / 2 - size / 2;
+        int by = SETTINGS_BTN_Y;
+
+        settingsBtnHovered = mouseX >= bx && mouseX <= bx + size
+                && mouseY >= by && mouseY <= by + size;
+        settingsBtnHover = settingsBtnHovered
+                ? Math.min(1f, settingsBtnHover + UISettings.animStep(0.2f))
+                : Math.max(0f, settingsBtnHover - UISettings.animStep(0.2f));
+
+        int bg  = Component.lerpColor(C_PANEL_BG, C_PANEL_HEADER, settingsBtnHover);
+        int bdr = Component.lerpColor(C_SEPARATOR, C_ACCENT,      settingsBtnHover);
+        int icon = Component.lerpColor(C_TEXT_DIM, C_ACCENT,      settingsBtnHover);
+
+        Component.drawShadow(g, bx, by, size, size);
+        Component.drawRoundedRect(   g, bx, by, size, size, bg);
+        Component.drawRoundedOutline(g, bx, by, size, size, bdr);
+
+        String gearIcon = "\u2699"; // ⚙
+        int iw = this.font.width(gearIcon);
+        UISettings.drawText(g, this.font, gearIcon,
+                bx + (size - iw) / 2, by + (size - 8) / 2, icon, false);
+
+        if (settingsBtnHovered) {
+            renderTooltip(g, "UI Settings", mouseX, mouseY);
+        }
     }
 
     // ── Module list ───────────────────────────────────────────────────────────
@@ -237,7 +306,7 @@ public class ClickGuiScreen extends Screen {
 
             // Titel adaptiv trimmen
             String headerTitle = trimToWidth("\u2630 " + cat.name(), dynColW - 6);
-            g.text(this.font, headerTitle,
+            UISettings.drawText(g, this.font, headerTitle,
                     panelX + 4, panelY + (HDR_H / 2) - 4,
                     hdrHov ? C_ACCENT : C_TEXT, false);
 
@@ -251,7 +320,7 @@ public class ClickGuiScreen extends Screen {
             int rowY = listTop;
 
             if (modules.isEmpty()) {
-                g.text(this.font, "no results",
+                UISettings.drawText(g, this.font, "no results",
                         panelX + 7, rowY + (dynModH / 2) - 4, C_TEXT_DIM, false);
             } else {
                 for (int i = 0; i < visibleRows; i++) {
@@ -305,13 +374,13 @@ public class ClickGuiScreen extends Screen {
                     int nameColor = module.enabled
                             ? Component.lerpColor(C_ACCENT_DIM, C_ENABLED, 0.7f + hp * 0.3f)
                             : Component.lerpColor(C_TEXT_DIM, C_TEXT, hp);
-                    g.text(this.font, displayName,
+                    UISettings.drawText(g, this.font, displayName,
                             panelX + 7, rowY + (dynModH / 2) - 4, nameColor, false);
 
                     if (isBound || isBinding) {
                         int kColor = isBinding ? C_BIND_PULSE : C_KEYBIND;
                         int kw = this.font.width(kStr);
-                        g.text(this.font, kStr,
+                        UISettings.drawText(g, this.font, kStr,
                                 panelX + dynColW - kw - 3, rowY + (dynModH / 2) - 4, kColor, false);
                     }
 
@@ -374,8 +443,8 @@ public class ClickGuiScreen extends Screen {
 
         Component.drawRoundedRect(   g, 8, 8, 86, 20, backBg);
         Component.drawRoundedOutline(g, 8, 8, 86, 20, backBdr);
-        g.text(this.font, "< Back", 15, 14, backFg, false);
-        g.text(this.font, "Settings  \u2014  " + selectedModule.name, 102, 14, C_TEXT, false);
+        UISettings.drawText(g, this.font, "< Back", 15, 14, backFg, false);
+        UISettings.drawText(g, this.font, "Settings  \u2014  " + selectedModule.name, 102, 14, C_TEXT, false);
         g.fill(8, 32, this.width - 8, 33, C_SEPARATOR);
 
         int rightX = 140;
@@ -450,7 +519,7 @@ public class ClickGuiScreen extends Screen {
     private void renderSearchBar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         if (!searchActive) {
             String hint = "CTRL+F  |  MMB = bind key";
-            g.text(this.font, hint,
+            UISettings.drawText(g, this.font, hint,
                     this.width / 2 - this.font.width(hint) / 2,
                     this.height - 11, C_TEXT_DIM, false);
             return;
@@ -467,10 +536,10 @@ public class ClickGuiScreen extends Screen {
         String cursor  = showCursor ? "|" : "";
 
         String display = "\u26b2  " + searchQuery + cursor;
-        g.text(this.font, display, barX + 6, barY + 5, C_TEXT, false);
+        UISettings.drawText(g, this.font, display, barX + 6, barY + 5, C_TEXT, false);
 
         String esc = "ESC";
-        g.text(this.font, esc, barX + barW - this.font.width(esc) - 5, barY + 5, C_TEXT_DIM, false);
+        UISettings.drawText(g, this.font, esc, barX + barW - this.font.width(esc) - 5, barY + 5, C_TEXT_DIM, false);
     }
 
     private void renderKeybindPrompt(GuiGraphicsExtractor g) {
@@ -480,7 +549,7 @@ public class ClickGuiScreen extends Screen {
         int bx = this.width / 2 - w / 2, by = 4;
         Component.drawRoundedRect(   g, bx, by, w, 15, 0xFF0A0A0A);
         Component.drawRoundedOutline(g, bx, by, w, 15, C_ACCENT);
-        g.text(this.font, msg, bx + 4, by + 4, C_BIND_PULSE, false);
+        UISettings.drawText(g, this.font, msg, bx + 4, by + 4, C_BIND_PULSE, false);
     }
 
     private void renderTooltip(GuiGraphicsExtractor g, String desc, int mx, int my) {
@@ -502,7 +571,7 @@ public class ClickGuiScreen extends Screen {
         Component.drawRoundedOutline(g, tx - pad, ty - pad, tw + pad * 2, totalH, C_ACCENT);
 
         int cy = ty;
-        for (var l : lines) { g.text(this.font, l.getString(), tx, cy, C_TEXT); cy += lh; }
+        for (var l : lines) { UISettings.drawText(g, this.font, l.getString(), tx, cy, C_TEXT); cy += lh; }
     }
 
     private static final Map<Integer, String> KEY_NAMES = new HashMap<>();
@@ -537,6 +606,17 @@ public class ClickGuiScreen extends Screen {
         int mx = (int) event.x(), my = (int) event.y(), btn = event.button();
 
         if (selectedModule == null) {
+            int gSize = UISettings.scaled(SETTINGS_BTN_SIZE);
+            int gx = this.width / 2 - gSize / 2;
+            int gy = SETTINGS_BTN_Y;
+            if (btn == 0 && mx >= gx && mx <= gx + gSize && my >= gy && my <= gy + gSize) {
+                selectedModule = UISettingsModule.getInstance();
+                bindingModule = null;
+                settingsScrollOffset = 0;
+                playGuiSound(1.2f, 0.3f);
+                return true;
+            }
+
             if (btn == 0) {
                 for (Module.Category cat : Module.Category.values()) {
                     int[] pos = panelPos.getOrDefault(cat, new int[]{START_X, START_Y});

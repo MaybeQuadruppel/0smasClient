@@ -4,6 +4,7 @@ import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import com.OsamaClient.newbridge.UI.components.*;
+import com.OsamaClient.newbridge.Utils.TeamUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -23,6 +24,7 @@ public class TriggerBot extends Module {
     public double cps = 10.0;
     public double range = 3.5;
     public double randomize = 2.0;
+    public boolean ignoreTeammates = true;
     public EntityFilterPicker entityFilter;
 
     private long nextAttackTime = 0;
@@ -37,6 +39,7 @@ public class TriggerBot extends Module {
         this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val).withDescription("Maximum distance to trigger attacks."));
         this.settings.add(new Slider("Randomize", 0.0, 5.0, randomize, val -> randomize = val).withDescription("Adds randomness to attack timings to mimic human behavior."));
         this.settings.add(this.entityFilter);
+        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents attacking teammates."));
     }
 
     public void onTick(Minecraft client) {
@@ -65,7 +68,10 @@ public class TriggerBot extends Module {
         if (dist > range) return false;
         if (!target.isAlive() || target == client.player) return false;
 
-        // Prüfen, ob der jeweilige Typ im Dropdown aktiviert ist
+        if (ignoreTeammates && TeamUtils.isTeammate(target)) {
+            return false;
+        }
+
         if (entityFilter.isFilterEnabled("Players") && target instanceof Player) return true;
         if (entityFilter.isFilterEnabled("Hostiles") && target instanceof Enemy) return true;
         if (entityFilter.isFilterEnabled("Animals") && target instanceof Animal) return true;
