@@ -32,15 +32,15 @@ import java.util.Set;
  */
 public class ModernClickGuiScreen extends Screen {
 
-    // Basis-Layout (über UISettings.modernScaled() skaliert)
-    private static final int PANEL_W  = 116;
-    private static final int HEADER_H = 14;
-    private static final int ROW_H    = 13;
-    private static final int PAD      = 6;
-    private static final int SET_GAP  = 3;
-    private static final int PANEL_GAP = 8;
-    private static final int TOP      = 16;
-    private static final int OPEN_ANIM_MS = 160;
+    // Basis-Layout (über UISettings.modernScaled() skaliert) – bewusst kompakt
+    private static final int PANEL_W  = 94;
+    private static final int HEADER_H = 13;
+    private static final int ROW_H    = 12;
+    private static final int PAD      = 5;
+    private static final int SET_GAP  = 2;
+    private static final int PANEL_GAP = 6;
+    private static final int TOP      = 14;
+    private static final int OPEN_ANIM_MS = 150;
 
     /** Persistenter Panel-Zustand (Position/Collapsed) – über Sessions geteilt. */
     public static final class PanelState {
@@ -178,21 +178,16 @@ public class ModernClickGuiScreen extends Screen {
         int bodyH = st.collapsed ? 0 : Math.min(bodyHeight(c, contentW), maxBodyHeight(st));
         int totalH = headerH + bodyH;
 
-        // Panel-Körper
-        Component.roundRect(g, px, py, pw, totalH, ms(3), UISettings.withPanelAlpha(p.bg));
+        // Panel-Körper (scharf, 1px)
+        g.fill(px, py, px + pw, py + totalH, UISettings.withPanelAlpha(p.bg));
 
-        // Header
-        boolean headerHov = inRect(mouseX, mouseY, px, py, pw, headerH);
-        Component.roundRect(g, px, py, pw, headerH, ms(3),
-                UISettings.withPanelAlpha(headerHov ? p.bgHover : Theme.darken(p.bg, 0.1f)));
-        g.fill(px, py + headerH - Math.max(1, ms(1)), px + pw, py + headerH, p.accent);
-        UISettings.drawText(g, this.font, prettyCategory(c),
-                px + ms(PAD), py + (headerH - ms(8)) / 2, p.text, false);
-        // Collapse-Symbol rechts
-        String sym = st.collapsed ? "+" : "–";
-        int symW = UISettings.textWidth(this.font, sym);
-        UISettings.drawText(g, this.font, sym,
-                px + pw - ms(PAD) - symW, py + (headerH - ms(8)) / 2, p.textDim, false);
+        // Header: Titel zentriert + Akzent-Unterstrich
+        g.fill(px, py, px + pw, py + headerH, UISettings.withPanelAlpha(Theme.darken(p.bg, 0.25f)));
+        g.fill(px, py + headerH - 1, px + pw, py + headerH, p.accent);
+        String title = prettyCategory(c);
+        int tw = UISettings.textWidth(this.font, title);
+        UISettings.drawText(g, this.font, title,
+                px + (pw - tw) / 2, py + (headerH - ms(7)) / 2, p.accent, false);
 
         if (st.collapsed) return;
 
@@ -200,34 +195,24 @@ public class ModernClickGuiScreen extends Screen {
         int bodyX = px, bodyY = py + headerH, bodyW = pw;
         g.enableScissor(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH);
         int contentX = px + ms(PAD);
-        int y = bodyY + ms(2) - (int) st.scroll;
+        int y = bodyY + ms(1) - (int) st.scroll;
 
         for (Module m : modulesOf(c)) {
             int rowH = ms(ROW_H);
             boolean rowHov = inRect(mouseX, mouseY, px, y, pw, rowH) && mouseY >= bodyY && mouseY <= bodyY + bodyH;
-            boolean exp = expanded.contains(m);
 
-            if (m.enabled) {
-                g.fill(px, y, px + ms(2), y + rowH, p.accent); // Akzent-Balken links
-                Component.roundRect(g, contentX - ms(2), y, contentW + ms(4), rowH, ms(2),
-                        UISettings.withPanelAlpha(Theme.lighten(p.bg, 0.06f)));
-            } else if (rowHov) {
-                Component.roundRect(g, contentX - ms(2), y, contentW + ms(4), rowH, ms(2),
-                        UISettings.withPanelAlpha(p.bgHover));
+            if (rowHov) {
+                g.fill(px, y, px + pw, y + rowH, Component.withAlpha(p.bgHover, 0.5f));
             }
 
+            // Modulname zentriert, Farbe nach Zustand (an = Akzent)
+            int col = m.enabled ? p.accent : (rowHov ? p.text : p.textDim);
+            int mw = UISettings.textWidth(this.font, m.name);
             UISettings.drawText(g, this.font, m.name,
-                    contentX, y + (rowH - ms(8)) / 2,
-                    m.enabled ? p.text : (rowHov ? p.text : p.textDim), false);
-            // Aufklapp-Dreieck rechts
-            String tri = exp ? "▾" : "▸";
-            int triW = UISettings.textWidth(this.font, tri);
-            UISettings.drawText(g, this.font, tri,
-                    px + pw - ms(PAD) - triW, y + (rowH - ms(8)) / 2,
-                    exp ? p.accent : p.textDim, false);
+                    px + (pw - mw) / 2, y + (rowH - ms(7)) / 2, col, false);
             y += rowH;
 
-            if (exp) {
+            if (expanded.contains(m)) {
                 for (Component comp : m.settings) {
                     comp.width = contentW;
                     comp.x = contentX;
@@ -291,14 +276,9 @@ public class ModernClickGuiScreen extends Screen {
         int px = (int) st.x, py = (int) st.y;
         int pw = ms(PANEL_W), headerH = ms(HEADER_H);
 
-        // Header?
+        // Header ziehen (verschieben)
         if (inRect(mx, my, px, py, pw, headerH)) {
-            int symW = UISettings.textWidth(this.font, "–");
-            boolean onCollapse = mx >= px + pw - ms(PAD) - symW - ms(3);
-            if (button == 0 && onCollapse) {
-                st.collapsed = !st.collapsed;
-                ClickGuiScreen.playGuiSound(st.collapsed ? 0.8f : 1.1f, 0.2f);
-            } else if (button == 0) {
+            if (button == 0) {
                 dragCategory = c;
                 dragOffX = mx - st.x;
                 dragOffY = my - st.y;
@@ -306,22 +286,18 @@ public class ModernClickGuiScreen extends Screen {
             return true;
         }
 
-        if (st.collapsed) return false;
-
         int bodyH = Math.min(bodyHeight(c, pw - ms(PAD) * 2), maxBodyHeight(st));
         int bodyY = py + headerH;
         if (!inRect(mx, my, px, bodyY, pw, bodyH)) return false;
 
         int contentX = px + ms(PAD), contentW = pw - ms(PAD) * 2;
-        int y = bodyY + ms(2) - (int) st.scroll;
+        int y = bodyY + ms(1) - (int) st.scroll;
 
         for (Module m : modulesOf(c)) {
             int rowH = ms(ROW_H);
-            boolean inRow = my >= y && my < y + rowH && my >= bodyY && my <= bodyY + bodyH;
 
-            // Zuerst Klicks an aufgeklappte Widgets weiterreichen
+            // Klicks zuerst an aufgeklappte Widgets weiterreichen
             if (expanded.contains(m)) {
-                // Widget-Positionen wurden im letzten render() gesetzt
                 for (Component comp : m.settings) {
                     if (my >= bodyY && my <= bodyY + bodyH && comp.mouseClicked(mx, my, button)) {
                         return true;
@@ -329,23 +305,17 @@ public class ModernClickGuiScreen extends Screen {
                 }
             }
 
+            boolean inRow = my >= y && my < y + rowH && my >= bodyY && my <= bodyY + bodyH;
             if (inRow) {
-                String tri = "▸";
-                int triW = UISettings.textWidth(this.font, tri);
-                boolean onTri = mx >= px + pw - ms(PAD) - triW - ms(3);
-                if (button == 0 && onTri) {
-                    if (!expanded.add(m)) expanded.remove(m);
-                    ClickGuiScreen.playGuiSound(1.1f, 0.2f);
-                    return true;
-                }
-                if (button == 0) {
+                if (button == 0) {                       // Linksklick = Modul an/aus
                     m.toggle();
                     ClickGuiScreen.playGuiSound(m.enabled ? 1.05f : 0.8f, 0.25f);
                     Config.save();
                     return true;
                 }
-                if (button == 1) { // Rechtsklick = Settings aufklappen
+                if (button == 1) {                       // Rechtsklick = Einstellungen auf/zu
                     if (!expanded.add(m)) expanded.remove(m);
+                    ClickGuiScreen.playGuiSound(1.1f, 0.2f);
                     return true;
                 }
             }

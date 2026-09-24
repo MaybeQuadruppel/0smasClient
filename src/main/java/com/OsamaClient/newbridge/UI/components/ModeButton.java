@@ -17,9 +17,10 @@ public class ModeButton extends Component {
     private final Consumer<String> onChange;
 
     private float hoverAnim = 0f;
-    private float changeFlash = 0f; // kurzes Aufblitzen beim Wechsel
+    private boolean expanded = false;
 
-    private static final int BASE_HEIGHT = 14;
+    private static final int BASE_HEIGHT = 11; // Kopfzeile
+    private static final int OPTION_H = 10;
 
     public ModeButton(String label, List<String> modes, int startIndex, Consumer<String> onChange) {
         super(0, 0, 100, BASE_HEIGHT);
@@ -35,54 +36,95 @@ public class ModeButton extends Component {
         return this;
     }
 
+    private int rowH()   { return UISettings.scaled(BASE_HEIGHT); }
+    private int optH()   { return UISettings.scaled(OPTION_H); }
+
     @Override
     public void render(Object graphics, int mouseX, int mouseY) {
         if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
 
-        syncHeight(BASE_HEIGHT, UISettings.scaled(BASE_HEIGHT));
+        if (this.width <= 0) this.width = UISettings.scaled(baseWidth);
+        int rowH = rowH();
+        this.baseHeight = BASE_HEIGHT;
+        this.height = expanded ? rowH + modes.size() * optH() : rowH;
 
         Theme.Palette p = Theme.getActive().palette;
-        hoverAnim   = approach(hoverAnim, isHovered(mouseX, mouseY) ? 1f : 0f, 0.25f);
-        changeFlash = approach(changeFlash, 0f, 0.12f);
+        boolean headerHov = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + rowH;
+        hoverAnim = approach(hoverAnim, headerHov ? 1f : 0f, 0.3f);
 
-        drawRoundedRect(guiGraphics, x, y, width, height,
-                UISettings.withPanelAlpha(lerpColor(p.bg, p.bgHover, hoverAnim * 0.8f)));
+        int pad = UISettings.scaled(3);
+        int textY = y + (rowH - UISettings.scaled(7)) / 2;
 
-        int textOffsetY = UISettings.scaled(4);
-        String valText = modes.get(index) + " \u203A";
-        int valWidth = UISettings.textWidth(Minecraft.getInstance().font, valText);
-        int valStartX = x + width - valWidth - UISettings.scaled(6);
+        if (hoverAnim > 0.01f) {
+            guiGraphics.fill(x, y, x + width, y + rowH, withAlpha(p.bgHover, hoverAnim * 0.4f));
+        }
 
-        // Label links
-        guiGraphics.enableScissor(x + 1, y + 1, Math.max(x + 1, valStartX - 2), y + height - 1);
-        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
-                x + UISettings.scaled(6), y + (height / 2) - textOffsetY,
-                lerpColor(p.textDim, p.text, hoverAnim), false);
+        // Kopfzeile: "Label: Value"  (Wert rechtsb\u00FCndig, Akzent)
+        String valText = modes.get(index);
+        int valW = UISettings.textWidth(Minecraft.getInstance().font, valText);
+        int valX = x + width - pad - valW;
+        guiGraphics.enableScissor(x + pad, y, Math.max(x + pad, valX - UISettings.scaled(2)), y + rowH);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label + ":",
+                x + pad, textY, lerpColor(p.textDim, p.text, hoverAnim), false);
         guiGraphics.disableScissor();
-
-        // Aktueller Modus rechts (Akzent, blitzt beim Wechsel kurz auf)
-        guiGraphics.enableScissor(Math.max(x + 1, valStartX - 2), y + 1, x + width - 1, y + height - 1);
-        int valColor = lerpColor(lerpColor(p.textDim, p.accent, 0.5f + hoverAnim * 0.5f), p.text, changeFlash);
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, valText,
-                valStartX, y + (height / 2) - textOffsetY, valColor, false);
-        guiGraphics.disableScissor();
+                valX, textY, lerpColor(p.accent, p.text, hoverAnim * 0.4f), false);
+
+        if (!expanded) return;
+
+        // Aufgeklappte Optionsliste
+        int oy = y + rowH;
+        int oh = optH();
+        for (int i = 0; i < modes.size(); i++) {
+            boolean sel = i == index;
+            boolean oHov = mouseX >= x && mouseX <= x + width && mouseY >= oy && mouseY <= oy + oh;
+            if (oHov && !sel) {
+                guiGraphics.fill(x, oy, x + width, oy + oh, withAlpha(p.bgHover, 0.4f));
+            }
+            if (sel) {
+                guiGraphics.fill(x, oy, x + UISettings.scaled(1), oy + oh, p.accent); // Cursor links
+            }
+            int otY = oy + (oh - UISettings.scaled(7)) / 2;
+            guiGraphics.enableScissor(x + pad + UISettings.scaled(3), oy, x + width - pad, oy + oh);
+            UISettings.drawText(guiGraphics, Minecraft.getInstance().font, modes.get(i),
+                    x + pad + UISettings.scaled(3), otY,
+                    sel ? p.accent : (oHov ? p.text : p.textDim), false);
+            guiGraphics.disableScissor();
+            oy += oh;
+        }
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY)) {
-            if (button == 0) {
-                index = (index + 1) % modes.size();
+        int rowH = rowH();
+        boolean inHeader = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + rowH;
+
+        if (inHeader) {
+            if (button == 0) {              // Liste auf/zu
+                expanded = !expanded;
                 Sounds.select();
-            } else if (button == 1) {
-                index = (index - 1 + modes.size()) % modes.size();
-                Sounds.deselect();
-            } else {
-                return false;
+                return true;
             }
-            changeFlash = 1f;
-            onChange.accept(modes.get(index));
-            return true;
+            if (button == 1) {              // Schnell-Zyklus rückwärts
+                index = (index - 1 + modes.size()) % modes.size();
+                onChange.accept(modes.get(index));
+                Sounds.deselect();
+                return true;
+            }
+            return false;
+        }
+
+        if (expanded && button == 0) {      // Option in der Liste wählen
+            int oy = y + rowH, oh = optH();
+            for (int i = 0; i < modes.size(); i++) {
+                if (mouseX >= x && mouseX <= x + width && mouseY >= oy && mouseY <= oy + oh) {
+                    index = i;
+                    onChange.accept(modes.get(index));
+                    Sounds.select();
+                    return true;
+                }
+                oy += oh;
+            }
         }
         return false;
     }

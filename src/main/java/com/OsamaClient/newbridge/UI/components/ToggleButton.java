@@ -17,7 +17,7 @@ public class ToggleButton extends Component {
     private float toggleAnim;
     private float hoverAnim;
 
-    private static final int BASE_HEIGHT = 14;
+    private static final int BASE_HEIGHT = 11;
 
     public ToggleButton(String label, boolean startValue, Consumer<Boolean> callback) {
         super(0, 0, 100, BASE_HEIGHT);
@@ -40,34 +40,33 @@ public class ToggleButton extends Component {
         syncHeight(BASE_HEIGHT, UISettings.scaled(BASE_HEIGHT));
 
         Theme.Palette p = Theme.getActive().palette;
+        hoverAnim  = approach(hoverAnim, isHovered(mouseX, mouseY) ? 1f : 0f, 0.3f);
+        toggleAnim = approach(toggleAnim, enabled ? 1f : 0f, 0.3f);
 
-        hoverAnim  = approach(hoverAnim, isHovered(mouseX, mouseY) ? 1f : 0f, 0.25f);
-        toggleAnim = approach(toggleAnim, enabled ? 1f : 0f, 0.22f);
+        if (hoverAnim > 0.01f) {
+            guiGraphics.fill(x, y, x + width, y + height,
+                    withAlpha(p.bgHover, hoverAnim * 0.5f));
+        }
 
-        drawRoundedRect(guiGraphics, x, y, width, height,
-                UISettings.withPanelAlpha(lerpColor(p.bg, p.bgHover, hoverAnim * 0.8f)));
+        // Kleine Checkbox links
+        int box = Math.max(5, UISettings.scaled(7));
+        int bx = x + UISettings.scaled(3);
+        int by = y + (height - box) / 2;
+        int frame = lerpColor(p.border, p.accent, toggleAnim);
+        drawRoundedOutline(guiGraphics, bx, by, box, box, frame);
+        if (toggleAnim > 0.01f) {
+            int inset = Math.round((1f - toggleAnim) * ((box - 2) / 2f));
+            guiGraphics.fill(bx + 1 + inset, by + 1 + inset,
+                    bx + box - 1 - inset, by + box - 1 - inset, p.accent);
+        }
 
-        final int TRACK_W = Math.max(14, UISettings.scaled(18));
-        final int TRACK_H = Math.max(6, UISettings.scaled(8));
-        int trackX = x + width - TRACK_W - UISettings.scaled(6);
-        int trackY = y + (height - TRACK_H) / 2;
-
-        guiGraphics.enableScissor(x + 1, y + 1, Math.max(x + 1, trackX - 3), y + height - 1);
+        // Label rechts daneben (geclippt, damit nichts überlappt)
+        int textX = bx + box + UISettings.scaled(4);
+        guiGraphics.enableScissor(textX, y, x + width - UISettings.scaled(2), y + height);
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
-                x + UISettings.scaled(6), y + (height / 2) - UISettings.scaled(4),
-                lerpColor(p.textDim, p.text, Math.max(hoverAnim, toggleAnim * 0.8f)), false);
+                textX, y + (height - UISettings.scaled(7)) / 2,
+                lerpColor(p.textDim, p.text, Math.max(hoverAnim, toggleAnim)), false);
         guiGraphics.disableScissor();
-
-        // Pillen-Track (voll rund), Farbe interpoliert aus/ein
-        int trackColor = lerpColor(UISettings.withPanelAlpha(p.disabled), p.accent, toggleAnim);
-        roundRect(guiGraphics, trackX, trackY, TRACK_W, TRACK_H, TRACK_H / 2, trackColor);
-
-        // Runder Knopf, gleitet weich
-        int thumbR = TRACK_H / 2 - 1;
-        int travel = TRACK_W - (thumbR * 2) - 2;
-        int cx = trackX + 1 + thumbR + Math.round(toggleAnim * travel);
-        int cy = trackY + TRACK_H / 2;
-        roundRect(guiGraphics, cx - thumbR, cy - thumbR, thumbR * 2, thumbR * 2, thumbR, p.text);
     }
 
     @Override

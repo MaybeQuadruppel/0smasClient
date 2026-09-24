@@ -123,11 +123,11 @@ public abstract class Component {
         drawShadow(g, x, y, w, h, 0x66000000);
     }
 
-    /** Standard-Eckenradius, skalenabhängig. */
+    /** Standard-Eckenradius. Bewusst 0 = scharfe, pixelgenaue Rechtecke
+     *  (klassischer ClickGUI-Look). Die Näherung über Randbänder sah bei den
+     *  kleinen Widgets "verpixelt" aus, deshalb rendern wir crisp. */
     private static int defaultRadius(int w, int h) {
-        if (!UISettings.roundedCorners) return 0;
-        int r = Math.max(2, UISettings.scaled(3));
-        return Math.min(r, Math.min(w, h) / 2);
+        return 0;
     }
 
     /** Horizontaler Einzug einer Zeile innerhalb eines Eckradius (Viertelkreis). */

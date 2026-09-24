@@ -22,7 +22,7 @@ public class ButtonComponent extends Component {
     private float hoverAnim = 0f;
     private float pressAnim = 0f;
 
-    private static final int BASE_HEIGHT = 14;
+    private static final int BASE_HEIGHT = 11;
 
     public ButtonComponent(String label, Runnable onClick) {
         super(0, 0, 100, BASE_HEIGHT);

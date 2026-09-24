@@ -24,9 +24,9 @@ public class Slider extends Component {
     private long lastClickMs = 0L;
     private static final long DOUBLE_CLICK_MS = 300L;
 
-    private static final int BASE_HEIGHT = 17;
-    private static final int TRACK_INSET_X = 6;
-    private static final int TRACK_H = 3;
+    private static final int BASE_HEIGHT = 12;
+    private static final int TRACK_INSET_X = 3;
+    private static final int TRACK_H = 1;
 
     // Animationszustände (weich interpoliert pro Frame)
     private float animPct = -1f;   // -1 = noch nicht initialisiert
@@ -78,10 +78,8 @@ public class Slider extends Component {
 
         syncHeight(BASE_HEIGHT, UISettings.scaled(BASE_HEIGHT));
 
-        int insetX = Math.max(2, UISettings.scaled(TRACK_INSET_X));
-        int trackH = Math.max(2, UISettings.scaled(TRACK_H));
-        int textPadX = Math.max(2, UISettings.scaled(6));
-        int textPadY = Math.max(1, UISettings.scaled(4));
+        int insetX = Math.max(1, UISettings.scaled(TRACK_INSET_X));
+        int trackH = Math.max(1, UISettings.scaled(TRACK_H));
 
         Theme.Palette p = Theme.getActive().palette;
 
@@ -91,49 +89,41 @@ public class Slider extends Component {
             applyValue(min + (diff / usable) * (max - min));
         }
 
-        hoverAnim = approach(hoverAnim, isHovered(mouseX, mouseY) ? 1f : 0f, 0.25f);
+        hoverAnim = approach(hoverAnim, isHovered(mouseX, mouseY) ? 1f : 0f, 0.3f);
 
         float targetPct = (max > min) ? (float) ((value - min) / (max - min)) : 0f;
-        animPct = animPct < 0f ? targetPct : approach(animPct, targetPct, 0.35f);
+        animPct = animPct < 0f ? targetPct : approach(animPct, targetPct, 0.4f);
 
-        // Hintergrund (dezent, nur bei Hover leicht heller) – kein Rahmen für cleanen Look
-        drawRoundedRect(guiGraphics, x, y, width, height,
-                UISettings.withPanelAlpha(lerpColor(p.bg, p.bgHover, hoverAnim * 0.8f)));
-        if (focused) drawRoundedOutline(guiGraphics, x, y, width, height,
-                withAlpha(p.accent, 0.7f));
-
-        int trackX = x + insetX;
-        int trackW = width - insetX * 2;
-        int trackY = y + height - trackH - Math.max(2, UISettings.scaled(4));
-
-        // Label links, Wert rechts (rechtsbündig)
-        String valStr = formatValue(value);
-        int valW = UISettings.textWidth(Minecraft.getInstance().font, valStr);
-        guiGraphics.enableScissor(x + 1, y + 1, x + width - 1, Math.max(y + 1, trackY));
-        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
-                x + textPadX, y + textPadY, lerpColor(p.textDim, p.text, hoverAnim), false);
-        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, valStr,
-                x + width - textPadX - valW, y + textPadY,
-                lerpColor(p.textDim, p.accent, 0.4f + hoverAnim * 0.6f), false);
-        guiGraphics.disableScissor();
-
-        // Track + animierter Fill
-        roundRect(guiGraphics, trackX, trackY, trackW, trackH, trackH / 2, p.disabled);
-        int fillW = Math.max(0, Math.round(animPct * trackW));
-        if (fillW > 0) {
-            roundRect(guiGraphics, trackX, trackY, fillW, trackH, trackH / 2,
-                    lerpColor(p.accent, p.text, hoverAnim * 0.35f));
+        if (hoverAnim > 0.01f) {
+            guiGraphics.fill(x, y, x + width, y + height,
+                    withAlpha(p.bgHover, hoverAnim * 0.4f));
         }
 
-        // Kreisförmiger Thumb, wächst leicht bei Hover/Drag
-        int baseR = Math.max(2, UISettings.scaled(3));
-        int grow = Math.round((hoverAnim + (dragging ? 1f : 0f)) * UISettings.scaled(1));
-        int r = baseR + Math.min(UISettings.scaled(2), grow);
-        int cx = trackX + fillW;
-        int cy = trackY + trackH / 2;
-        cx = Math.max(trackX + r, Math.min(trackX + trackW - r, cx));
-        roundRect(guiGraphics, cx - r, cy - r, r * 2, r * 2, r, p.text);
-        roundRect(guiGraphics, cx - r + 1, cy - r + 1, (r - 1) * 2, (r - 1) * 2, r - 1, p.accent);
+        // "Label: value" – Label links, Wert rechts, mit Scissor gegen Überlappung
+        String valStr = formatValue(value);
+        int valW = UISettings.textWidth(Minecraft.getInstance().font, valStr);
+        int textY = y + UISettings.scaled(1);
+        int valX = x + width - insetX - valW;
+        guiGraphics.enableScissor(x + insetX, y, Math.max(x + insetX, valX - UISettings.scaled(2)), y + height);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
+                x + insetX, textY, lerpColor(p.textDim, p.text, hoverAnim), false);
+        guiGraphics.disableScissor();
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, valStr,
+                valX, textY, lerpColor(p.accent, p.text, hoverAnim * 0.4f), false);
+
+        // Dünne Underline-Track + animierter Fill + kleiner Marker
+        int trackX = x + insetX;
+        int trackW = width - insetX * 2;
+        int trackY = y + height - trackH - UISettings.scaled(2);
+        guiGraphics.fill(trackX, trackY, trackX + trackW, trackY + trackH, p.disabled);
+        int fillW = Math.max(0, Math.round(animPct * trackW));
+        if (fillW > 0) {
+            guiGraphics.fill(trackX, trackY, trackX + fillW, trackY + trackH, p.accent);
+        }
+        int markerW = Math.max(1, UISettings.scaled(1));
+        int markerH = trackH + UISettings.scaled(2);
+        int mxPos = Math.max(trackX, Math.min(trackX + trackW - markerW, trackX + fillW - markerW / 2));
+        guiGraphics.fill(mxPos, trackY - UISettings.scaled(1), mxPos + markerW, trackY - UISettings.scaled(1) + markerH, p.text);
     }
 
     private String formatValue(double v) {

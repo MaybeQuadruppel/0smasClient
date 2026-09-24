@@ -72,6 +72,10 @@ public class ColorPicker extends Component {
 
     private boolean hexFocused = false;
     private String hexInput = "";     // ohne '#', während der Eingabe
+    private boolean collapsed = true; // eingeklappt: nur "Label + Swatch"
+    private float hoverAnim = 0f;
+
+    private int headerH() { return UISettings.scaled(12); }
 
     public ColorPicker(String label, int defaultColor, Consumer<Integer> onChange) {
         super(0, 0, BASE_W, BASE_H);
@@ -173,29 +177,38 @@ public class ColorPicker extends Component {
     public void render(Object graphics, int mouseX, int mouseY) {
         if (!(graphics instanceof GuiGraphicsExtractor g)) return;
 
-        syncHeight(baseHeight, UISettings.scaled(baseHeight));
         Theme.Palette p = Theme.getActive().palette;
+        if (this.width <= 0) this.width = UISettings.scaled(baseWidth);
+        this.baseHeight = baseHeight;
+        int headH = headerH();
+        this.height = collapsed ? headH : Math.max(headH, UISettings.scaled(baseHeight));
 
-        // Live-Drag anwenden (framegenau, wie beim alten Picker)
+        boolean headerHov = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + headH;
+        hoverAnim = approach(hoverAnim, headerHov ? 1f : 0f, 0.3f);
+
+        // Kopfzeile: "Label" links + Swatch rechts (klickbar zum Auf-/Zuklappen)
+        if (hoverAnim > 0.01f) {
+            g.fill(x, y, x + width, y + headH, withAlpha(p.bgHover, hoverAnim * 0.4f));
+        }
+        int pad = UISettings.scaled(PAD);
+        UISettings.drawText(g, Minecraft.getInstance().font, label,
+                x + pad, y + (headH - UISettings.scaled(7)) / 2,
+                lerpColor(p.textDim, p.text, hoverAnim), false);
+        int pvW = UISettings.scaled(12), pvH = Math.max(4, headH - UISettings.scaled(4));
+        int pvX = x + width - pvW - pad, pvY = y + (headH - pvH) / 2;
+        drawChecker(g, pvX, pvY, pvW, pvH);
+        g.fill(pvX, pvY, pvX + pvW, pvY + pvH, color);
+        drawRoundedOutline(g, pvX, pvY, pvW, pvH, p.border);
+
+        if (collapsed) return;
+
+        // Live-Drag anwenden (nur im aufgeklappten Zustand)
         switch (dragging) {
             case SV    -> applySV(mouseX, mouseY);
             case HUE   -> applyHue(mouseY);
             case ALPHA -> applyAlpha(mouseY);
             default -> {}
         }
-
-        // Panel
-        drawRoundedRect(g, x, y, width, height, UISettings.withPanelAlpha(p.bg));
-        drawRoundedOutline(g, x, y, width, height, p.border);
-
-        // Label + Vorschau-Swatch oben rechts
-        UISettings.drawText(g, Minecraft.getInstance().font, label,
-                x + UISettings.scaled(PAD), y + UISettings.scaled(4), p.accent, false);
-        int pvW = UISettings.scaled(14), pvH = UISettings.scaled(10);
-        int pvX = x + width - pvW - UISettings.scaled(PAD), pvY = y + UISettings.scaled(4);
-        drawChecker(g, pvX, pvY, pvW, pvH);
-        drawRoundedRect(g, pvX, pvY, pvW, pvH, color);
-        drawRoundedOutline(g, pvX, pvY, pvW, pvH, p.border);
 
         renderSvSquare(g, p);
         renderHueBar(g);
@@ -339,6 +352,14 @@ public class ColorPicker extends Component {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Kopfzeile klicken = auf-/zuklappen
+        if (button == 0 && inRect(mouseX, mouseY, x, y, width, headerH())) {
+            collapsed = !collapsed;
+            Sounds.select();
+            return true;
+        }
+        if (collapsed) return false;
+
         if (button == 0) {
             if (inRect(mouseX, mouseY, svX(), svY(), svW(), svH())) {
                 dragging = Drag.SV; applySV(mouseX, mouseY); Sounds.select(); return true;
