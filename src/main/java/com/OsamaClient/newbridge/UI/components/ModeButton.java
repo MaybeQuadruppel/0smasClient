@@ -59,16 +59,16 @@ public class ModeButton extends Component {
             guiGraphics.fill(x, y, x + width, y + rowH, withAlpha(p.bgHover, hoverAnim * 0.4f));
         }
 
-        // Kopfzeile: "Label: Value"  (Wert rechtsb\u00FCndig, Akzent)
+        // Kopfzeile inline: "Label: Value" (Wert in Akzent)
+        String labStr = label + ": ";
         String valText = modes.get(index);
-        int valW = UISettings.textWidth(Minecraft.getInstance().font, valText);
-        int valX = x + width - pad - valW;
-        guiGraphics.enableScissor(x + pad, y, Math.max(x + pad, valX - UISettings.scaled(2)), y + rowH);
-        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label + ":",
+        int labW = UISettings.textWidth(Minecraft.getInstance().font, labStr);
+        guiGraphics.enableScissor(x + pad, y, x + width - pad, y + rowH);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, labStr,
                 x + pad, textY, lerpColor(p.textDim, p.text, hoverAnim), false);
-        guiGraphics.disableScissor();
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, valText,
-                valX, textY, lerpColor(p.accent, p.text, hoverAnim * 0.4f), false);
+                x + pad + labW, textY, lerpColor(p.accent, p.text, hoverAnim * 0.4f), false);
+        guiGraphics.disableScissor();
 
         if (!expanded) return;
 

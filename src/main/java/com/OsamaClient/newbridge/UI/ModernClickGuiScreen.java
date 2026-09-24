@@ -33,7 +33,7 @@ import java.util.Set;
 public class ModernClickGuiScreen extends Screen {
 
     // Basis-Layout (über UISettings.modernScaled() skaliert) – bewusst kompakt
-    private static final int PANEL_W  = 94;
+    private static final int PANEL_W  = 100;
     private static final int HEADER_H = 13;
     private static final int ROW_H    = 12;
     private static final int PAD      = 5;

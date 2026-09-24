@@ -99,17 +99,17 @@ public class Slider extends Component {
                     withAlpha(p.bgHover, hoverAnim * 0.4f));
         }
 
-        // "Label: value" – Label links, Wert rechts, mit Scissor gegen Überlappung
+        // Inline "Label: value" (Wert in Akzent) – wie im Referenz-Look
+        String labStr = label + ": ";
         String valStr = formatValue(value);
-        int valW = UISettings.textWidth(Minecraft.getInstance().font, valStr);
+        int labW = UISettings.textWidth(Minecraft.getInstance().font, labStr);
         int textY = y + UISettings.scaled(1);
-        int valX = x + width - insetX - valW;
-        guiGraphics.enableScissor(x + insetX, y, Math.max(x + insetX, valX - UISettings.scaled(2)), y + height);
-        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
+        guiGraphics.enableScissor(x + insetX, y, x + width - insetX, y + height);
+        UISettings.drawText(guiGraphics, Minecraft.getInstance().font, labStr,
                 x + insetX, textY, lerpColor(p.textDim, p.text, hoverAnim), false);
-        guiGraphics.disableScissor();
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, valStr,
-                valX, textY, lerpColor(p.accent, p.text, hoverAnim * 0.4f), false);
+                x + insetX + labW, textY, lerpColor(p.accent, p.text, hoverAnim * 0.4f), false);
+        guiGraphics.disableScissor();
 
         // Dünne Underline-Track + animierter Fill + kleiner Marker
         int trackX = x + insetX;
