@@ -31,20 +31,31 @@ public final class ChamsBufferSource {
     }
 
     public void uploadAndDraw() {
-        try {
-            if (draws.isEmpty()) return;
+        if (draws.isEmpty()) return;
 
+        try {
             stagedBuffer.upload();
 
             for (int i = 0; i < draws.size(); i++) {
                 draw(drawTypes.get(i), draws.get(i));
             }
-
-            stagedBuffer.endDraw();
         } finally {
+            // Bugfix (Absturz nach ~20 min): Vorher wurde nur endDraw() aufgerufen.
+            // Die GPU-Buffer-Pools im StagedVertexBuffer geben ihre Buffer aber erst
+            // in endFrame() zum Recycling frei (wie Vanilla RenderBuffers.endFrame()).
+            // Ohne endFrame() wurde bei JEDEM upload() ein neuer GPU-Buffer erzeugt
+            // und in "usedThisFrame" für immer festgehalten -> VRAM/Native-Leak.
+            // endFrame() ruft endDraw() selbst auf und läuft jetzt auch bei Exceptions.
+            stagedBuffer.endFrame();
             draws.clear();
             drawTypes.clear();
         }
+    }
+
+    public void close() {
+        draws.clear();
+        drawTypes.clear();
+        stagedBuffer.close();
     }
 
     private void draw(RenderType type, StagedVertexBuffer.Draw draw) {

@@ -38,6 +38,8 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -58,6 +60,8 @@ public class PlayerESP extends Module {
 
     // --- SKELETON CACHES & FIELDS ---
     private final ChamsBufferSource bufferSource = new ChamsBufferSource();
+    private final List<LivingEntity> targets = new ArrayList<>();
+    private int[] targetColors = new int[64];
     private static final Map<Entity, LivingEntityRenderState> STATE_CACHE = new WeakHashMap<>();
     private static final Map<ModelPart, Map<String, ModelPart>> CHILDREN_CACHE = new WeakHashMap<>();
     private static final Map<ModelPart, Vector3f> LOCAL_CENTER_CACHE = new WeakHashMap<>();
@@ -143,6 +147,8 @@ public class PlayerESP extends Module {
         boolean drawOutline = (renderMode.equals("Outline") || renderMode.equals("Both")) && !renderMode.equals("None");
         boolean drawSkeleton = renderMode.equals("Skeleton");
 
+        collectTargets(client);
+        if (targets.isEmpty()) return;
 
         float startX = 0f, startY = 0f, startZ = 0f;
         if (renderTracers) {
@@ -160,60 +166,32 @@ public class PlayerESP extends Module {
             startZ = dirZ * offset;
         }
 
-        // --- SCHLEIFE 1: FILLS ---
-        if (drawFill) {
-            VertexConsumer fillConsumer = bufferSource.getBuffer(RenderTypes.storageEspFillSeeThrough());
-            for (Entity entity : client.level.entitiesForRendering()) {
-                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
-
-                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
-                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
-
-                String filterKey = getFilterKey(entity);
-                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
-
-                if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0x80FF0000 : getEntityColor(client.player, living, filterKey, 0.5f);
+        try {
+            // --- SCHLEIFE 1: FILLS ---
+            if (drawFill) {
+                VertexConsumer fillConsumer = bufferSource.getBuffer(RenderTypes.storageEspFillSeeThrough());
+                for (int i = 0; i < targets.size(); i++) {
+                    LivingEntity living = targets.get(i);
+                    int color = Trajectories.targetedEntity == living ? 0x80FF0000 : halfAlpha(targetColors[i]);
                     renderRotatedBox(poseStack, fillConsumer, living, tickDelta, camX, camY, camZ, color, true, (float) outlineWidth);
                 }
             }
-        }
 
-        // --- SCHLEIFE 2: OUTLINES ---
-        if (drawOutline) {
-            VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
-            for (Entity entity : client.level.entitiesForRendering()) {
-                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
-
-                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
-                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
-
-                String filterKey = getFilterKey(entity);
-                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
-
-                if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
-                    renderRotatedBox(poseStack, lineConsumer, living, tickDelta, camX, camY, camZ, color, false, (float) outlineWidth);
+            // --- SCHLEIFE 2: OUTLINES ---
+            if (drawOutline) {
+                VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
+                for (int i = 0; i < targets.size(); i++) {
+                    renderRotatedBox(poseStack, lineConsumer, targets.get(i), tickDelta, camX, camY, camZ, targetColors[i], false, (float) outlineWidth);
                 }
             }
-        }
 
-        // --- SCHLEIFE 3: SKELETON ---
-        if (drawSkeleton) {
-            VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
-            for (Entity entity : client.level.entitiesForRendering()) {
-                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
-
-                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
-                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
-
-                String filterKey = getFilterKey(entity);
-                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
-
-                if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
-
-                    EntityRenderer<?, ?> renderer = client.getEntityRenderDispatcher().getRenderer(entity);
+            // --- SCHLEIFE 3: SKELETON ---
+            if (drawSkeleton) {
+                VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
+                for (int i = 0; i < targets.size(); i++) {
+                    LivingEntity living = targets.get(i);
+                    int color = targetColors[i];
+                    EntityRenderer<?, ?> renderer = client.getEntityRenderDispatcher().getRenderer(living);
                     if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> livingRenderer)) continue;
                     EntityModel<?> model = livingRenderer.getModel();
 
@@ -225,9 +203,9 @@ public class PlayerESP extends Module {
                     ((EntityModel) model).setupAnim(state);
 
                     Vec3 entityPos = new Vec3(
-                            Mth.lerp(tickDelta, entity.xo, entity.getX()),
-                            Mth.lerp(tickDelta, entity.yo, entity.getY()),
-                            Mth.lerp(tickDelta, entity.zo, entity.getZ())
+                            Mth.lerp(tickDelta, living.xo, living.getX()),
+                            Mth.lerp(tickDelta, living.yo, living.getY()),
+                            Mth.lerp(tickDelta, living.zo, living.getZ())
                     );
 
                     PoseStack calcStack = CALC_STACK;
@@ -248,23 +226,13 @@ public class PlayerESP extends Module {
                     renderSkeletonPart(calcStack, "root", model.root(), lineConsumer, matrix, normalMatrix, color, (float) outlineWidth, null);
                 }
             }
-        }
 
-        // --- SCHLEIFE 4: TRACERS ---
-        if (renderTracers) {
-            VertexConsumer tracerConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
-            for (Entity entity : client.level.entitiesForRendering()) {
-                if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
-
-                boolean isTrajTarget = (Trajectories.targetedEntity == entity);
-                if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
-
-                String filterKey = getFilterKey(entity);
-                boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
-
-                if (isTrajTarget || isEnabledInPicker) {
-                    int color = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
-
+            // --- SCHLEIFE 4: TRACERS ---
+            if (renderTracers) {
+                VertexConsumer tracerConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
+                for (int i = 0; i < targets.size(); i++) {
+                    LivingEntity living = targets.get(i);
+                    int color = targetColors[i];
                     double x = Mth.lerp(tickDelta, living.xo, living.getX()) - camX;
                     double y = Mth.lerp(tickDelta, living.yo, living.getY()) - camY;
                     double z = Mth.lerp(tickDelta, living.zo, living.getZ()) - camZ;
@@ -279,9 +247,41 @@ public class PlayerESP extends Module {
                     line(matrix, normalMatrix, tracerConsumer, startX, startY, startZ, targetX, targetY, targetZ, color, (float) tracerWidth);
                 }
             }
+        } finally {
+            // Immer hochladen & den Frame abschließen, auch wenn ein Pass (z.B. Skeleton
+            // bei einem Mod-Renderer) eine Exception wirft. Sonst stapeln sich die
+            // Draws im Buffer jeden Frame weiter an.
+            bufferSource.uploadAndDraw();
+            targets.clear();
         }
+    }
 
-        bufferSource.uploadAndDraw();
+    // Sammelt die Ziele EINMAL pro Frame. Vorher lief jeder Pass (Fill/Outline/
+    // Skeleton/Tracer) erneut über alle Entities und rief pro Entity jedes Mal
+    // TeamUtils.isTeammate() auf, das Display-Names/Components neu aufbaut.
+    private void collectTargets(Minecraft client) {
+        targets.clear();
+        for (Entity entity : client.level.entitiesForRendering()) {
+            if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
+
+            boolean isTrajTarget = (Trajectories.targetedEntity == entity);
+            if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
+
+            String filterKey = getFilterKey(entity);
+            boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
+            if (!isTrajTarget && !isEnabledInPicker) continue;
+
+            if (targets.size() == targetColors.length) {
+                targetColors = Arrays.copyOf(targetColors, targetColors.length * 2);
+            }
+            targetColors[targets.size()] = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
+            targets.add(living);
+        }
+    }
+
+    // Entspricht getEntityColor(..., 0.5f): halbiert nur den Alpha-Kanal.
+    private static int halfAlpha(int argb) {
+        return (((argb >>> 24) >> 1) << 24) | (argb & 0x00FFFFFF);
     }
 
     private int getEntityColor(Player clientPlayer, LivingEntity target, String filterKey, float alphaMultiplier) {
@@ -523,8 +523,7 @@ public class PlayerESP extends Module {
                                 float x1, float y1, float z1, float x2, float y2, float z2,
                                 float x3, float y3, float z3, float x4, float y4, float z4,
                                 float nx, float ny, float nz, int r, int g, int b, int a) {
-        Vector3f normal = new Vector3f(nx, ny, nz);
-        normal.mul(normalMatrix);
+        Vector3f normal = SCRATCH_NORMAL.set(nx, ny, nz).mul(normalMatrix);
 
         consumer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a).setUv(0f, 0f).setOverlay(OverlayTexture.NO_OVERLAY).setNormal(normal.x(), normal.y(), normal.z());
         consumer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a).setUv(0f, 0f).setOverlay(OverlayTexture.NO_OVERLAY).setNormal(normal.x(), normal.y(), normal.z());

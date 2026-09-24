@@ -12,6 +12,10 @@ import java.util.List;
 public final class ChamsRenderQueue {
     private static final List<BodySubmit> BODIES = new ArrayList<>();
     private static final List<ModelSubmit> LAYERS = new ArrayList<>();
+    // Einmal anlegen und wiederverwenden: vorher wurde in flush() JEDEN Frame ein
+    // neuer ChamsBufferSource (4 MB nativer Speicher + GPU-Buffer) erzeugt und nie
+    // geschlossen.
+    private static final ChamsBufferSource BUFFERS = new ChamsBufferSource();
 
     private ChamsRenderQueue() {
     }
@@ -45,25 +49,26 @@ public final class ChamsRenderQueue {
         List<ModelSubmit> layers = List.copyOf(LAYERS);
         clear();
 
+        ChamsBufferSource buffers = BUFFERS;
 
-        ChamsBufferSource buffers = new ChamsBufferSource();
+        try {
+            for (BodySubmit body : bodies) {
+                draw(buffers, framePose, body.model(), body.state(), body.pose(), body.occludedType(),
+                        body.light(), body.overlay(), body.occludedColor(), body.sprite());
+            }
 
-        for (BodySubmit body : bodies) {
-            draw(buffers, framePose, body.model(), body.state(), body.pose(), body.occludedType(),
-                    body.light(), body.overlay(), body.occludedColor(), body.sprite());
+            for (BodySubmit body : bodies) {
+                draw(buffers, framePose, body.model(), body.state(), body.pose(), body.visibleType(),
+                        body.light(), body.overlay(), body.visibleColor(), body.sprite());
+            }
+
+            for (ModelSubmit layer : layers) {
+                draw(buffers, framePose, layer.model(), layer.state(), layer.pose(), layer.type(),
+                        layer.light(), layer.overlay(), layer.color(), layer.sprite());
+            }
+        } finally {
+            buffers.uploadAndDraw();
         }
-
-        for (BodySubmit body : bodies) {
-            draw(buffers, framePose, body.model(), body.state(), body.pose(), body.visibleType(),
-                    body.light(), body.overlay(), body.visibleColor(), body.sprite());
-        }
-
-        for (ModelSubmit layer : layers) {
-            draw(buffers, framePose, layer.model(), layer.state(), layer.pose(), layer.type(),
-                    layer.light(), layer.overlay(), layer.color(), layer.sprite());
-        }
-
-        buffers.uploadAndDraw();
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

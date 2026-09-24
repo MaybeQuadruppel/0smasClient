@@ -32,6 +32,7 @@ public final class TestEnderChestESP extends Module {
 
     public String renderMode = "Both";
 
+    private final ChamsBufferSource bufferSource = new ChamsBufferSource();
     private final List<AABB> renderBoxes = new CopyOnWriteArrayList<>();
 
     public TestEnderChestESP() {
@@ -101,7 +102,6 @@ public final class TestEnderChestESP extends Module {
         boolean drawFill = renderMode.equals("Fill") || renderMode.equals("Both");
         boolean drawOutline = renderMode.equals("Outline") || renderMode.equals("Both");
 
-        ChamsBufferSource bufferSource = new ChamsBufferSource();
 
         int colorFill = 0x40AA00FF;
         int colorOutline = 0xFFAA00FF;
