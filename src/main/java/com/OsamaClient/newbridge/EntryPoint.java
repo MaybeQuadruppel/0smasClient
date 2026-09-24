@@ -8,6 +8,7 @@ import com.OsamaClient.newbridge.Hacks.Visual.HudOverlay;
 import com.OsamaClient.newbridge.Hacks.Visual.Nametags;
 import com.OsamaClient.newbridge.Hacks.Visual.TeammateList;
 import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.GuiManager;
 import com.OsamaClient.newbridge.UI.ProfileManager;
 import com.OsamaClient.newbridge.UI.UISettings;
 import com.OsamaClient.newbridge.UI.components.Module;
@@ -36,6 +37,10 @@ public class EntryPoint implements ClientModInitializer {
     /** Edge-Detection für die (rohe, nicht als KeyMapping registrierte)
      *  GUI-Öffnen-Taste - siehe unten im Tick-Handler. */
     private static boolean guiOpenKeyWasDown = false;
+
+    /** Edge-Detection für die Taste, die zwischen Classic- und Modern-GUI
+     *  umschaltet (nur bei geschlossener GUI). */
+    private static boolean guiModeToggleKeyWasDown = false;
 
     public static final EventBus EVENT_BUS = new EventBus();
 
@@ -98,9 +103,19 @@ public class EntryPoint implements ClientModInitializer {
             // einmal auslöst statt jeden Tick erneut.
             boolean guiOpenKeyIsDown = InputConstants.isKeyDown(client.getWindow(), UISettings.guiOpenKey);
             if (guiOpenKeyIsDown && !guiOpenKeyWasDown) {
-                client.gui.setScreen(new ClickGuiScreen());
+                // Öffnet die GUI im aktuell aktiven Modus (Classic/Modern).
+                client.gui.setScreen(GuiManager.createScreen());
             }
             guiOpenKeyWasDown = guiOpenKeyIsDown;
+
+            // Modus umschalten (nur bei geschlossener GUI); wird persistiert und
+            // beim nächsten Öffnen wirksam.
+            boolean modeKeyIsDown = InputConstants.isKeyDown(client.getWindow(), UISettings.guiModeToggleKey);
+            if (modeKeyIsDown && !guiModeToggleKeyWasDown) {
+                GuiManager.toggleMode();
+                Config.save();
+            }
+            guiModeToggleKeyWasDown = modeKeyIsDown;
 
             if (client.gui.screen() == null) {
                 ClickGuiScreen.keybinds.forEach((moduleName, boundKey) -> {

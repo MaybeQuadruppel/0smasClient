@@ -55,6 +55,27 @@ public final class UISettings {
 
 
     // ========================================================================
+    // MODERN GUI SCALE (unabhängig vom Classic-Scale)
+    // ========================================================================
+
+    /** Eigenständiger Skalierungsfaktor für die tabbasierte Modern-GUI,
+     *  damit beide GUIs unabhängig an Auflösung/DPI angepasst werden können. */
+    public static float modernScale = 1.0f;
+
+    public static final float MODERN_SCALE_MIN = 0.50f;
+    public static final float MODERN_SCALE_MAX = 2.00f;
+
+    public static void setModernScale(float value) {
+        modernScale = Math.max(MODERN_SCALE_MIN, Math.min(MODERN_SCALE_MAX, value));
+    }
+
+    /** Skaliert einen Basiswert mit dem Modern-GUI-Faktor (min. 1 px). */
+    public static int modernScaled(int value) {
+        return Math.max(1, Math.round(value * modernScale));
+    }
+
+
+    // ========================================================================
     // FONT SCALE
     // ========================================================================
 
@@ -387,6 +408,14 @@ public final class UISettings {
 
     public static void setGuiOpenKey(int key) {
         guiOpenKey = key;
+    }
+
+    /** Taste zum Umschalten zwischen Classic- und Modern-GUI (bei geschlossener
+     *  GUI, per Raw-Input in EntryPoint abgefragt). */
+    public static int guiModeToggleKey = GLFW.GLFW_KEY_RIGHT_CONTROL;
+
+    public static void setGuiModeToggleKey(int key) {
+        guiModeToggleKey = key;
     }
 
 

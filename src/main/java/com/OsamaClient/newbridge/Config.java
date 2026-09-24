@@ -2,6 +2,8 @@ package com.OsamaClient.newbridge;
 
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.RenderUtils;
 import com.OsamaClient.newbridge.UI.ClickGuiScreen;
+import com.OsamaClient.newbridge.UI.GuiManager;
+import com.OsamaClient.newbridge.UI.GuiMode;
 import com.OsamaClient.newbridge.UI.Theme;
 import com.OsamaClient.newbridge.UI.UISettings;
 import com.OsamaClient.newbridge.UI.UISettingsModule;
@@ -348,6 +350,21 @@ public class Config {
                 UISettings.guiOpenKey
         );
 
+        gui.addProperty(
+                "guiMode",
+                GuiManager.getMode().name()
+        );
+
+        gui.addProperty(
+                "modernScale",
+                UISettings.modernScale
+        );
+
+        gui.addProperty(
+                "guiModeToggleKey",
+                UISettings.guiModeToggleKey
+        );
+
         // Gespeicherte Farb-Favoriten des ColorPickers (über alle Picker geteilt).
         JsonArray favorites =
                 new JsonArray();
@@ -647,6 +664,29 @@ public class Config {
             UISettings.guiOpenKey =
                     gui.get("guiOpenKey")
                             .getAsInt();
+        }
+
+        if (gui.has("guiMode")) {
+            try {
+                GuiManager.setMode(
+                        GuiMode.valueOf(
+                                gui.get("guiMode").getAsString()
+                        )
+                );
+            } catch (IllegalArgumentException ignored) {
+                // unbekannter Modus -> Standard (Classic) behalten
+            }
+        }
+
+        if (gui.has("modernScale")) {
+            UISettings.setModernScale(
+                    gui.get("modernScale").getAsFloat()
+            );
+        }
+
+        if (gui.has("guiModeToggleKey")) {
+            UISettings.guiModeToggleKey =
+                    gui.get("guiModeToggleKey").getAsInt();
         }
 
         if (gui.has("colorFavorites")
