@@ -348,6 +348,19 @@ public class Config {
                 UISettings.guiOpenKey
         );
 
+        // Gespeicherte Farb-Favoriten des ColorPickers (über alle Picker geteilt).
+        JsonArray favorites =
+                new JsonArray();
+
+        for (Integer favColor : ColorPicker.getFavorites()) {
+            favorites.add(favColor);
+        }
+
+        gui.add(
+                "colorFavorites",
+                favorites
+        );
+
         root.add(
                 "gui_settings",
                 gui
@@ -634,6 +647,25 @@ public class Config {
             UISettings.guiOpenKey =
                     gui.get("guiOpenKey")
                             .getAsInt();
+        }
+
+        if (gui.has("colorFavorites")
+                && gui.get("colorFavorites").isJsonArray()) {
+
+            java.util.List<Integer> favorites =
+                    new java.util.ArrayList<>();
+
+            for (JsonElement el :
+                    gui.getAsJsonArray("colorFavorites")) {
+
+                try {
+                    favorites.add(el.getAsInt());
+                } catch (RuntimeException ignored) {
+                    // fehlerhaften Eintrag überspringen
+                }
+            }
+
+            ColorPicker.loadFavorites(favorites);
         }
 
         UISettings.applyToSounds();

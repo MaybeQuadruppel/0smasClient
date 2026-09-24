@@ -95,9 +95,20 @@ public class ColorPicker extends Component {
         return this;
     }
 
-    /** Aktuelle Favoritenliste (z. B. für eine spätere Persistierung). */
+    /** Aktuelle Favoritenliste (für die Persistierung durch Config). */
     public static List<Integer> getFavorites() {
         return new ArrayList<>(FAVORITES);
+    }
+
+    /** Ersetzt die Favoritenliste beim Laden der Config (dedupliziert, gekappt). */
+    public static void loadFavorites(List<Integer> colors) {
+        FAVORITES.clear();
+        if (colors == null) return;
+        for (Integer c : colors) {
+            if (c != null && !FAVORITES.contains(c) && FAVORITES.size() < MAX_FAVORITES) {
+                FAVORITES.add(c);
+            }
+        }
     }
 
     // ── Farb-Zerlegung / -Zusammensetzung ───────────────────────────────────
