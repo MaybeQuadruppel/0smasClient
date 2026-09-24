@@ -37,15 +37,16 @@ public class Freecam extends Module {
         cameraPitch = mc.player.getXRot();
 
         originalPerspective = mc.options.getCameraType();
+        // Bugfix: vorher wurde originalPerspective nur GESPEICHERT, aber nie
+        // tatsächlich auf Third-Person umgestellt. Ohne diesen Wechsel greift
+        // an anderer Stelle im Spiel weiterhin die First-Person-spezifische
+        // Logik, die das eigene Spielermodell versteckt - man sieht seinen
+        // echten Körper also gar nicht, obwohl EntityRenderDispatcherMixin
+        // das Rendern eigentlich erzwingt.
+        mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+
         lastFrameTime = System.nanoTime();
         isActive = true;
-    }
-
-    @Override
-    public void onTick(Minecraft mc) {
-        if (mc.player == null || !isActive) return;
-        // Blockiert die physische Paket-Bewegung des echten Spielers alle 50ms
-        mc.player.setDeltaMovement(0, 0, 0);
     }
 
     // Diese Methode wird jetzt über das CameraMixin bei jedem gerenderten Frame aufgerufen

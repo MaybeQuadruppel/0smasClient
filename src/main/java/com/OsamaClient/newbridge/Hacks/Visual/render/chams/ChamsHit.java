@@ -33,6 +33,18 @@ public final class ChamsHit {
     }
 
     public static void tick() {
+        // Bugfix: FLASH wurde vorher NUR bereinigt, wenn isFlashing() erneut
+        // für genau dieselbe Entity-ID aufgerufen wurde. Verschwindet die
+        // Entity (Tod, Despawn, Chunk-Unload, Disconnect) bevor das passiert,
+        // blieb der Eintrag für immer in der Map - ein klassischer,
+        // unbegrenzt wachsender Memory-Leak über eine lange Session. Jetzt
+        // wird FLASH jeden Tick aktiv nach abgelaufenen Einträgen durchsucht,
+        // unabhängig davon, ob PENDING gerade leer ist.
+        if (!FLASH.isEmpty()) {
+            long now = System.currentTimeMillis();
+            FLASH.entrySet().removeIf(entry -> now - entry.getValue() >= FLASH_MS);
+        }
+
         if (PENDING.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.level == null) {

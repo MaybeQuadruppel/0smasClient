@@ -76,6 +76,7 @@ public class ModuleManager {
         modules.add(new AutoEat());
         modules.add(new TeammateList());
         modules.add(new UISettingsModule());
+        modules.add(new HudOverlay());
 
     }
 

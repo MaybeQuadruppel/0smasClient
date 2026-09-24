@@ -36,6 +36,39 @@ public class Config {
     // ========================================================================
 
     public static void save() {
+        JsonObject root = serializeState();
+
+        // ====================================================================
+        // WRITE
+        // ====================================================================
+
+        try (
+                Writer writer =
+                        new FileWriter(
+                                CONFIG_PATH.toFile()
+                        )
+        ) {
+
+            GSON.toJson(
+                    root,
+                    writer
+            );
+
+        } catch (IOException e) {
+
+            e.printStackTrace();
+        }
+    }
+
+
+    // ========================================================================
+    // SERIALIZE
+    // ========================================================================
+    // Wird sowohl von save() (zentrale newbridge.json) als auch von
+    // ProfileManager (einzelne Profil-Dateien) genutzt, damit beide Stellen
+    // garantiert dasselbe Format schreiben und nicht auseinanderlaufen.
+
+    public static JsonObject serializeState() {
 
         JsonObject root =
                 new JsonObject();
@@ -310,32 +343,18 @@ public class Config {
                 Theme.getActive().ordinal()
         );
 
+        gui.addProperty(
+                "guiOpenKey",
+                UISettings.guiOpenKey
+        );
+
         root.add(
                 "gui_settings",
                 gui
         );
 
 
-        // ====================================================================
-        // WRITE
-        // ====================================================================
-
-        try (
-                Writer writer =
-                        new FileWriter(
-                                CONFIG_PATH.toFile()
-                        )
-        ) {
-
-            GSON.toJson(
-                    root,
-                    writer
-            );
-
-        } catch (IOException e) {
-
-            e.printStackTrace();
-        }
+        return root;
     }
 
 
@@ -367,105 +386,117 @@ public class Config {
                 return;
             }
 
-
-            // ================================================================
-            // MODULES
-            // ================================================================
-
-            if (root.has("modules")) {
-
-                JsonObject modules =
-                        root.getAsJsonObject(
-                                "modules"
-                        );
-
-                for (Module module :
-                        ModuleManager.modules) {
-
-                    if (module instanceof UISettingsModule) {
-                        continue;
-                    }
-
-                    if (!modules.has(module.name)) {
-                        continue;
-                    }
-
-                    JsonObject moduleObj =
-                            modules.getAsJsonObject(
-                                    module.name
-                            );
-
-                    boolean enabled =
-                            moduleObj.has("enabled")
-                                    && moduleObj
-                                    .get("enabled")
-                                    .getAsBoolean();
-
-                    if (enabled != module.enabled) {
-                        module.toggle();
-                    }
-
-                    if (moduleObj.has("settings")) {
-
-                        JsonObject settings =
-                                moduleObj.getAsJsonObject(
-                                        "settings"
-                                );
-
-                        for (Component c :
-                                module.settings) {
-
-                            loadComponentSetting(
-                                    c,
-                                    settings
-                            );
-                        }
-                    }
-                }
-            }
-
-
-            // ================================================================
-            // KEYBINDS
-            // ================================================================
-
-            if (root.has("keybinds")) {
-
-                JsonObject binds =
-                        root.getAsJsonObject(
-                                "keybinds"
-                        );
-
-                ClickGuiScreen.keybinds.clear();
-
-                for (Map.Entry<String, JsonElement> entry :
-                        binds.entrySet()) {
-
-                    ClickGuiScreen.keybinds.put(
-                            entry.getKey(),
-                            entry.getValue().getAsInt()
-                    );
-                }
-            }
-
-
-            // ================================================================
-            // GUI SETTINGS
-            // ================================================================
-
-            if (root.has("gui_settings")) {
-
-                JsonObject gui =
-                        root.getAsJsonObject(
-                                "gui_settings"
-                        );
-
-                loadGuiSettings(gui);
-            }
+            deserializeState(root);
 
         } catch (Exception e) {
 
             e.printStackTrace();
+        }
+    }
+
+
+    // ========================================================================
+    // DESERIALIZE
+    // ========================================================================
+    // Wird sowohl von load() (zentrale newbridge.json) als auch von
+    // ProfileManager (einzelne Profil-Dateien) genutzt, damit ein geladenes
+    // Profil exakt denselben Effekt hat wie ein normaler Config-Load.
+
+    public static void deserializeState(JsonObject root) {
+
+        // ================================================================
+        // MODULES
+        // ================================================================
+
+        if (root.has("modules")) {
+
+            JsonObject modules =
+                    root.getAsJsonObject(
+                            "modules"
+                    );
+
+            for (Module module :
+                    ModuleManager.modules) {
+
+                if (module instanceof UISettingsModule) {
+                    continue;
+                }
+
+                if (!modules.has(module.name)) {
+                    continue;
+                }
+
+                JsonObject moduleObj =
+                        modules.getAsJsonObject(
+                                module.name
+                        );
+
+                boolean enabled =
+                        moduleObj.has("enabled")
+                                && moduleObj
+                                .get("enabled")
+                                .getAsBoolean();
+
+                if (enabled != module.enabled) {
+                    module.toggle();
+                }
+
+                if (moduleObj.has("settings")) {
+
+                    JsonObject settings =
+                            moduleObj.getAsJsonObject(
+                                    "settings"
+                            );
+
+                    for (Component c :
+                            module.settings) {
+
+                        loadComponentSetting(
+                                c,
+                                settings
+                        );
+                    }
+                }
+            }
+        }
+
+
+        // ================================================================
+        // KEYBINDS
+        // ================================================================
+
+        if (root.has("keybinds")) {
+
+            JsonObject binds =
+                    root.getAsJsonObject(
+                            "keybinds"
+                    );
+
+            ClickGuiScreen.keybinds.clear();
+
+            for (Map.Entry<String, JsonElement> entry :
+                    binds.entrySet()) {
+
+                ClickGuiScreen.keybinds.put(
+                        entry.getKey(),
+                        entry.getValue().getAsInt()
+                );
+            }
+        }
+
+
+        // ================================================================
+        // GUI SETTINGS
+        // ================================================================
+
+        if (root.has("gui_settings")) {
+
+            JsonObject gui =
+                    root.getAsJsonObject(
+                            "gui_settings"
+                    );
+
+            loadGuiSettings(gui);
         }
     }
 
@@ -596,6 +627,13 @@ public class Config {
                         themes[index]
                 );
             }
+        }
+
+        if (gui.has("guiOpenKey")) {
+
+            UISettings.guiOpenKey =
+                    gui.get("guiOpenKey")
+                            .getAsInt();
         }
 
         UISettings.applyToSounds();

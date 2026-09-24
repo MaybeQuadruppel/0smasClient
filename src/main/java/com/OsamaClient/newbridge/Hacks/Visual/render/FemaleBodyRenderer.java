@@ -29,16 +29,23 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
+import java.lang.ref.WeakReference;
 
 public final class FemaleBodyRenderer {
     private static final float ARM_WIDTH_SCALE = 0.78F;
-    private static final Set<PlayerModel> MAIN_MODELS = Collections.newSetFromMap(new IdentityHashMap<>());
-    private static final Set<PlayerModel> ARMOR_MODELS = Collections.newSetFromMap(new IdentityHashMap<>());
+    // Bugfix: MAIN_MODELS/ARMOR_MODELS wurden vorher nie bereinigt. Der
+    // LivingEntityRenderLayerRegistrationCallback feuert aber bei JEDEM
+    // Resource-Reload (F3+T, Ressourcenpaket-Wechsel, teils Fenstergrößen-
+    // änderung) erneut und erzeugt dabei ein komplett neues PlayerModel -
+    // das alte blieb über diese statischen Sets für immer referenziert,
+    // obwohl niemand sonst es mehr braucht. WeakHashMap-basierte Sets lassen
+    // die alten PlayerModel-Instanzen normal vom GC einsammeln.
+    private static final Set<PlayerModel> MAIN_MODELS = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Set<PlayerModel> ARMOR_MODELS = Collections.newSetFromMap(new WeakHashMap<>());
 
     private static final MeshSet FULL_MESHES = MeshSet.build(MeshBuilder.Detail.FULL);
     private static final MeshSet MEDIUM_MESHES = MeshSet.build(MeshBuilder.Detail.MEDIUM);
@@ -48,8 +55,17 @@ public final class FemaleBodyRenderer {
     private static final double MEDIUM_DETAIL_DISTANCE_SQ = 18.0 * 18.0;
     private static final double CROWD_SAMPLE_DISTANCE_SQ = 32.0 * 32.0;
     private static final int CROWD_DETAIL_PLAYER_COUNT = 24;
-    private static final Map<Identifier, JacketAlpha> JACKET_ALPHA_CACHE = new HashMap<>();
-    private static Object crowdSampleLevel;
+    // Bugfix: war eine normale HashMap, die pro einzigartiger Skin-Textur
+    // (praktisch pro Spieler) für immer einen Eintrag behielt - auf großen
+    // Servern mit vielen unterschiedlichen Spielern über eine lange Session
+    // ein unbegrenzt wachsender Cache. WeakHashMap lässt Einträge zu Skins,
+    // die sonst nirgends mehr referenziert werden, automatisch verschwinden.
+    private static final Map<Identifier, JacketAlpha> JACKET_ALPHA_CACHE = new WeakHashMap<>();
+    // Bugfix: hielt vorher eine starke Referenz auf die zuletzt gesehene
+    // ClientLevel-Instanz. Nach einem Disconnect blieb die komplette alte
+    // Welt (Chunks, Entities, ...) dadurch unnötig im Speicher, bis der
+    // nächste Join das Feld überschrieben hat. WeakReference verhindert das.
+    private static WeakReference<Object> crowdSampleLevel = new WeakReference<>(null);
     private static long crowdSampleTick = Long.MIN_VALUE;
     private static int nearbyPlayerCount;
 
@@ -194,8 +210,8 @@ public final class FemaleBodyRenderer {
         private static int sampleNearbyPlayerCount(Minecraft minecraft) {
             if (minecraft.level == null || minecraft.player == null) return 0;
             long tick = minecraft.level.getGameTime();
-            if (minecraft.level == crowdSampleLevel && tick == crowdSampleTick) return nearbyPlayerCount;
-            crowdSampleLevel = minecraft.level;
+            if (minecraft.level == crowdSampleLevel.get() && tick == crowdSampleTick) return nearbyPlayerCount;
+            crowdSampleLevel = new WeakReference<>(minecraft.level);
             crowdSampleTick = tick;
             int count = 0;
             for (var player : minecraft.level.players()) {

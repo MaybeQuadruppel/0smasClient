@@ -1,6 +1,8 @@
 package com.OsamaClient.newbridge.UI;
 
 import com.OsamaClient.newbridge.Config;
+import com.OsamaClient.newbridge.Hacks.Visual.HudLayoutScreen;
+import com.OsamaClient.newbridge.Hacks.Visual.HudOverlay;
 import com.OsamaClient.newbridge.UI.components.*;
 import com.OsamaClient.newbridge.UI.components.Module;
 import net.minecraft.client.Minecraft;
@@ -35,6 +37,18 @@ public class ClickGuiScreen extends Screen {
 
     private String bindingModule = null;
 
+    // ========================================================================
+    // GUI OPEN KEY (in UI Settings einstellbar, kein Minecraft-KeyMapping)
+    // ========================================================================
+
+    private boolean bindingGuiOpenKey = false;
+    /** Text einer Konflikt-Warnung ("Taste X ist bereits an Modul Y gebunden"
+     *  o.ä.), oder null wenn gerade keine angezeigt wird. Wird zugelassen -
+     *  die Bindung passiert trotzdem, es ist nur ein Hinweis. */
+    private String conflictWarning = null;
+    private long conflictWarningUntil = 0L;
+    private static final long CONFLICT_WARNING_MS = 3500L;
+
     private long openTimeMs = -1L;
 
     private double categoryScroll = 0.0;
@@ -47,6 +61,21 @@ public class ClickGuiScreen extends Screen {
 
     private String lastHoveredModule = null;
     private String lastHoveredSidebarItem = null;
+
+    // ========================================================================
+    // PROFILES
+    // ========================================================================
+
+    private boolean profileInputActive = false;
+    private String profileNameInput = "";
+    private double profileScroll = 0.0;
+    private int profileMaxScroll = 0;
+    /** Name des Profils, das gerade zur Löschbestätigung markiert ist.
+     *  Erster Klick auf "Delete" markiert, zweiter Klick auf dasselbe
+     *  Profil löscht wirklich - verhindert versehentliches Löschen. */
+    private String pendingDeleteProfile = null;
+    private float newProfileHover = 0f;
+    private final Map<String, Float> profileRowHover = new HashMap<>();
 
     // ========================================================================
     // SORTING & FILTERING
@@ -233,6 +262,7 @@ public class ClickGuiScreen extends Screen {
         moduleScroll = 0;
         settingsScroll = 0;
         bindingModule = null;
+        bindingGuiOpenKey = false;
 
         playGuiSound(1.35f, 0.28f);
     }
@@ -286,6 +316,10 @@ public class ClickGuiScreen extends Screen {
         searchActive = false;
         searchQuery = "";
         bindingModule = null;
+        bindingGuiOpenKey = false;
+        profileInputActive = false;
+        profileNameInput = "";
+        pendingDeleteProfile = null;
 
         playGuiSound(1.05f, 0.20f);
     }
@@ -346,6 +380,7 @@ public class ClickGuiScreen extends Screen {
         }
 
         renderBindingPrompt(g);
+        renderConflictWarning(g);
 
         super.extractRenderState(g, mouseX, mouseY, delta);
     }
@@ -382,7 +417,7 @@ public class ClickGuiScreen extends Screen {
         int contentH = wh - headerH - contentPadding() * 2;
 
         if (profilesSelected) {
-            renderProfilesPlaceholder(g, contentX, contentY, contentW, contentH);
+            renderProfiles(g, contentX, contentY, contentW, contentH, mouseX, mouseY);
         } else {
             renderModules(g, contentX, contentY, contentW, contentH, mouseX, mouseY);
         }
@@ -728,22 +763,191 @@ public class ClickGuiScreen extends Screen {
         UISettings.drawText(g, this.font, subtitle, centerX - subW / 2, centerY + s(6), C_TEXT_DIM, false);
     }
 
-    private void renderProfilesPlaceholder(GuiGraphicsExtractor g, int x, int y, int width, int height) {
-        int boxW = Math.min(width - s(10), s(300));
-        int boxH = s(90);
-        int bx = x + (width - boxW) / 2;
-        int by = y + (height - boxH) / 2;
+    // ------------------------------------------------------------------
+    // PROFILES TAB
+    // ------------------------------------------------------------------
+    // Layout: eine "+ New Profile" Zeile oben (Klick öffnet ein Textfeld,
+    // Enter speichert den aktuellen Live-Zustand unter diesem Namen,
+    // Escape bricht ab), darunter eine scrollbare Liste aller vorhandenen
+    // Profile mit Load-/Delete-Aktion pro Zeile.
 
-        drawBox(g, bx, by, boxW, boxH, C_CARD);
-        drawOutline(g, bx, by, boxW, boxH, C_SEPARATOR);
+    private int profileRowHeight() {
+        return s(UISettings.compactMode ? 24 : 27);
+    }
 
-        String title = "Profiles";
-        int titleW = UISettings.textWidth(this.font, title);
-        UISettings.drawText(g, this.font, title, bx + (boxW - titleW) / 2, by + s(20), C_TEXT, false);
+    private void renderProfiles(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
+        int rowH = profileRowHeight();
+        int gap = s(4);
+        int pad = s(6);
 
-        String text = "Profile system coming soon";
-        int textW = UISettings.textWidth(this.font, text);
-        UISettings.drawText(g, this.font, text, bx + (boxW - textW) / 2, by + s(43), C_TEXT_DIM, false);
+        // ── "+ New Profile" Zeile ──────────────────────────────────────
+        int newBtnH = s(UISettings.compactMode ? 22 : 24);
+        boolean newBtnHovered = !profileInputActive
+                && mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + newBtnH;
+        newProfileHover = newBtnHovered
+                ? Math.min(1f, newProfileHover + UISettings.animStep(0.18f))
+                : Math.max(0f, newProfileHover - UISettings.animStep(0.18f));
+
+        int newBg = profileInputActive
+                ? Component.lerpColor(C_CARD, C_CARD_HOVER, 1f)
+                : Component.lerpColor(C_CARD, C_CARD_HOVER, newProfileHover);
+        drawBox(g, x, y, width, newBtnH, newBg);
+        drawOutline(g, x, y, width, newBtnH, profileInputActive ? C_ACCENT : (newBtnHovered ? C_ACCENT : C_SEPARATOR));
+
+        if (profileInputActive) {
+            boolean showCursor = (System.currentTimeMillis() / 500) % 2 == 0;
+            String display = "+ " + profileNameInput + (showCursor ? "|" : "");
+            UISettings.drawText(g, this.font, trimToWidth(display, width - s(90)), x + pad, y + newBtnH / 2 - s(4), C_TEXT, false);
+
+            String hint = "Enter = save  \u2014  Esc = cancel";
+            int hintW = UISettings.textWidth(this.font, hint);
+            UISettings.drawText(g, this.font, hint, x + width - hintW - pad, y + newBtnH / 2 - s(4), C_TEXT_DIM, false);
+        } else {
+            UISettings.drawText(g, this.font, "+  New Profile", x + pad, y + newBtnH / 2 - s(4), newBtnHovered ? C_ACCENT : C_TEXT, false);
+
+            String hint = "saves current setup";
+            int hintW = UISettings.textWidth(this.font, hint);
+            UISettings.drawText(g, this.font, hint, x + width - hintW - pad, y + newBtnH / 2 - s(4), C_TEXT_DIM, false);
+        }
+
+        int listY = y + newBtnH + gap;
+        int listH = Math.max(0, height - newBtnH - gap);
+
+        List<String> profiles = ProfileManager.listProfiles();
+
+        if (profiles.isEmpty()) {
+            String msg = "No profiles yet \u2014 create one above.";
+            int msgW = UISettings.textWidth(this.font, msg);
+            UISettings.drawText(g, this.font, msg, x + (width - msgW) / 2, listY + s(14), C_TEXT_DIM, false);
+            profileMaxScroll = 0;
+            return;
+        }
+
+        int totalH = profiles.size() * (rowH + gap);
+        profileMaxScroll = Math.max(0, totalH - listH);
+        profileScroll = Math.max(0, Math.min(profileScroll, profileMaxScroll));
+
+        g.enableScissor(x, listY, x + width, listY + listH);
+
+        int rowY = listY - (int) profileScroll;
+        int actionW = s(UISettings.compactMode ? 74 : 84);
+
+        for (String name : profiles) {
+            if (rowY + rowH >= listY && rowY <= listY + listH) {
+                boolean active = name.equals(ProfileManager.activeProfile);
+                boolean rowHovered = mouseX >= x && mouseX <= x + width && mouseY >= rowY && mouseY <= rowY + rowH;
+
+                float hover = profileRowHover.getOrDefault(name, 0f);
+                hover = rowHovered ? Math.min(1f, hover + UISettings.animStep(0.18f)) : Math.max(0f, hover - UISettings.animStep(0.18f));
+                profileRowHover.put(name, hover);
+
+                int rowBg = active ? Component.lerpColor(C_CARD, C_ACCENT, 0.10f) : Component.lerpColor(C_CARD, C_CARD_HOVER, hover);
+                drawBox(g, x, rowY, width, rowH, rowBg);
+                drawOutline(g, x, rowY, width, rowH, active ? C_ACCENT : C_SEPARATOR);
+
+                if (active) {
+                    g.fill(x + s(1), rowY + s(4), x + s(3), rowY + rowH - s(4), C_ACCENT);
+                }
+
+                String label = trimToWidth(name, width - actionW * 2 - s(24));
+                UISettings.drawText(g, this.font, label, x + s(9), rowY + rowH / 2 - s(4), active ? C_TEXT : Component.lerpColor(C_TEXT_DIM, C_TEXT, hover), false);
+
+                // Load-Button
+                int loadX = x + width - actionW * 2 - s(6);
+                boolean loadHovered = mouseX >= loadX && mouseX <= loadX + actionW && mouseY >= rowY && mouseY <= rowY + rowH;
+                drawBox(g, loadX, rowY + s(3), actionW, rowH - s(6), loadHovered ? Component.lerpColor(C_SIDEBAR, C_ACCENT, 0.18f) : C_SIDEBAR);
+                drawOutline(g, loadX, rowY + s(3), actionW, rowH - s(6), loadHovered ? C_ACCENT : C_SEPARATOR);
+                String loadTxt = "Load";
+                int loadTxtW = UISettings.textWidth(this.font, loadTxt);
+                UISettings.drawText(g, this.font, loadTxt, loadX + (actionW - loadTxtW) / 2, rowY + rowH / 2 - s(4), loadHovered ? C_ACCENT : C_TEXT_DIM, false);
+
+                // Delete-Button (zweistufig: erst "Delete?", zweiter Klick loescht wirklich)
+                boolean pendingDelete = name.equals(pendingDeleteProfile);
+                int delX = x + width - actionW - s(2);
+                boolean delHovered = mouseX >= delX && mouseX <= delX + actionW && mouseY >= rowY && mouseY <= rowY + rowH;
+                int delColor = pendingDelete ? 0xFFFF5555 : (delHovered ? 0xFFFF8888 : C_SEPARATOR);
+                drawBox(g, delX, rowY + s(3), actionW, rowH - s(6), pendingDelete ? Component.withAlpha(0xFFFF5555, 0.18f) : C_SIDEBAR);
+                drawOutline(g, delX, rowY + s(3), actionW, rowH - s(6), delColor);
+                String delTxt = pendingDelete ? "Confirm?" : "Delete";
+                int delTxtW = UISettings.textWidth(this.font, delTxt);
+                UISettings.drawText(g, this.font, delTxt, delX + (actionW - delTxtW) / 2, rowY + rowH / 2 - s(4), pendingDelete ? 0xFFFF5555 : C_TEXT_DIM, false);
+            }
+            rowY += rowH + gap;
+        }
+
+        g.disableScissor();
+
+        if (profileMaxScroll > 0) {
+            renderScrollbar(g, x + width - s(3), listY, s(3), listH, totalH, profileScroll, profileMaxScroll);
+        }
+    }
+
+    /** Klick-Logik für die Profiles-Tab-Liste; gibt true zurück, wenn der Klick verarbeitet wurde. */
+    private boolean handleProfilesClick(int mx, int my, int x, int y, int width, int height, int button) {
+        if (button != 0) return false;
+
+        int rowH = profileRowHeight();
+        int gap = s(4);
+        int newBtnH = s(UISettings.compactMode ? 22 : 24);
+
+        if (mx >= x && mx <= x + width && my >= y && my <= y + newBtnH) {
+            profileInputActive = true;
+            profileNameInput = "";
+            pendingDeleteProfile = null;
+            playGuiSound(1.20f, 0.22f);
+            return true;
+        }
+
+        int listY = y + newBtnH + gap;
+        int listH = Math.max(0, height - newBtnH - gap);
+        if (mx < x || mx > x + width || my < listY || my > listY + listH) {
+            return false;
+        }
+
+        List<String> profiles = ProfileManager.listProfiles();
+        int actionW = s(UISettings.compactMode ? 74 : 84);
+        int rowY = listY - (int) profileScroll;
+
+        for (String name : profiles) {
+            if (my >= rowY && my <= rowY + rowH) {
+                int loadX = x + width - actionW * 2 - s(6);
+                int delX = x + width - actionW - s(2);
+
+                if (mx >= loadX && mx <= loadX + actionW) {
+                    if (ProfileManager.loadProfile(name)) {
+                        // Live-Zustand kann sich geändert haben (Module, Kategorien) -> View auffrischen.
+                        selectedCategory = getFirstCategory();
+                        selectedModule = null;
+                        moduleScroll = 0;
+                        pendingDeleteProfile = null;
+                        playGuiSound(1.30f, 0.30f);
+                    } else {
+                        playGuiSound(0.60f, 0.25f);
+                    }
+                    return true;
+                }
+
+                if (mx >= delX && mx <= delX + actionW) {
+                    if (name.equals(pendingDeleteProfile)) {
+                        ProfileManager.deleteProfile(name);
+                        pendingDeleteProfile = null;
+                        playGuiSound(0.65f, 0.25f);
+                    } else {
+                        pendingDeleteProfile = name;
+                        playGuiSound(0.95f, 0.20f);
+                    }
+                    return true;
+                }
+
+                // Klick auf die Zeile selbst (nicht auf einen Button) verwirft eine offene Löschbestätigung.
+                pendingDeleteProfile = null;
+                return true;
+            }
+            rowY += rowH + gap;
+        }
+
+        pendingDeleteProfile = null;
+        return false;
     }
 
     // ========================================================================
@@ -764,6 +968,28 @@ public class ClickGuiScreen extends Screen {
         int contentY = wy + headerH + contentPadding();
         int contentW = ww - contentPadding() * 2;
         int contentH = wh - headerH - contentPadding() * 2;
+
+        // "Open ClickGUI Key" ist kein normales Component im settings-Array
+        // (braucht Tasten-Capture, kein Slider/Toggle/ModeButton), sondern
+        // eine feste, angeheftete Zeile ganz oben - nur im UI-Settings-Modul.
+        if (selectedModule == UISettingsModule.getInstance()) {
+            int pinnedH = guiOpenKeyRowHeight();
+            renderGuiOpenKeyRow(g, contentX, contentY, contentW, pinnedH, mouseX, mouseY);
+
+            int pinnedGap = s(6);
+            contentY += pinnedH + pinnedGap;
+            contentH -= pinnedH + pinnedGap;
+        } else if (selectedModule == HudOverlay.instance) {
+            // Gleiches Prinzip: "Edit HUD Layout" ist ein reiner Aktions-Button
+            // (öffnet HudLayoutScreen), kein Slider/Toggle - daher ebenfalls
+            // als angeheftete Zeile statt als generisches Component.
+            int pinnedH = guiOpenKeyRowHeight();
+            renderHudEditorRow(g, contentX, contentY, contentW, pinnedH, mouseX, mouseY);
+
+            int pinnedGap = s(6);
+            contentY += pinnedH + pinnedGap;
+            contentH -= pinnedH + pinnedGap;
+        }
 
         List<Component> components = selectedModule.settings;
         int gap = s(UISettings.compactMode ? 3 : 5);
@@ -854,6 +1080,43 @@ public class ClickGuiScreen extends Screen {
         drawOutline(g, wx, wy, ww, wh, C_SEPARATOR);
     }
 
+    private int guiOpenKeyRowHeight() {
+        return s(UISettings.compactMode ? 24 : 27);
+    }
+
+    private void renderGuiOpenKeyRow(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
+        boolean hovered = !bindingGuiOpenKey && mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+
+        int bg = bindingGuiOpenKey
+                ? Component.lerpColor(C_CARD, C_ACCENT, 0.18f)
+                : Component.lerpColor(C_CARD, C_CARD_HOVER, hovered ? 1f : 0f);
+        drawBox(g, x, y, width, height, bg);
+        drawOutline(g, x, y, width, height, bindingGuiOpenKey || hovered ? C_ACCENT : C_SEPARATOR);
+
+        String label = "Open ClickGUI Key";
+        UISettings.drawText(g, this.font, label, x + s(8), y + height / 2 - s(4), C_TEXT, false);
+
+        String valueText = bindingGuiOpenKey ? "Press a key\u2026 (Esc cancel)" : keyName(UISettings.guiOpenKey);
+        int valueW = UISettings.textWidth(this.font, valueText);
+        UISettings.drawText(g, this.font, valueText, x + width - valueW - s(8), y + height / 2 - s(4),
+                bindingGuiOpenKey ? C_ACCENT : (hovered ? C_ACCENT : C_TEXT_DIM), false);
+    }
+
+    private void renderHudEditorRow(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
+        boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+
+        int bg = Component.lerpColor(C_CARD, C_CARD_HOVER, hovered ? 1f : 0f);
+        drawBox(g, x, y, width, height, bg);
+        drawOutline(g, x, y, width, height, hovered ? C_ACCENT : C_SEPARATOR);
+
+        String label = "Edit HUD Layout";
+        UISettings.drawText(g, this.font, label, x + s(8), y + height / 2 - s(4), hovered ? C_ACCENT : C_TEXT, false);
+
+        String hint = "drag widgets on screen \u2192";
+        int hintW = UISettings.textWidth(this.font, hint);
+        UISettings.drawText(g, this.font, hint, x + width - hintW - s(8), y + height / 2 - s(4), C_TEXT_DIM, false);
+    }
+
     private void renderSettingsHeader(GuiGraphicsExtractor g, int x, int y, int width, int height, int mouseX, int mouseY) {
         drawBox(g, x, y, width, height, C_HEADER);
 
@@ -897,8 +1160,11 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void renderBindingPrompt(GuiGraphicsExtractor g) {
-        if (bindingModule == null) return;
-        String text = "Bind: " + bindingModule + "  |  press key  |  ESC clear";
+        if (bindingModule == null && !bindingGuiOpenKey) return;
+
+        String text = bindingGuiOpenKey
+                ? "Bind: Open ClickGUI Key  |  press key  |  ESC cancel"
+                : "Bind: " + bindingModule + "  |  press key  |  ESC clear";
         int textW = UISettings.textWidth(this.font, text);
         int width = textW + s(14), height = s(20);
         int x = this.width / 2 - width / 2, y = s(5);
@@ -906,6 +1172,30 @@ public class ClickGuiScreen extends Screen {
         drawBox(g, x, y, width, height, C_HEADER);
         drawOutline(g, x, y, width, height, C_ACCENT);
         UISettings.drawText(g, this.font, text, x + s(7), y + s(6), C_ACCENT, false);
+    }
+
+    /** Kurzzeitige, nicht-blockierende Hinweis-Box für Tastenkonflikte
+     *  (Modul-Keybind <-> GUI-Öffnen-Taste). Verhindert nichts, informiert nur. */
+    private void renderConflictWarning(GuiGraphicsExtractor g) {
+        if (conflictWarning == null) return;
+        if (System.currentTimeMillis() > conflictWarningUntil) {
+            conflictWarning = null;
+            return;
+        }
+
+        int maxW = s(260);
+        int textW = Math.min(maxW, UISettings.textWidth(this.font, conflictWarning));
+        String text = trimToWidth(conflictWarning, maxW);
+        textW = UISettings.textWidth(this.font, text);
+
+        int width = textW + s(14), height = s(20);
+        int x = this.width / 2 - width / 2;
+        int y = s(5) + (bindingModule != null || bindingGuiOpenKey ? s(24) : 0);
+
+        int warnColor = 0xFFE0A030;
+        drawBox(g, x, y, width, height, C_HEADER);
+        drawOutline(g, x, y, width, height, warnColor);
+        UISettings.drawText(g, this.font, text, x + s(7), y + s(6), warnColor, false);
     }
 
     // ========================================================================
@@ -990,8 +1280,40 @@ public class ClickGuiScreen extends Screen {
             if (isBackButtonHovered(mx, my)) {
                 selectedModule = null;
                 settingsScroll = 0;
+                bindingModule = null;
+                bindingGuiOpenKey = false;
                 playGuiSound(0.85f, 0.25f);
                 return true;
+            }
+
+            if (selectedModule == UISettingsModule.getInstance()) {
+                int[] window = getWindowRect();
+                int headerH = headerHeight();
+                int contentX = window[0] + contentPadding();
+                int contentY = window[1] + headerH + contentPadding();
+                int contentW = window[2] - contentPadding() * 2;
+                int pinnedH = guiOpenKeyRowHeight();
+
+                if (mx >= contentX && mx <= contentX + contentW && my >= contentY && my <= contentY + pinnedH) {
+                    bindingGuiOpenKey = true;
+                    bindingModule = null;
+                    conflictWarning = null;
+                    playGuiSound(1.20f, 0.22f);
+                    return true;
+                }
+            } else if (selectedModule == HudOverlay.instance) {
+                int[] window = getWindowRect();
+                int headerH = headerHeight();
+                int contentX = window[0] + contentPadding();
+                int contentY = window[1] + headerH + contentPadding();
+                int contentW = window[2] - contentPadding() * 2;
+                int pinnedH = guiOpenKeyRowHeight();
+
+                if (mx >= contentX && mx <= contentX + contentW && my >= contentY && my <= contentY + pinnedH) {
+                    playGuiSound(1.20f, 0.25f);
+                    Minecraft.getInstance().gui.setScreen(new HudLayoutScreen());
+                    return true;
+                }
             }
 
             for (Component component : selectedModule.settings) {
@@ -1027,7 +1349,14 @@ public class ClickGuiScreen extends Screen {
             if (handleSidebarClick(mx, my, wx, wy + headerH, sidebarW, wh - headerH, button)) return true;
         }
 
-        if (!profilesSelected) {
+        if (profilesSelected) {
+            int contentX = wx + sidebarW + contentPadding();
+            int contentY = wy + headerH + contentPadding();
+            int contentW = ww - sidebarW - contentPadding() * 2;
+            int contentH = wh - headerH - contentPadding() * 2;
+
+            if (handleProfilesClick(mx, my, contentX, contentY, contentW, contentH, button)) return true;
+        } else {
             List<Module> modules = getFilteredModules();
             int contentX = wx + sidebarW + contentPadding();
             int contentY = wy + headerH + contentPadding();
@@ -1049,6 +1378,8 @@ public class ClickGuiScreen extends Screen {
                         && cardY + moduleH >= contentY && cardY <= contentY + contentH) {
                     if (button == 0) {
                         module.toggle();
+                        Config.save();
+                        ProfileManager.syncActiveProfile();
                         playGuiSound(module.enabled ? 1.05f : 0.80f, 0.25f);
                         return true;
                     }
@@ -1056,6 +1387,7 @@ public class ClickGuiScreen extends Screen {
                         selectedModule = module;
                         settingsScroll = 0;
                         bindingModule = null;
+                        bindingGuiOpenKey = false;
                         playGuiSound(1.20f, 0.25f);
                         return true;
                     }
@@ -1100,8 +1432,14 @@ public class ClickGuiScreen extends Screen {
         if (mx >= profileX && mx <= profileX + profileW && my >= currentY && my <= currentY + itemH) {
             profilesSelected = true;
             selectedModule = null;
-            selectedCategory = null;
             moduleScroll = 0;
+            searchActive = false;
+            searchQuery = "";
+            bindingModule = null;
+            bindingGuiOpenKey = false;
+            profileInputActive = false;
+            profileNameInput = "";
+            pendingDeleteProfile = null;
             playGuiSound(1.0f, 0.20f);
             return true;
         }
@@ -1113,6 +1451,10 @@ public class ClickGuiScreen extends Screen {
             selectedModule = UISettingsModule.getInstance();
             settingsScroll = 0;
             bindingModule = null;
+            bindingGuiOpenKey = false;
+            profileInputActive = false;
+            profileNameInput = "";
+            pendingDeleteProfile = null;
             playGuiSound(1.25f, 0.25f);
             return true;
         }
@@ -1133,6 +1475,14 @@ public class ClickGuiScreen extends Screen {
             for (Component component : selectedModule.settings) {
                 component.mouseReleased(event.x(), event.y(), event.button());
             }
+            // Autosave: deckt Slider-Drags, Toggle-/ModeButton-Klicks und
+            // Color-Picker-Änderungen in der Settings-View ab, ohne jede
+            // einzelne Komponente einzeln anfassen zu müssen. Persistiert
+            // sowohl in die zentrale Config als auch (falls eins aktiv ist)
+            // in das aktuell geladene Profil, damit Änderungen sofort
+            // hängen bleiben statt nur beim Schließen der GUI.
+            Config.save();
+            ProfileManager.syncActiveProfile();
         }
         return super.mouseReleased(event);
     }
@@ -1165,7 +1515,26 @@ public class ClickGuiScreen extends Screen {
             return true;
         }
 
-        if (moduleMaxScroll > 0) {
+        if (profilesSelected) {
+            // Eigener Scroll-Bereich für die Profil-Liste. Vorher fehlte diese
+            // Unterscheidung komplett: das Mausrad über der Profiles-Tab nutzte
+            // stillschweigend das (potenziell veraltete) moduleMaxScroll der
+            // zuletzt angezeigten Kategorie und konnte so unsichtbar "ins Leere"
+            // scrollen bzw. das Scroll-Event schlucken, ohne dass die
+            // tatsächlich sichtbare Profil-Liste reagierte.
+            if (profileMaxScroll > 0) {
+                int contentX = window[0] + sidebarW + contentPadding();
+                int contentY = window[1] + headerH + contentPadding();
+                int contentW = window[2] - sidebarW - contentPadding() * 2;
+                int contentH = window[3] - headerH - contentPadding() * 2;
+
+                if (mouseX >= contentX && mouseX <= contentX + contentW && mouseY >= contentY && mouseY <= contentY + contentH) {
+                    profileScroll -= verticalAmount * s(18);
+                    profileScroll = Math.max(0, Math.min(profileScroll, profileMaxScroll));
+                    return true;
+                }
+            }
+        } else if (moduleMaxScroll > 0) {
             int contentX = window[0] + sidebarW + contentPadding();
             int contentY = window[1] + headerH + contentPadding();
             int contentW = window[2] - sidebarW - contentPadding() * 2;
@@ -1185,16 +1554,80 @@ public class ClickGuiScreen extends Screen {
     public boolean keyPressed(KeyEvent event) {
         int key = event.key(), modifiers = event.modifiers();
 
+        // Aufnahme einer neuen "Open ClickGUI Key" - exklusiv zu bindingModule,
+        // damit nicht beides gleichzeitig läuft.
+        if (bindingGuiOpenKey) {
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                bindingGuiOpenKey = false;
+                playGuiSound(0.70f, 0.20f);
+                return true;
+            }
+            UISettings.setGuiOpenKey(key);
+            bindingGuiOpenKey = false;
+            Config.save();
+            ProfileManager.syncActiveProfile();
+
+            String conflicting = modulesBoundTo(key, null);
+            if (conflicting != null) {
+                showConflictWarning("Note: this key already toggles \u00bb" + conflicting + "\u00ab \u2014 both will trigger.");
+            } else {
+                conflictWarning = null;
+            }
+            playGuiSound(1.25f, 0.25f);
+            return true;
+        }
+
         if (bindingModule != null) {
             if (key == GLFW.GLFW_KEY_ESCAPE) {
                 keybinds.remove(bindingModule);
                 bindingModule = null;
+                Config.save();
+                ProfileManager.syncActiveProfile();
                 playGuiSound(0.70f, 0.20f);
                 return true;
             }
             keybinds.put(bindingModule, key);
+
+            String conflictingModules = modulesBoundTo(key, bindingModule);
+            if (conflictingModules != null) {
+                showConflictWarning("Note: this key already toggles \u00bb" + conflictingModules + "\u00ab too \u2014 both will trigger.");
+            } else if (key == UISettings.guiOpenKey) {
+                showConflictWarning("Note: this key also opens the ClickGUI.");
+            } else {
+                conflictWarning = null;
+            }
+
             bindingModule = null;
+            Config.save();
+            ProfileManager.syncActiveProfile();
             playGuiSound(1.25f, 0.25f);
+            return true;
+        }
+
+        // Eingabe für den "+ New Profile"-Namen hat Vorrang vor allen anderen
+        // Kurzbefehlen (Suche, Sortierung, ...), solange das Textfeld offen ist.
+        if (profileInputActive) {
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                profileInputActive = false;
+                profileNameInput = "";
+                playGuiSound(0.80f, 0.20f);
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+                String name = profileNameInput.trim();
+                if (!name.isEmpty()) {
+                    ProfileManager.saveProfile(name);
+                    profileInputActive = false;
+                    profileNameInput = "";
+                    pendingDeleteProfile = null;
+                    playGuiSound(1.35f, 0.30f);
+                }
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_BACKSPACE && !profileNameInput.isEmpty()) {
+                profileNameInput = profileNameInput.substring(0, profileNameInput.length() - 1);
+                return true;
+            }
             return true;
         }
 
@@ -1202,6 +1635,13 @@ public class ClickGuiScreen extends Screen {
             searchActive = !searchActive;
             searchQuery = "";
             moduleScroll = 0;
+            // Bugfix: vorher blieb profilesSelected beim Öffnen der Suche
+            // aktiv, wodurch weiterhin die Profiles-Tab statt der
+            // Suchergebnisse angezeigt wurde, obwohl der Header schon
+            // "Search Results" anzeigte.
+            if (searchActive) {
+                profilesSelected = false;
+            }
             playGuiSound(searchActive ? 1.45f : 0.90f, 0.20f);
             return true;
         }
@@ -1241,6 +1681,13 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
+        if (profileInputActive) {
+            char character = (char) event.codepoint();
+            if (character >= 32 && character != 127) {
+                profileNameInput += character;
+            }
+            return true;
+        }
         if (searchActive && bindingModule == null) {
             char character = (char) event.codepoint();
             if (character >= 32 && character != 127) {
@@ -1288,9 +1735,35 @@ public class ClickGuiScreen extends Screen {
         return KEY_NAMES.getOrDefault(key, "K" + key);
     }
 
+    // ========================================================================
+    // KEY CONFLICT DETECTION
+    // ========================================================================
+    // Konflikte werden nie blockiert, nur angezeigt - eine Taste darf
+    // gleichzeitig die GUI öffnen UND ein Modul togglen, wenn der Nutzer das
+    // so will. Das hier ist rein informativ.
+
+    /** Modulname(n), die bereits an {@code key} gebunden sind (durch
+     *  {@code excludingModule} ausgenommen, z.B. das Modul, das man gerade
+     *  neu bindet), zusammengefasst als String - oder null, falls keine. */
+    private String modulesBoundTo(int key, String excludingModule) {
+        List<String> hits = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : keybinds.entrySet()) {
+            if (entry.getValue() == key && !entry.getKey().equals(excludingModule)) {
+                hits.add(entry.getKey());
+            }
+        }
+        return hits.isEmpty() ? null : String.join(", ", hits);
+    }
+
+    private void showConflictWarning(String text) {
+        conflictWarning = text;
+        conflictWarningUntil = System.currentTimeMillis() + CONFLICT_WARNING_MS;
+    }
+
     @Override
     public void onClose() {
         Config.save();
+        ProfileManager.syncActiveProfile();
         super.onClose();
     }
 

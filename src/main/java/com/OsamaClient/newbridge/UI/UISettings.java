@@ -2,6 +2,7 @@ package com.OsamaClient.newbridge.UI;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import org.lwjgl.glfw.GLFW;
 
 /**
  * Globale, persistierbare Einstellungen für die ClickGUI.
@@ -372,6 +373,21 @@ public final class UISettings {
     // ========================================================================
 
     public static boolean roundedCorners = true;
+
+
+    // ========================================================================
+    // GUI OPEN KEY
+    // ========================================================================
+    // Kein Minecraft-KeyMapping mehr (kein Eintrag unter Optionen ->
+    // Steuerung), sondern ein einfacher GLFW-Keycode, der nur hier bzw. über
+    // die ClickGUI selbst (UI Settings -> "Open ClickGUI Key") verändert
+    // werden kann. Wird von EntryPoint jeden Tick per Raw-Input abgefragt.
+
+    public static int guiOpenKey = GLFW.GLFW_KEY_RIGHT_SHIFT;
+
+    public static void setGuiOpenKey(int key) {
+        guiOpenKey = key;
+    }
 
 
     // ========================================================================
