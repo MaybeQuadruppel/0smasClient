@@ -27,6 +27,7 @@
     "camera.CameraMixin",
     "camera.EntityRenderDispatcherMixin",
     "camera.FreeLookPlayerMixin",
+    "camera.KeyboardInputMixin",
     "camera.LocalPlayerMixin",
     "camera.MouseHandlerMixin",
     "chams.ChamsCapeLayerMixin",

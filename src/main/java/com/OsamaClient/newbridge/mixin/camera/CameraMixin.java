@@ -34,7 +34,9 @@ public abstract class CameraMixin {
         Minecraft mc = Minecraft.getInstance();
 
         if (Freecam.isActive) {
-            this.detached = true;
+            // (Ein "detached = true" hier war wirkungslos: alignWithEntity setzt
+            // detached selbst neu aus options.getCameraType(). Freecam stellt dafür
+            // auf THIRD_PERSON_BACK, siehe Freecam.onEnable().)
 
             // WICHTIG: Holt sich deine Freecam-Instanz (oder ruft die Logik statisch auf)
             // Hier triggern wir die flüssige Frame-Bewegung!
@@ -42,15 +44,39 @@ public abstract class CameraMixin {
         }
 
         // Freelook Logik
-        boolean freelooking = Freelook.isFreelooking();
-        if (freelooking && !wasFreelooking) {
-            mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-            firstTimeFreelook = true;
+        // Bugfix: Während Freecam aktiv ist, darf Freelook die Perspektive NICHT
+        // umstellen. Vorher hat das Loslassen von Alt in Freecam auf FIRST_PERSON
+        // geschaltet -> eigener Körper weg, Hand schwebt vor der Freecam-Kamera.
+        // wasFreelooking wird dabei bewusst nicht aktualisiert, damit nach dem
+        // Beenden von Freecam der Übergang ganz normal nachgeholt wird.
+        if (!Freecam.isActive) {
+            boolean freelooking = Freelook.isFreelooking();
+            if (freelooking && !wasFreelooking) {
+                mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                firstTimeFreelook = true;
+            }
+            if (!freelooking && wasFreelooking) {
+                mc.options.setCameraType(CameraType.FIRST_PERSON);
+            }
+            wasFreelooking = freelooking;
         }
-        if (!freelooking && wasFreelooking) {
-            mc.options.setCameraType(CameraType.FIRST_PERSON);
+    }
+
+    /**
+     * Bugfix "Freecam geht in F5": Freecam stellt auf THIRD_PERSON_BACK (damit der
+     * eigene Körper gerendert und die Hand ausgeblendet wird). Vanilla schiebt die
+     * Kamera in Third-Person aber per move(-maxZoom, 0, 0) bis zu 4 Blöcke nach
+     * hinten - also hing die Freecam immer 4 Blöcke HINTER der eigentlichen
+     * Freecam-Position, genau wie F5. In Freecam wird dieser Versatz jetzt auf 0
+     * gesetzt, die Kamera sitzt exakt auf Freecam.cameraPos.
+     */
+    @ModifyArgs(method = "alignWithEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;move(FFF)V"))
+    private void onMoveArgs(Args args) {
+        if (Freecam.isActive) {
+            args.set(0, 0.0F);
+            args.set(1, 0.0F);
+            args.set(2, 0.0F);
         }
-        wasFreelooking = freelooking;
     }
 
     @ModifyArgs(method = "alignWithEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;setPosition(DDD)V"))

@@ -4,6 +4,7 @@ import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.CameraType;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.phys.Vec3;
 
 public class Freecam extends Module {
@@ -15,6 +16,7 @@ public class Freecam extends Module {
     public static double speedValue = 1.0;
 
     private CameraType originalPerspective;
+    private ClientLevel enabledInLevel;
     private static long lastFrameTime = System.nanoTime();
 
     public Freecam() {
@@ -43,10 +45,24 @@ public class Freecam extends Module {
         // Logik, die das eigene Spielermodell versteckt - man sieht seinen
         // echten Körper also gar nicht, obwohl EntityRenderDispatcherMixin
         // das Rendern eigentlich erzwingt.
+        // Den sonst dabei entstehenden F5-Versatz nach hinten entfernt
+        // CameraMixin.onMoveArgs.
         mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
 
+        enabledInLevel = mc.level;
         lastFrameTime = System.nanoTime();
         isActive = true;
+    }
+
+    @Override
+    public void onTick(Minecraft client) {
+        // Bugfix: Nach Disconnect/Weltwechsel (Server, Dimension) blieb Freecam
+        // aktiv - mit der Kameraposition aus der ALTEN Welt, und alle
+        // Bewegungspakete wurden weiter verworfen. Jetzt schaltet sich Freecam
+        // beim ersten Tick in einer neuen Welt selbst ab.
+        if (client.level != enabledInLevel) {
+            this.toggle();
+        }
     }
 
     // Diese Methode wird jetzt über das CameraMixin bei jedem gerenderten Frame aufgerufen
@@ -96,9 +112,13 @@ public class Freecam extends Module {
         isActive = false;
         Minecraft mc = Minecraft.getInstance();
 
-        if (mc.player != null && originalPerspective != null) {
+        // Bugfix: Vorher nur mit mc.player != null - wurde Freecam ohne Welt
+        // beendet (z.B. nach Disconnect), blieb die Perspektive dauerhaft auf F5.
+        if (originalPerspective != null) {
             mc.options.setCameraType(originalPerspective);
+            originalPerspective = null;
         }
+        enabledInLevel = null;
 
         super.onDisable();
     }
