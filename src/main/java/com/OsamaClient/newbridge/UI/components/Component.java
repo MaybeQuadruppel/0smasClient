@@ -29,12 +29,38 @@ public abstract class Component {
 
     /**
      * Synchronisiert die physische Größe mit der aktuellen UI-Skalierung.
+     * (Legacy: setzt Breite UND Höhe. Neue Komponenten nutzen
+     * {@link #syncHeight(int, int)} und respektieren die vom jeweiligen GUI
+     * zugewiesene {@link #width}.)
      */
     public void syncScaledSize(int baseW, int baseH, int minW, int minH) {
         this.baseWidth = baseW;
         this.baseHeight = baseH;
         this.width = Math.max(minW, UISettings.scaled(baseW));
         this.height = Math.max(minH, UISettings.scaled(baseH));
+    }
+
+    /**
+     * Synchronisiert nur die HÖHE mit der Skalierung und lässt die Breite
+     * unangetastet – die Breite wird vom GUI (Classic-Spalte bzw. Meteor-Panel)
+     * vor dem Rendern zugewiesen, sodass Komponenten ihre Spalte/Panel füllen.
+     * Falls noch keine Breite gesetzt wurde, greift die skalierte Basisbreite.
+     */
+    protected void syncHeight(int baseH, int minH) {
+        this.baseHeight = baseH;
+        if (this.width <= 0) this.width = Math.max(1, UISettings.scaled(baseWidth));
+        this.height = Math.max(minH, UISettings.scaled(baseH));
+    }
+
+    /**
+     * Frame-basiertes, weiches Annähern eines Animationswerts an ein Ziel
+     * (0..1). {@code speed} ist der Anteil pro Frame (z. B. 0.25). Respektiert
+     * die globale Animations-Einstellung.
+     */
+    public static float approach(float current, float target, float speed) {
+        if (!UISettings.animationsEnabled) return target;
+        float next = current + (target - current) * Math.min(1f, Math.max(0f, speed));
+        return Math.abs(target - next) < 0.0015f ? target : next;
     }
 
     public boolean isHovered(double mouseX, double mouseY) {
@@ -97,18 +123,62 @@ public abstract class Component {
         drawShadow(g, x, y, w, h, 0x66000000);
     }
 
+    /** Standard-Eckenradius, skalenabhängig. */
+    private static int defaultRadius(int w, int h) {
+        if (!UISettings.roundedCorners) return 0;
+        int r = Math.max(2, UISettings.scaled(3));
+        return Math.min(r, Math.min(w, h) / 2);
+    }
+
+    /** Horizontaler Einzug einer Zeile innerhalb eines Eckradius (Viertelkreis). */
+    private static int cornerInset(int row, int r) {
+        double dy = (r - 0.5) - row;
+        double dx = r - Math.sqrt(Math.max(0.0, (double) r * r - dy * dy));
+        return (int) Math.round(dx);
+    }
+
     public static void drawRoundedRect(Object g, int x, int y, int w, int h, int color) {
-        if (g instanceof GuiGraphicsExtractor extractor) {
-            extractor.fill(x, y, x + w, y + h, color);
+        roundRect(g, x, y, w, h, defaultRadius(w, h), color);
+    }
+
+    /** Gefülltes Rechteck mit abgerundeten Ecken (billig über Randbänder). */
+    public static void roundRect(Object g, int x, int y, int w, int h, int r, int color) {
+        if (!(g instanceof GuiGraphicsExtractor e) || w <= 0 || h <= 0) return;
+        r = Math.min(r, Math.min(w, h) / 2);
+        if (r <= 0) { e.fill(x, y, x + w, y + h, color); return; }
+        e.fill(x, y + r, x + w, y + h - r, color);
+        for (int i = 0; i < r; i++) {
+            int ins = cornerInset(i, r);
+            e.fill(x + ins, y + i, x + w - ins, y + i + 1, color);
+            e.fill(x + ins, y + h - 1 - i, x + w - ins, y + h - i, color);
         }
     }
 
     public static void drawRoundedOutline(Object g, int x, int y, int w, int h, int color) {
-        if (g instanceof GuiGraphicsExtractor extractor) {
-            extractor.fill(x, y, x + w, y + 1, color);           // Oben
-            extractor.fill(x, y + h - 1, x + w, y + h, color);   // Unten
-            extractor.fill(x, y, x + 1, y + h, color);           // Links
-            extractor.fill(x + w - 1, y, x + w, y + h, color);   // Rechts
+        roundOutline(g, x, y, w, h, defaultRadius(w, h), color);
+    }
+
+    /** Rahmen mit abgerundeten Ecken. */
+    public static void roundOutline(Object g, int x, int y, int w, int h, int r, int color) {
+        if (!(g instanceof GuiGraphicsExtractor e) || w <= 0 || h <= 0) return;
+        r = Math.min(r, Math.min(w, h) / 2);
+        if (r <= 0) {
+            e.fill(x, y, x + w, y + 1, color);
+            e.fill(x, y + h - 1, x + w, y + h, color);
+            e.fill(x, y, x + 1, y + h, color);
+            e.fill(x + w - 1, y, x + w, y + h, color);
+            return;
+        }
+        e.fill(x + r, y, x + w - r, y + 1, color);
+        e.fill(x + r, y + h - 1, x + w - r, y + h, color);
+        e.fill(x, y + r, x + 1, y + h - r, color);
+        e.fill(x + w - 1, y + r, x + w, y + h - r, color);
+        for (int i = 0; i < r; i++) {
+            int ins = cornerInset(i, r);
+            e.fill(x + ins, y + i, x + ins + 1, y + i + 1, color);
+            e.fill(x + w - 1 - ins, y + i, x + w - ins, y + i + 1, color);
+            e.fill(x + ins, y + h - 1 - i, x + ins + 1, y + h - i, color);
+            e.fill(x + w - 1 - ins, y + h - 1 - i, x + w - ins, y + h - i, color);
         }
     }
 

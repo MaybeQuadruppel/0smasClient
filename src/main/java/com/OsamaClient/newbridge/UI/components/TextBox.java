@@ -113,7 +113,7 @@ public class TextBox extends Component {
     public void render(Object graphics, int mouseX, int mouseY) {
         if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
 
-        syncScaledSize(baseWidth, BASE_TOTAL_HEIGHT, 50, BASE_TOTAL_HEIGHT);
+        syncHeight(BASE_TOTAL_HEIGHT, UISettings.scaled(BASE_TOTAL_HEIGHT));
         updateViewOffset();
 
         Theme.Palette p = Theme.getActive().palette;

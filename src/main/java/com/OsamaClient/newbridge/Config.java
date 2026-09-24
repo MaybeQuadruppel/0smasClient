@@ -4,6 +4,7 @@ import com.OsamaClient.newbridge.Hacks.Visual.ESP.RenderUtils;
 import com.OsamaClient.newbridge.UI.ClickGuiScreen;
 import com.OsamaClient.newbridge.UI.GuiManager;
 import com.OsamaClient.newbridge.UI.GuiMode;
+import com.OsamaClient.newbridge.UI.ModernClickGuiScreen;
 import com.OsamaClient.newbridge.UI.Theme;
 import com.OsamaClient.newbridge.UI.UISettings;
 import com.OsamaClient.newbridge.UI.UISettingsModule;
@@ -378,6 +379,28 @@ public class Config {
                 favorites
         );
 
+        // Panel-Positionen der Modern-GUI (Meteor-Stil).
+        JsonObject panels =
+                new JsonObject();
+
+        for (Map.Entry<Module.Category, ModernClickGuiScreen.PanelState> e :
+                ModernClickGuiScreen.getPanelStates().entrySet()) {
+
+            if (!e.getValue().placed) continue;
+
+            JsonObject ps =
+                    new JsonObject();
+            ps.addProperty("x", e.getValue().x);
+            ps.addProperty("y", e.getValue().y);
+            ps.addProperty("collapsed", e.getValue().collapsed);
+            panels.add(e.getKey().name(), ps);
+        }
+
+        gui.add(
+                "panels",
+                panels
+        );
+
         root.add(
                 "gui_settings",
                 gui
@@ -706,6 +729,27 @@ public class Config {
             }
 
             ColorPicker.loadFavorites(favorites);
+        }
+
+        if (gui.has("panels")
+                && gui.get("panels").isJsonObject()) {
+
+            JsonObject panels =
+                    gui.getAsJsonObject("panels");
+
+            for (String key : panels.keySet()) {
+                try {
+                    JsonObject ps = panels.getAsJsonObject(key);
+                    ModernClickGuiScreen.loadPanel(
+                            key,
+                            ps.get("x").getAsDouble(),
+                            ps.get("y").getAsDouble(),
+                            ps.has("collapsed") && ps.get("collapsed").getAsBoolean()
+                    );
+                } catch (RuntimeException ignored) {
+                    // fehlerhaften Panel-Eintrag überspringen
+                }
+            }
         }
 
         UISettings.applyToSounds();

@@ -82,7 +82,7 @@ public class ItemPicker extends Component {
     public void render(Object graphics, int mouseX, int mouseY) {
         if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
 
-        syncScaledSize(baseWidth, BASE_TOTAL_HEIGHT, 60, BASE_TOTAL_HEIGHT);
+        syncHeight(BASE_TOTAL_HEIGHT, UISettings.scaled(BASE_TOTAL_HEIGHT));
         Theme.Palette p = Theme.getActive().palette;
 
         String title = label + (open ? " (R-Click: Color):" : ":");

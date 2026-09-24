@@ -16,7 +16,10 @@ public class ModeButton extends Component {
     private int index;
     private final Consumer<String> onChange;
 
-    private static final int BASE_HEIGHT = 16;
+    private float hoverAnim = 0f;
+    private float changeFlash = 0f; // kurzes Aufblitzen beim Wechsel
+
+    private static final int BASE_HEIGHT = 14;
 
     public ModeButton(String label, List<String> modes, int startIndex, Consumer<String> onChange) {
         super(0, 0, 100, BASE_HEIGHT);
@@ -36,37 +39,32 @@ public class ModeButton extends Component {
     public void render(Object graphics, int mouseX, int mouseY) {
         if (!(graphics instanceof GuiGraphicsExtractor guiGraphics)) return;
 
-        syncScaledSize(baseWidth, BASE_HEIGHT, 60, BASE_HEIGHT);
+        syncHeight(BASE_HEIGHT, UISettings.scaled(BASE_HEIGHT));
 
         Theme.Palette p = Theme.getActive().palette;
-        float hover = stepHover(mouseX, mouseY);
+        hoverAnim   = approach(hoverAnim, isHovered(mouseX, mouseY) ? 1f : 0f, 0.25f);
+        changeFlash = approach(changeFlash, 0f, 0.12f);
 
-        // Hintergrund mit Panel Alpha
         drawRoundedRect(guiGraphics, x, y, width, height,
-                UISettings.withPanelAlpha(lerpColor(p.bg, p.bgHover, hover)));
-        drawRoundedOutline(guiGraphics, x, y, width, height,
-                lerpColor(p.border, p.borderHover, hover * 0.7f));
+                UISettings.withPanelAlpha(lerpColor(p.bg, p.bgHover, hoverAnim * 0.8f)));
 
         int textOffsetY = UISettings.scaled(4);
-        String valText = "\u25C4 " + modes.get(index) + " \u25BA";
-
+        String valText = modes.get(index) + " \u203A";
         int valWidth = UISettings.textWidth(Minecraft.getInstance().font, valText);
         int valStartX = x + width - valWidth - UISettings.scaled(6);
 
-        // Label Scissor-Bereich
+        // Label links
         guiGraphics.enableScissor(x + 1, y + 1, Math.max(x + 1, valStartX - 2), y + height - 1);
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, label,
                 x + UISettings.scaled(6), y + (height / 2) - textOffsetY,
-                lerpColor(p.textDim, p.text, hover), false);
+                lerpColor(p.textDim, p.text, hoverAnim), false);
         guiGraphics.disableScissor();
 
-        // Modus-Text Scissor-Bereich
+        // Aktueller Modus rechts (Akzent, blitzt beim Wechsel kurz auf)
         guiGraphics.enableScissor(Math.max(x + 1, valStartX - 2), y + 1, x + width - 1, y + height - 1);
+        int valColor = lerpColor(lerpColor(p.textDim, p.accent, 0.5f + hoverAnim * 0.5f), p.text, changeFlash);
         UISettings.drawText(guiGraphics, Minecraft.getInstance().font, valText,
-                valStartX,
-                y + (height / 2) - textOffsetY,
-                lerpColor(p.textDim, lerpColor(p.accent, p.text, hover), hover),
-                false);
+                valStartX, y + (height / 2) - textOffsetY, valColor, false);
         guiGraphics.disableScissor();
     }
 
@@ -82,6 +80,7 @@ public class ModeButton extends Component {
             } else {
                 return false;
             }
+            changeFlash = 1f;
             onChange.accept(modes.get(index));
             return true;
         }

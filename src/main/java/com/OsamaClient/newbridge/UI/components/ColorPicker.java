@@ -173,7 +173,7 @@ public class ColorPicker extends Component {
     public void render(Object graphics, int mouseX, int mouseY) {
         if (!(graphics instanceof GuiGraphicsExtractor g)) return;
 
-        syncScaledSize(baseWidth, baseHeight, 96, 90);
+        syncHeight(baseHeight, UISettings.scaled(baseHeight));
         Theme.Palette p = Theme.getActive().palette;
 
         // Live-Drag anwenden (framegenau, wie beim alten Picker)
