@@ -2,6 +2,7 @@ package com.OsamaClient.newbridge.UI.gui;
 
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
+import com.OsamaClient.newbridge.config.ConfigCodec;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.anim.Progress;
 import com.OsamaClient.newbridge.UI.gui.input.UiInput;
@@ -60,8 +61,32 @@ public final class ClickGui {
             Panel p = new Panel(ORDER[i], TITLES[i], ModuleManager.getModulesByCategory(ORDER[i]));
             p.x = 8 + i * (Theme.PANEL_W + Theme.GAP);
             p.y = 8;
+            applyPending(p);
             panels.add(p);
         }
+    }
+
+    private final java.util.Map<String, ConfigCodec.PanelState> pendingPanels = new java.util.HashMap<>();
+
+    /** Panel layout for saving (panels that were never built keep their loaded state). */
+    public java.util.Map<String, ConfigCodec.PanelState> panelStates() {
+        java.util.Map<String, ConfigCodec.PanelState> out = new java.util.HashMap<>(pendingPanels);
+        for (Panel p : panels) out.put(p.category.name(), new ConfigCodec.PanelState(p.x, p.y, p.collapsed));
+        return out;
+    }
+
+    /** Restores saved panel positions / collapsed state (applied when the panels are built). */
+    public void applyPanelStates(java.util.Map<String, ConfigCodec.PanelState> states) {
+        pendingPanels.putAll(states);
+        for (Panel p : panels) applyPending(p);
+    }
+
+    private void applyPending(Panel p) {
+        ConfigCodec.PanelState s = pendingPanels.get(p.category.name());
+        if (s == null) return;
+        p.x = s.x();
+        p.y = s.y();
+        p.snapCollapsed(s.collapsed());
     }
 
     public Panel panel(Module.Category c) {
