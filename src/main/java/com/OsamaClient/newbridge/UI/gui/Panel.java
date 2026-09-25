@@ -16,7 +16,9 @@ public final class Panel {
     final String title;
     final List<ModuleRow> rows = new ArrayList<>();
 
+    /** Saved position (units); {@link #dx}/{@link #dy} is where it is drawn (clamped to the screen). */
     float x, y;
+    private float dx, dy;
     boolean collapsed;
     private final Anim openA = new Anim(1f, 14f);
     private final Anim scrollA = new Anim(0f, 16f);
@@ -50,7 +52,7 @@ public final class Panel {
     }
 
     boolean contains(float mx, float my) {
-        return mx >= x && mx < x + Theme.PANEL_W && my >= y && my < y + lastH;
+        return mx >= dx && mx < dx + Theme.PANEL_W && my >= dy && my < dy + lastH;
     }
 
     private float contentHeight() {
@@ -70,11 +72,10 @@ public final class Panel {
         }
 
         float w = Theme.PANEL_W;
-        // keep the panel reachable after a window resize (or a config from a bigger screen)
-        if (!dragging) {
-            x = Math.max(0f, Math.min(x, ui.width() - w));
-            y = Math.max(0f, Math.min(y, ui.height() - Theme.HEADER_H));
-        }
+        // keep the panel reachable after a window resize, without changing its saved position
+        dx = dragging ? this.x : Math.max(0f, Math.min(this.x, ui.width() - w));
+        dy = dragging ? this.y : Math.max(0f, Math.min(this.y, ui.height() - Theme.HEADER_H));
+        float x = dx, y = dy; // drawn position (shadows the saved one below)
         float yy = y - 6f * (1f - appear);
         float radius = Theme.radius();
         float headerH = Theme.HEADER_H;
@@ -149,6 +150,8 @@ public final class Panel {
         if (headerHovered) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                 dragging = true;
+                x = dx;
+                y = dy;
                 dragDX = ui.mouseX - x;
                 dragDY = ui.mouseY - y;
             } else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {

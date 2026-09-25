@@ -340,7 +340,7 @@ messages with the attribution lines your harness gives you. Test both backends i
 - [x] **9. Polish.** Compare against §2: compact, crisp, consistent spacing; smooth at 30 and 240 FPS; MC GUI scale changes nothing;
       854×480 and 4K both usable; no per-frame allocations in hot paths (reuse buffers); no GPU resource leaks
       (close textures/buffers on resize/scale change and on shutdown; an earlier ESP bug leaked GPU buffers and crashed after 20 min!).
-- [ ] **10. Optional blur background** (§4.4). Skip if it isn't clean.
+- [x] **10. Optional blur background** (§4.4). Skip if it isn't clean.
 - [ ] **11. Cleanup.** Remove spike code, final `./gradlew build` + `test`, tick all boxes here, and tell the user what's done
       (and anything that was skipped).
 

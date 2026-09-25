@@ -35,8 +35,20 @@ public final class UiPipelines {
             .build();
     public static final int TEXT_STRIDE = 12 + 8 + 4;
 
+    /** Blur pass vertex: NDC position, params (unused, unused, offset, mode), out (1/outW, 1/outH, alpha, unused). */
+    public static final VertexFormat BLUR_FORMAT = VertexFormat.builder(0)
+            .addAttribute("Position", GpuFormat.RGB32_FLOAT)
+            .addAttribute("Params", GpuFormat.RGBA32_FLOAT)
+            .addAttribute("Out", GpuFormat.RGBA32_FLOAT)
+            .build();
+    public static final int BLUR_STRIDE = 12 + 16 + 16;
+
     public static RenderPipeline SDF;
     public static RenderPipeline TEXT;
+    /** Blur down/up passes into our own textures (no blending). */
+    public static RenderPipeline BLUR;
+    /** Final blur pass onto the main target, blended with the open-animation alpha. */
+    public static RenderPipeline BLUR_COMPOSITE;
 
     private UiPipelines() {}
 
@@ -66,6 +78,22 @@ public final class UiPipelines {
                 .withDepthStencilState(Optional.empty())
                 .withCull(false)
                 .build());
+
+        BLUR = RenderPipelines.register(blur("pipeline/ui_blur").withColorTargetState(ColorTargetState.DEFAULT).build());
+        BLUR_COMPOSITE = RenderPipelines.register(blur("pipeline/ui_blur_composite")
+                .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT)).build());
+    }
+
+    private static RenderPipeline.Builder blur(String location) {
+        return RenderPipeline.builder()
+                .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+                .withLocation(id(location))
+                .withVertexShader(id("core/ui_blur"))
+                .withFragmentShader(id("core/ui_blur"))
+                .withVertexBinding(0, BLUR_FORMAT)
+                .withPrimitiveTopology(PrimitiveTopology.QUADS)
+                .withDepthStencilState(Optional.empty())
+                .withCull(false);
     }
 
     private static Identifier id(String path) {

@@ -6,6 +6,7 @@ import com.OsamaClient.newbridge.config.ConfigCodec;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.anim.Progress;
 import com.OsamaClient.newbridge.UI.gui.input.UiInput;
+import com.OsamaClient.newbridge.UI.gui.render.BlurRenderer;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.render.UiRenderer;
 import com.OsamaClient.newbridge.UI.gui.render.font.UiFont;
@@ -35,6 +36,7 @@ public final class ClickGui {
     private static final String[] TITLES = {"Combat", "Movement", "Visual", "Misc", "Donut", "Client"};
 
     private final UiRenderer renderer = new UiRenderer();
+    private final BlurRenderer blur = new BlurRenderer();
     private final Ui ui = new Ui(renderer);
     private final List<Panel> panels = new ArrayList<>();
     private final Progress openP = new Progress(0.3f);
@@ -134,6 +136,7 @@ public final class ClickGui {
     /** Frees our GPU resources (client shutdown). */
     public void shutdown() {
         renderer.close();
+        blur.close();
         UiFont.closeAll();
     }
 
@@ -185,7 +188,9 @@ public final class ClickGui {
     private void draw(float dt) {
         float open = openP.eased();
         String bg = Theme.background();
-        if (!"None".equals(bg)) ui.rect(0, 0, ui.width(), ui.height(), ColorUtil.alpha(0xFF000000, 0.35f * open));
+        if ("Blur".equals(bg)) blur.render(open, 1.5f); // executes before the UI pass (flushed later)
+        float dim = "Blur".equals(bg) ? 0.2f : "Dim".equals(bg) ? 0.35f : 0f;
+        if (dim > 0) ui.rect(0, 0, ui.width(), ui.height(), ColorUtil.alpha(0xFF000000, dim * open));
         ui.alpha = open;
         drawHelp(); // under the panels
 
