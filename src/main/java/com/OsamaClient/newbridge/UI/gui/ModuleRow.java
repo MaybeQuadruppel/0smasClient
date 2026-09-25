@@ -20,6 +20,8 @@ public final class ModuleRow {
     private static final int TEXT_OFF = 0xFFB9B9C3;
 
     final Module module;
+    /** Lower-case name for the search filter (computed once, not per frame). */
+    final String searchName;
     final List<SettingWidget> widgets = new ArrayList<>();
     private final Anim toggleA, hoverA = new Anim(0f, 18f), expandA = new Anim(0f, 14f);
     private boolean expanded;
@@ -29,6 +31,7 @@ public final class ModuleRow {
 
     ModuleRow(Module module) {
         this.module = module;
+        this.searchName = module.name.toLowerCase(java.util.Locale.ROOT);
         this.toggleA = new Anim(module.enabled ? 1f : 0f, 14f);
         for (Component c : module.settings) widgets.add(SettingWidgets.create(c));
         widgets.add(new BindWidget(module, () -> binding, () -> ClickGui.INSTANCE.startBinding(this)));

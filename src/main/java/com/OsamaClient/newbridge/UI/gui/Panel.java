@@ -8,7 +8,6 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /** One category column: header (drag / collapse), scrollable list of module rows. */
 public final class Panel {
@@ -65,12 +64,17 @@ public final class Panel {
         float speed = Theme.animSpeed();
         openA.update(ui.dt, speed);
         for (int i = 0; i < rows.size(); i++) {
-            boolean match = search.isEmpty() || rows.get(i).module.name.toLowerCase(Locale.ROOT).contains(search);
+            boolean match = search.isEmpty() || rows.get(i).searchName.contains(search);
             rowVisible[i].setTarget(match ? 1f : 0f);
             rowVisible[i].update(ui.dt, speed);
         }
 
         float w = Theme.PANEL_W;
+        // keep the panel reachable after a window resize (or a config from a bigger screen)
+        if (!dragging) {
+            x = Math.max(0f, Math.min(x, ui.width() - w));
+            y = Math.max(0f, Math.min(y, ui.height() - Theme.HEADER_H));
+        }
         float yy = y - 6f * (1f - appear);
         float radius = Theme.radius();
         float headerH = Theme.HEADER_H;

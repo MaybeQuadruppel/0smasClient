@@ -7,16 +7,19 @@ import java.util.Map;
 
 /**
  * Text measuring and drawing in physical pixels on top of {@link FontAtlas}. One atlas per pixel size,
- * created on first use and kept until {@link #closeAll()}.
+ * created on first use; idle ones are freed by {@link #collect(int)}, all of them by {@link #closeAll()}.
  */
 public final class UiFont {
 
     private static final Map<Integer, FontAtlas> ATLASES = new HashMap<>();
+    private static long frame;
 
     private UiFont() {}
 
     public static FontAtlas atlas(int pixelSize) {
-        return ATLASES.computeIfAbsent(Math.max(4, pixelSize), FontAtlas::new);
+        FontAtlas a = ATLASES.computeIfAbsent(Math.max(4, pixelSize), FontAtlas::new);
+        a.lastUsed = frame;
+        return a;
     }
 
     /** Frees every atlas (e.g. on shutdown). */
@@ -25,14 +28,19 @@ public final class UiFont {
         ATLASES.clear();
     }
 
-    /** Frees atlases of sizes that are no longer used (after a scale change). */
-    public static void retainOnly(java.util.Set<Integer> sizes) {
+    /**
+     * Call once per frame after drawing: frees atlases not used for {@code maxIdleFrames} frames
+     * (sizes left behind by a scale change), so their GPU textures do not pile up.
+     */
+    public static void collect(int maxIdleFrames) {
+        frame++;
         ATLASES.entrySet().removeIf(e -> {
-            if (sizes.contains(e.getKey())) return false;
+            if (frame - e.getValue().lastUsed <= maxIdleFrames) return false;
             e.getValue().close();
             return true;
         });
     }
+
 
     public static float width(FontAtlas a, String s) {
         float w = 0;

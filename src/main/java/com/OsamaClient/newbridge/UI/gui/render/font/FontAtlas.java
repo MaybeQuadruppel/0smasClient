@@ -53,6 +53,8 @@ public final class FontAtlas implements AutoCloseable {
     }
 
     public final int pixelSize;
+    /** Frame this atlas was last requested in (for {@link UiFont#collect}). */
+    long lastUsed;
     private final FT_Face face;
     private final boolean kerning;
     public final float ascender, descender, lineHeight, capHeight;

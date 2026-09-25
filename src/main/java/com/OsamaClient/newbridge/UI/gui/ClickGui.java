@@ -8,6 +8,7 @@ import com.OsamaClient.newbridge.UI.gui.anim.Progress;
 import com.OsamaClient.newbridge.UI.gui.input.UiInput;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.render.UiRenderer;
+import com.OsamaClient.newbridge.UI.gui.render.font.UiFont;
 import com.OsamaClient.newbridge.UI.gui.setting.SettingWidget;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import net.minecraft.client.Minecraft;
@@ -130,6 +131,12 @@ public final class ClickGui {
         GuiEvents.fireClosed();
     }
 
+    /** Frees our GPU resources (client shutdown). */
+    public void shutdown() {
+        renderer.close();
+        UiFont.closeAll();
+    }
+
     public void onScreenRemoved() {
         // screen replaced by something else (or closed by us at the end of the animation)
         if (openP.forward()) {
@@ -168,6 +175,7 @@ public final class ClickGui {
             ui.hoverBlocked = false;
             draw(dt);
             renderer.flush();
+            UiFont.collect(600);
         } catch (RuntimeException e) {
             LOG.error("ClickGui frame failed", e);
             renderer.begin(); // drop the half-built frame
@@ -178,25 +186,27 @@ public final class ClickGui {
         float open = openP.eased();
         String bg = Theme.background();
         if (!"None".equals(bg)) ui.rect(0, 0, ui.width(), ui.height(), ColorUtil.alpha(0xFF000000, 0.35f * open));
+        ui.alpha = open;
+        drawHelp(); // under the panels
 
         List<Panel> ps = panels();
         for (Panel p : ps) p.drag(ui);
         Panel top = topPanelAtMouse();
 
         hint = null;
+        String query = searchBar.query();
         for (int i = 0; i < ps.size(); i++) {
             Panel p = ps.get(i);
             float appear = openP.forward() ? Anim.easeOutCubic(openP.delayed(i * 0.03f)) : open;
             ui.alpha = appear;
             ui.hoverBlocked = p != top || !openP.forward();
-            p.render(ui, appear, searchBar.query());
+            p.render(ui, appear, query);
         }
         ui.hoverBlocked = false;
         ui.alpha = open;
 
         searchBar.draw(ui);
         drawTooltip(dt);
-        drawHelp();
     }
 
     private Panel topPanelAtMouse() {

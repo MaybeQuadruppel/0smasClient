@@ -61,6 +61,8 @@ public class EntryPoint implements ClientModInitializer {
         com.OsamaClient.newbridge.UI.gui.Keybinds.register();
         // Alles speichern/laden (Module, Keybinds, Einstellungen, Panels, GUI-Theme)
         com.OsamaClient.newbridge.config.Config.init();
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
+                c -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.shutdown());
 
         LevelRenderEvents.START_MAIN.register(context -> {
             Minecraft client = Minecraft.getInstance();
