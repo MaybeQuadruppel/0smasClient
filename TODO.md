@@ -327,7 +327,7 @@ messages with the attribution lines your harness gives you. Test both backends i
       If it really can't be made to work → **stop and ask the user**.
 - [x] **1. Font.** Inter + OFL license file, `FontAtlas` (FreeType) + `TextBatch` + `ui_text` pipeline + `UiFont`. Verify crisp text
       at scale 1, 1.5, 2, 3 and correct widths (right-aligned values line up).
-- [ ] **2. Pure logic + tests.** Add JUnit 5 to `build.gradle` (`testImplementation 'org.junit.jupiter:junit-jupiter:5.x'`,
+- [x] **2. Pure logic + tests.** Add JUnit 5 to `build.gradle` (`testImplementation 'org.junit.jupiter:junit-jupiter:5.x'`,
       `test { useJUnitPlatform() }`). Write `Anim` + `ColorUtil` test-first. `./gradlew test` passes.
 - [ ] **3. Data holder getters.** `Slider` min/max/step/default, `ModeButton.getModes()`, `TextBox` getters, `Module.key`,
       `Category.CLIENT`. Nothing else in modules changes.
