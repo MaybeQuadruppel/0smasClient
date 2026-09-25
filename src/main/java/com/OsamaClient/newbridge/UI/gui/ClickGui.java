@@ -37,6 +37,19 @@ public final class ClickGui {
         renderer.pushClip(100, 300, 100, 30);
         renderer.shape(80, 290, 200, 60, 10, 0, 0, 0xFF30D080, 0xFF30D080, 0xFF30D080, 0xFF30D080);
         renderer.popClip();
+        // font test: 7 units at scale 1, 1.5, 2, 3; right-aligned values must line up at x = 620
+        float y = 20;
+        for (float s : new float[]{1f, 1.5f, 2f, 3f}) {
+            var a = com.OsamaClient.newbridge.UI.gui.render.font.UiFont.atlas(Math.round(7 * s));
+            float rowH = 11 * s;
+            renderer.shape(340, y, 280, rowH, 2 * s, 0, 0, 0xFF18181D, 0xFF18181D, 0xFF18181D, 0xFF18181D);
+            float base = y + (rowH + a.capHeight) / 2f;
+            com.OsamaClient.newbridge.UI.gui.render.font.UiFont.draw(renderer, a, "KillAura Speed äöüß", 344, base, 0xFFE6E6EB);
+            String v = s + "x 4.50";
+            float w = com.OsamaClient.newbridge.UI.gui.render.font.UiFont.width(a, v);
+            com.OsamaClient.newbridge.UI.gui.render.font.UiFont.draw(renderer, a, v, 616 - w, base, 0xFF8A8A96);
+            y += rowH + 6;
+        }
         renderer.flush();
     }
 

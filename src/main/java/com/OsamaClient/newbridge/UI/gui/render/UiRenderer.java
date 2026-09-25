@@ -11,6 +11,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.OsamaClient.newbridge.UI.gui.render.font.FontAtlas;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.Projection;
@@ -38,7 +39,8 @@ public final class UiRenderer {
     private int cmds;
     private int[] cmdType = new int[64], cmdFirst = new int[64], cmdCount = new int[64];
     private int[] cmdClip = new int[64 * 4];
-    private GpuTextureView[] cmdTex = new GpuTextureView[64];
+    private FontAtlas[] cmdTex = new FontAtlas[64];
+    private GpuTextureView[] cmdView = new GpuTextureView[64];
 
     // clip stack in framebuffer px, top-left origin; clip[0] < 0 means "no clip"
     private final int[] clipStack = new int[32 * 4];
@@ -132,7 +134,7 @@ public final class UiRenderer {
     }
 
     /** One textured glyph quad in framebuffer pixels. */
-    public void glyph(GpuTextureView atlas, float x0, float y0, float x1, float y1,
+    public void glyph(FontAtlas atlas, float x0, float y0, float x1, float y1,
                       float u0, float v0, float u1, float v1, int argb) {
         if ((argb >>> 24) == 0) return;
         if (clipped(x0, y0, x1 - x0, y1 - y0)) return;
@@ -149,7 +151,7 @@ public final class UiRenderer {
     }
 
     /** Appends 4 vertices to the last command if its state matches, otherwise starts a new command. */
-    private void command(int type, GpuTextureView tex, int firstVertex) {
+    private void command(int type, FontAtlas tex, int firstVertex) {
         if (cmds > 0) {
             int i = cmds - 1;
             int c = i * 4;
@@ -165,6 +167,7 @@ public final class UiRenderer {
             cmdFirst = Arrays.copyOf(cmdFirst, n);
             cmdCount = Arrays.copyOf(cmdCount, n);
             cmdTex = Arrays.copyOf(cmdTex, n);
+            cmdView = Arrays.copyOf(cmdView, n);
             cmdClip = Arrays.copyOf(cmdClip, n * 4);
         }
         cmdType[cmds] = type;
@@ -182,6 +185,9 @@ public final class UiRenderer {
         Minecraft mc = Minecraft.getInstance();
         RenderTarget target = mc.gameRenderer.mainRenderTarget();
         CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+
+        // resolve atlas textures now (uploads new glyphs; an atlas may have grown during the frame)
+        for (int i = 0; i < cmds; i++) cmdView[i] = cmdTex[i] != null ? cmdTex[i].texture() : null;
 
         sdfGpu = upload(encoder, sdfGpu, sdf, "newbridge ui sdf");
         textGpu = upload(encoder, textGpu, text, "newbridge ui text");
@@ -216,9 +222,9 @@ public final class UiRenderer {
                     boundType = type;
                     boundTex = null;
                 }
-                if (type == TYPE_TEXT && cmdTex[i] != boundTex) {
-                    pass.bindTexture("Sampler0", cmdTex[i], sampler);
-                    boundTex = cmdTex[i];
+                if (type == TYPE_TEXT && cmdView[i] != boundTex) {
+                    pass.bindTexture("Sampler0", cmdView[i], sampler);
+                    boundTex = cmdView[i];
                 }
                 int c = i * 4;
                 if (cmdClip[c] >= 0) {

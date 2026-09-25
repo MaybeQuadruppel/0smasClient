@@ -325,7 +325,7 @@ messages with the attribution lines your harness gives you. Test both backends i
       Verify: correct position/size in **physical pixels**, AA edges, blending over the world, a resize works, changing MC's GUI
       scale changes **nothing**, no GL errors, works on OpenGL (and Vulkan if selectable).
       If it really can't be made to work → **stop and ask the user**.
-- [ ] **1. Font.** Inter + OFL license file, `FontAtlas` (FreeType) + `TextBatch` + `ui_text` pipeline + `UiFont`. Verify crisp text
+- [x] **1. Font.** Inter + OFL license file, `FontAtlas` (FreeType) + `TextBatch` + `ui_text` pipeline + `UiFont`. Verify crisp text
       at scale 1, 1.5, 2, 3 and correct widths (right-aligned values line up).
 - [ ] **2. Pure logic + tests.** Add JUnit 5 to `build.gradle` (`testImplementation 'org.junit.jupiter:junit-jupiter:5.x'`,
       `test { useJUnitPlatform() }`). Write `Anim` + `ColorUtil` test-first. `./gradlew test` passes.
