@@ -19,6 +19,7 @@
     "NoRender.RenderEffectLocalPlayerMixin",
     "NoRender.ScreenEffectRendererMixin",
     "EntityMixin",
+    "GameRendererUiMixin",
     "MinecraftMixin"
   ],
   "client": [

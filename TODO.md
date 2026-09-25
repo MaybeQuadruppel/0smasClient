@@ -320,7 +320,7 @@ After a visual step, tell them exactly what to look at. Commits go on `master` (
 messages with the attribution lines your harness gives you. Test both backends if the game has an option for it
 (Video Settings → graphics API / renderer, or a launch flag; find out with javap/strings on `blaze3d/vulkan`).
 
-- [ ] **0. Renderer spike.** `UiPipelines`, `ui_sdf` shaders, `UiRenderer` + `ShapeBatch`, the `GameRenderer` mixin hook, and a
+- [x] **0. Renderer spike.** `UiPipelines`, `ui_sdf` shaders, `UiRenderer` + `ShapeBatch`, the `GameRenderer` mixin hook, and a
       blank `ClickGuiScreen` (temporarily opened by RShift). Draw one rounded rect + glow + gradient at fixed pixel coordinates.
       Verify: correct position/size in **physical pixels**, AA edges, blending over the world, a resize works, changing MC's GUI
       scale changes **nothing**, no GL errors, works on OpenGL (and Vulkan if selectable).

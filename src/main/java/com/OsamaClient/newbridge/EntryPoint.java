@@ -7,6 +7,7 @@ import com.OsamaClient.newbridge.Hacks.Visual.Nametags;
 import com.OsamaClient.newbridge.Hacks.Visual.TeammateList;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
+import com.OsamaClient.newbridge.UI.gui.render.UiPipelines;
 import com.OsamaClient.newbridge.Utils.ChatHandler;
 import com.OsamaClient.newbridge.event.EventBus;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -51,6 +52,9 @@ public class EntryPoint implements ClientModInitializer {
                         .withDepthStencilState(Optional.empty())
                         .build()
         );
+
+        // Eigene Pipelines der ClickGUI (SDF-Formen + FreeType-Text)
+        UiPipelines.register();
 
         ModuleManager.init();
         ChatHandler.register();
