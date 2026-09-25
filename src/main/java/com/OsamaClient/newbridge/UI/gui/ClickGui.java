@@ -42,6 +42,7 @@ public final class ClickGui {
     private final Progress openP = new Progress(0.3f);
     private final Anim tooltipA = new Anim(0f, 16f);
     private long lastNanos;
+    private int failures;
 
     private String hint, shownHint = "";
     private float hintTime;
@@ -180,7 +181,7 @@ public final class ClickGui {
             renderer.flush();
             UiFont.collect(600);
         } catch (RuntimeException e) {
-            LOG.error("ClickGui frame failed", e);
+            if (failures++ % 600 == 0) LOG.error("ClickGui frame failed ({}x)", failures, e); // no log flood
             renderer.begin(); // drop the half-built frame
         }
     }

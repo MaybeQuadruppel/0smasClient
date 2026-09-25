@@ -1,5 +1,30 @@
 # TODO: Build the new ClickGUI (handoff for a fresh Claude session)
 
+> **STATUS (2026-09-25): all steps 0–11 are DONE** (see the ticked boxes in §5 and `git log`). Verified in-game on
+> OpenGL and Vulkan by screenshots. The notes below record where the implementation deviates from this plan.
+>
+> Decisions taken during implementation (each with what it costs if wrong):
+> - **Search bar sits at the bottom center**, not top center: panels start at y = 8, so a top bar would cover the
+>   headers of the middle panels. Cost: one constant in `SearchBar.draw` to move it.
+> - **`ItemPicker`'s `Integer` is an ARGB outline color** (ItemESP uses it), not a count: persisted as
+>   `{ "minecraft:diamond": "#FFFFD700" }`; new items default to gold `0xFFFFD700` like the old picker. RMB on a
+>   selected item opens its color picker.
+> - **`EnchantmentPicker`'s map is display name → max emerald price** (AutoTrade matches names against book
+>   descriptions), not id → level. The picker offers the old hardcoded name list; new entries default to price 20;
+>   RMB on a selected one opens a price slider. Cost if wrong: swap the list source in `SettingWidgets`.
+> - **Every module gets a "Bind" row** at the end of its settings (so every row is expandable), plus MMB bind mode.
+> - **Scale is only applied while no mouse button is held**, otherwise dragging the Scale slider feeds back into
+>   the mouse → units mapping and jumps to the max.
+> - **`Progress.delayed`** lets staggered panels start later but finish together (the first version never
+>   reached 1 for later panels; fixed test-first). Open animation is 0.3 s with 30 ms stagger.
+> - **Panels keep their saved position**; only the drawn position is clamped to the window, so a small window no
+>   longer rearranges the layout for good.
+> - **Blur** (step 10) was clean enough to keep: `BlurRenderer`, dual Kawase, uv from `gl_FragCoord` (no backend Y
+>   conventions). With Blur a lighter dim (0.2) is drawn on top for contrast.
+> - Added an SDF **line-segment mode** (mode 3) to `ui_sdf` for chevrons, the checkmark helper and the search icon.
+> - Slider values are saved rounded to 7 significant digits (float → double noise); broken config files are kept
+>   as `0smasclient.json.broken`.
+
 > **If you are a new Claude session: read this whole file, then start coding at "Implementation plan", step 0.**
 > The design below was discussed with the user and **approved** on 2026-09-24. The user explicitly asked that the next
 > session implement directly from this file. Do **not** re-run brainstorming or ask the design questions again.
@@ -341,7 +366,7 @@ messages with the attribution lines your harness gives you. Test both backends i
       854×480 and 4K both usable; no per-frame allocations in hot paths (reuse buffers); no GPU resource leaks
       (close textures/buffers on resize/scale change and on shutdown; an earlier ESP bug leaked GPU buffers and crashed after 20 min!).
 - [x] **10. Optional blur background** (§4.4). Skip if it isn't clean.
-- [ ] **11. Cleanup.** Remove spike code, final `./gradlew build` + `test`, tick all boxes here, and tell the user what's done
+- [x] **11. Cleanup.** Remove spike code, final `./gradlew build` + `test`, tick all boxes here, and tell the user what's done
       (and anything that was skipped).
 
 ### Definition of done

@@ -14,6 +14,6 @@ public class LabelWidget extends SettingWidget {
     @Override
     protected void draw(Ui ui) {
         background(ui, height());
-        ui.text(label(setting), x + Theme.PAD, y, height(), Theme.FONT_SMALL, Theme.TEXT_DIM);
+        ui.text(com.OsamaClient.newbridge.config.ConfigCodec.label(setting), x + Theme.PAD, y, height(), Theme.FONT_SMALL, Theme.TEXT_DIM);
     }
 }

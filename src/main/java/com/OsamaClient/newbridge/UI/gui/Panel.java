@@ -114,14 +114,18 @@ public final class Panel {
         float lineW = (w - 2 * Theme.PAD) * (0.35f + 0.65f * openA.value());
         ui.gradientH(x + Theme.PAD, yy + headerH - 1f, lineW, 1f / ui.scale, 0, Theme.accent(0.9f), Theme.accent(0.05f));
 
-        // rows
+        // rows (a collapsed body draws none, so drop their hover state)
+        if (bodyH <= 0.01f) for (ModuleRow r : rows) r.clearHover();
         if (bodyH > 0.01f) {
             float top = yy + headerH;
             ui.pushClip(x, top, w, bodyH);
             float ry = top - scrollA.value();
             for (int i = 0; i < rows.size(); i++) {
                 float v = rowVisible[i].value();
-                if (v < 0.001f) continue;
+                if (v < 0.001f) {
+                    rows.get(i).clearHover();
+                    continue;
+                }
                 ModuleRow row = rows.get(i);
                 float rh = row.height() * v;
                 if (v < 0.999f) {

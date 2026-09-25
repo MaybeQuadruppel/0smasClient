@@ -107,6 +107,7 @@ public final class ModuleRow {
             for (SettingWidget sw : widgets) {
                 float wh = sw.height();
                 if (ui.visible(x, yy, w, wh) || sw.wantsKeyboard()) sw.render(ui, x + 1f, yy, w - 1f);
+                else sw.clearHover();
                 if (sw.isHovered()) ClickGui.INSTANCE.hint(sw.description());
                 yy += wh;
             }
@@ -114,6 +115,12 @@ public final class ModuleRow {
             ui.rect(x, y + h, 1f, sh, Theme.accent(0.35f + 0.35f * t));
             ui.popClip();
         }
+    }
+
+    /** Not drawn this frame (hidden by search, collapsed panel): forget hover state. */
+    void clearHover() {
+        hovered = false;
+        for (SettingWidget sw : widgets) sw.clearHover();
     }
 
     boolean mouseClicked(Ui ui, int button, int mods) {

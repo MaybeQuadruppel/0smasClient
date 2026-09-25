@@ -47,6 +47,9 @@ public abstract class SettingWidget {
 
     public boolean isHovered() { return hovered; }
 
+    /** Called instead of {@link #render} when the widget is not drawn this frame (no stale hover). */
+    public void clearHover() { hovered = false; }
+
     public String description() { return setting.getDescription(); }
 
     /** @return true if the click was consumed. */
@@ -69,12 +72,4 @@ public abstract class SettingWidget {
 
     /** Hovered widget gets key presses too (e.g. arrow keys on sliders) even without focus. */
     public boolean hoverKey(int key, int mods) { return false; }
-
-    protected static String label(Component c) {
-        try {
-            return (String) c.getClass().getMethod("getLabel").invoke(c);
-        } catch (ReflectiveOperationException e) {
-            return c.getClass().getSimpleName();
-        }
-    }
 }
