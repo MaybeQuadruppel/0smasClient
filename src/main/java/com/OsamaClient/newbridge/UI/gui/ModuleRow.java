@@ -4,6 +4,7 @@ import com.OsamaClient.newbridge.UI.components.Component;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
+import com.OsamaClient.newbridge.UI.gui.setting.BindWidget;
 import com.OsamaClient.newbridge.UI.gui.setting.SettingWidget;
 import com.OsamaClient.newbridge.UI.gui.setting.SettingWidgets;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
@@ -30,6 +31,7 @@ public final class ModuleRow {
         this.module = module;
         this.toggleA = new Anim(module.enabled ? 1f : 0f, 14f);
         for (Component c : module.settings) widgets.add(SettingWidgets.create(c));
+        widgets.add(new BindWidget(module, () -> binding, () -> ClickGui.INSTANCE.startBinding(this)));
     }
 
     private float settingsHeight() {

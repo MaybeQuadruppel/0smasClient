@@ -44,6 +44,7 @@ public final class ClickGui {
     private ModuleRow bindingRow;
     private SettingWidget focused;
     String search = "";
+    private int buttonsDown;
 
     private ClickGui() {}
 
@@ -84,6 +85,7 @@ public final class ClickGui {
         panels();
         if (!(mc.gui.screen() instanceof ClickGuiScreen)) mc.gui.setScreen(new ClickGuiScreen());
         openP.setForward(true);
+        buttonsDown = 0;
         lastNanos = 0;
     }
 
@@ -131,7 +133,8 @@ public final class ClickGui {
 
         try {
             renderer.begin();
-            ui.scale = Theme.scale();
+            // never change the scale while a button is held (dragging the Scale slider would feed back)
+            if (buttonsDown == 0) ui.scale = Theme.scale();
             ui.dt = dt;
             ui.mouseX = UiInput.mouseFbX() / ui.scale;
             ui.mouseY = UiInput.mouseFbY() / ui.scale;
@@ -221,6 +224,7 @@ public final class ClickGui {
     // ------------------------------------------------------------------ input (from ClickGuiScreen)
 
     public void mouseClicked(int button, int mods) {
+        buttonsDown |= 1 << button;
         if (!openP.forward()) return;
         if (bindingRow != null) {
             bindingRow.binding = false;
@@ -241,6 +245,7 @@ public final class ClickGui {
     }
 
     public void mouseReleased(int button) {
+        buttonsDown &= ~(1 << button);
         for (Panel p : panels) p.mouseReleased(ui, button);
     }
 
