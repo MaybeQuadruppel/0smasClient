@@ -42,6 +42,8 @@ public class TextBox extends Component {
     }
 
     public String getLabel() { return label; }
+    public int getMaxLength() { return maxLength; }
+    public boolean isNumericOnly() { return numericOnly; }
 
     private String clampLength(String value) {
         return (maxLength >= 0 && value.length() > maxLength) ? value.substring(0, maxLength) : value;

@@ -329,7 +329,7 @@ messages with the attribution lines your harness gives you. Test both backends i
       at scale 1, 1.5, 2, 3 and correct widths (right-aligned values line up).
 - [x] **2. Pure logic + tests.** Add JUnit 5 to `build.gradle` (`testImplementation 'org.junit.jupiter:junit-jupiter:5.x'`,
       `test { useJUnitPlatform() }`). Write `Anim` + `ColorUtil` test-first. `./gradlew test` passes.
-- [ ] **3. Data holder getters.** `Slider` min/max/step/default, `ModeButton.getModes()`, `TextBox` getters, `Module.key`,
+- [x] **3. Data holder getters.** `Slider` min/max/step/default, `ModeButton.getModes()`, `TextBox` getters, `Module.key`,
       `Category.CLIENT`. Nothing else in modules changes.
 - [ ] **4. ClickGui + Panel + ModuleRow.** Scaling, raw input, dragging, collapse, scroll, toggle/hover/expand animations, tooltip,
       help line, open/close animation, Dim background. `ClickGuiModule` + `Theme`.

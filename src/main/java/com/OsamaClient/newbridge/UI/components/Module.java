@@ -10,13 +10,15 @@ public abstract class Module {
     public String name;
     public boolean enabled = false;
     public boolean keyAlreadyPressed = false;
+    /** GLFW key code that toggles this module, -1 = unbound. */
+    public int key = -1;
     public String description;
     public Category category;
 
     public List<Component> settings = new ArrayList<>();
 
     public enum Category {
-        COMBAT, MOVEMENT, VISUAL, MISC, Donut
+        COMBAT, MOVEMENT, VISUAL, MISC, Donut, CLIENT
     }
 
     public Module(String name, String description, Category category) {

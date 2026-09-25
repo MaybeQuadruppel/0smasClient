@@ -44,6 +44,10 @@ public class Slider extends Component {
 
     public String getLabel() { return label; }
     public double getValue() { return value; }
+    public double getMin() { return min; }
+    public double getMax() { return max; }
+    public double getStep() { return step; }
+    public double getDefaultValue() { return defaultValue; }
 
     public void setValue(double v) {
         this.value = snap(v);

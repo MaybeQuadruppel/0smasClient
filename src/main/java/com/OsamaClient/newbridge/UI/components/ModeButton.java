@@ -26,6 +26,8 @@ public class ModeButton extends Component {
 
     public String getLabel() { return label; }
     public int getIndex() { return index; }
+    public List<String> getModes() { return modes; }
+    public String getMode() { return modes.get(index); }
 
     public void setIndex(int i) {
         this.index = Math.min(modes.size() - 1, Math.max(0, i));
