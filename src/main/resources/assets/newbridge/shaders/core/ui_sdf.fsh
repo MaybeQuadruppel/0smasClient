@@ -2,7 +2,8 @@
 
 // newbridge ClickGUI: signed-distance rounded rects in physical pixels.
 // Shape = (local.x, local.y, mode, param), Rect = (halfW, halfH, radius, unused).
-// mode 0 = fill, 1 = outline (param = thickness), 2 = glow (param = glow radius).
+// mode 0 = fill, 1 = outline (param = thickness), 2 = glow (param = glow radius),
+// mode 3 = line segment from Rect.xy to Rect.zw (relative to the quad center), param = thickness.
 
 layout(std140) uniform DynamicTransforms {
     mat4 ModelViewMat;
@@ -30,7 +31,12 @@ void main() {
     float param = vShape.w;
 
     float a;
-    if (mode < 0.5) {
+    if (mode > 2.5) {
+        vec2 pa = vShape.xy - vRect.xy, ba = vRect.zw - vRect.xy;
+        float h = clamp(dot(pa, ba) / max(dot(ba, ba), 0.0001), 0.0, 1.0);
+        float ds = length(pa - ba * h) - param * 0.5;
+        a = clamp(0.5 - ds, 0.0, 1.0);
+    } else if (mode < 0.5) {
         a = clamp(0.5 - d, 0.0, 1.0);
     } else if (mode < 1.5) {
         a = clamp(0.5 - (abs(d + param * 0.5) - param * 0.5), 0.0, 1.0);

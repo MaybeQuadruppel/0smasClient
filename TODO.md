@@ -331,7 +331,7 @@ messages with the attribution lines your harness gives you. Test both backends i
       `test { useJUnitPlatform() }`). Write `Anim` + `ColorUtil` test-first. `./gradlew test` passes.
 - [x] **3. Data holder getters.** `Slider` min/max/step/default, `ModeButton.getModes()`, `TextBox` getters, `Module.key`,
       `Category.CLIENT`. Nothing else in modules changes.
-- [ ] **4. ClickGui + Panel + ModuleRow.** Scaling, raw input, dragging, collapse, scroll, toggle/hover/expand animations, tooltip,
+- [x] **4. ClickGui + Panel + ModuleRow.** Scaling, raw input, dragging, collapse, scroll, toggle/hover/expand animations, tooltip,
       help line, open/close animation, Dim background. `ClickGuiModule` + `Theme`.
 - [ ] **5. Keybinds.** Tick-based key handling, RShift opens the GUI, `BindWidget`, MMB bind mode.
 - [ ] **6. Setting widgets.** Bool → Slider → Mode → Color (full picker) → Text → EntityFilter → ListPicker. Look at each one in-game.

@@ -33,10 +33,12 @@ public final class Progress {
 
     public float eased() { return Anim.easeOutCubic(raw()); }
 
-    /** Progress of an element that starts {@code delay} seconds later (still ends at 1 when fully open). */
+    /** Progress of an element that starts {@code delay} seconds later but still ends together with the rest. */
     public float delayed(float delay) {
-        if (elapsed >= duration + delay || (!forward && raw() >= 1f)) return 1f;
-        return Anim.clamp01((elapsed - delay) / duration);
+        if (delay <= 0f) return raw();
+        float span = duration - delay;
+        if (span <= 0f) return raw() >= 1f ? 1f : 0f;
+        return Anim.clamp01((elapsed - delay) / span);
     }
 
     public boolean finished() { return forward ? elapsed >= duration : elapsed <= 0f; }

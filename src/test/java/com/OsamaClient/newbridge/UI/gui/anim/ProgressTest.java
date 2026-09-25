@@ -58,7 +58,7 @@ class ProgressTest {
         p.setForward(true);
         p.update(0.1f, 1f); // elapsed 0.1 s
         assertEquals(0.5f, p.delayed(0f), 1e-6);
-        assertEquals(0.25f, p.delayed(0.05f), 1e-6);
+        assertEquals(1f / 3f, p.delayed(0.05f), 1e-6); // starts later, still ends with the rest
         assertEquals(0f, p.delayed(0.2f), 1e-6);
     }
 
@@ -68,5 +68,24 @@ class ProgressTest {
         p.setForward(true);
         run(p, 0.5f);
         assertEquals(Anim.easeOutCubic(0.5f), p.eased(), 1e-5);
+    }
+
+    @Test
+    void delayedElementsReachOneWhenFullyOpen() {
+        Progress p = new Progress(0.2f);
+        p.setForward(true);
+        run(p, 0.3f);
+        assertEquals(1f, p.delayed(0.05f), 1e-6);
+        assertEquals(1f, p.delayed(0.15f), 1e-6);
+    }
+
+    @Test
+    void delayedElementsReachZeroWhenClosed() {
+        Progress p = new Progress(0.2f);
+        p.setForward(true);
+        run(p, 0.3f);
+        p.setForward(false);
+        run(p, 0.3f);
+        assertEquals(0f, p.delayed(0.05f), 1e-6);
     }
 }

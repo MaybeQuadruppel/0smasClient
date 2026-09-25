@@ -102,6 +102,12 @@ public final class UiRenderer {
         return x > clip[0] + clip[2] || y > clip[1] + clip[3] || x + w < clip[0] || y + h < clip[1];
     }
 
+    /** True if the pixel lies inside the current clip (or no clip is active). */
+    public boolean insideClip(float px, float py) {
+        if (clip[0] < 0) return true;
+        return px >= clip[0] && px < clip[0] + clip[2] && py >= clip[1] && py < clip[1] + clip[3];
+    }
+
     // ------------------------------------------------------------------ primitives
 
     /**
@@ -123,6 +129,31 @@ public final class UiRenderer {
         sdfVertex(b, x0, y1, cx, cy, cBL, mode, param, hw, hh, radius);
         sdfVertex(b, x1, y1, cx, cy, cBR, mode, param, hw, hh, radius);
         sdfVertex(b, x1, y0, cx, cy, cTR, mode, param, hw, hh, radius);
+    }
+
+    /** Anti-aliased line segment (round caps) in framebuffer pixels. */
+    public void line(float ax, float ay, float bx, float by, float thickness, int argb) {
+        if ((argb >>> 24) == 0) return;
+        float e = thickness * 0.5f + 1f;
+        float x0 = Math.min(ax, bx) - e, y0 = Math.min(ay, by) - e;
+        float x1 = Math.max(ax, bx) + e, y1 = Math.max(ay, by) + e;
+        if (clipped(x0, y0, x1 - x0, y1 - y0)) return;
+        command(TYPE_SDF, null, sdf.vertexCount());
+        float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
+        float rax = ax - cx, ray = ay - cy, rbx = bx - cx, rby = by - cy;
+        ByteBuffer b = sdf.reserve(4);
+        lineVertex(b, x0, y0, cx, cy, argb, thickness, rax, ray, rbx, rby);
+        lineVertex(b, x0, y1, cx, cy, argb, thickness, rax, ray, rbx, rby);
+        lineVertex(b, x1, y1, cx, cy, argb, thickness, rax, ray, rbx, rby);
+        lineVertex(b, x1, y0, cx, cy, argb, thickness, rax, ray, rbx, rby);
+    }
+
+    private static void lineVertex(ByteBuffer b, float x, float y, float cx, float cy, int color, float thickness,
+                                   float ax, float ay, float bx, float by) {
+        b.putFloat(x).putFloat(y).putFloat(0f);
+        QuadBuffer.putColor(b, color);
+        b.putFloat(x - cx).putFloat(y - cy).putFloat(3f).putFloat(thickness);
+        b.putFloat(ax).putFloat(ay).putFloat(bx).putFloat(by);
     }
 
     private static void sdfVertex(ByteBuffer b, float x, float y, float cx, float cy, int color, int mode, float param,

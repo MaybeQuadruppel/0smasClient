@@ -74,6 +74,7 @@ public class ModuleManager {
         modules.add(new TrueSight());
         modules.add(new AutoEat());
         modules.add(new TeammateList());
+        modules.add(new com.OsamaClient.newbridge.UI.gui.ClickGuiModule());
 
     }
 

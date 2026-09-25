@@ -58,6 +58,7 @@ public class EntryPoint implements ClientModInitializer {
 
         ModuleManager.init();
         ChatHandler.register();
+        com.OsamaClient.newbridge.UI.gui.Keybinds.register();
 
         LevelRenderEvents.START_MAIN.register(context -> {
             Minecraft client = Minecraft.getInstance();
