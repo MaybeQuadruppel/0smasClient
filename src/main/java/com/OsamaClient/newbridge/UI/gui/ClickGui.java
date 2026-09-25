@@ -43,7 +43,7 @@ public final class ClickGui {
     private float hintTime;
     private ModuleRow bindingRow;
     private SettingWidget focused;
-    String search = "";
+    private final SearchBar searchBar = new SearchBar();
     private int buttonsDown;
 
     private ClickGui() {}
@@ -95,6 +95,7 @@ public final class ClickGui {
         focused = null;
         bindingRow = null;
         for (Panel p : panels) p.dragging = false;
+        searchBar.close();
         openP.setForward(false);
         onClosed();
     }
@@ -163,11 +164,12 @@ public final class ClickGui {
             float appear = openP.forward() ? Anim.easeOutCubic(openP.delayed(i * 0.03f)) : open;
             ui.alpha = appear;
             ui.hoverBlocked = p != top || !openP.forward();
-            p.render(ui, appear, search.toLowerCase(java.util.Locale.ROOT));
+            p.render(ui, appear, searchBar.query());
         }
         ui.hoverBlocked = false;
         ui.alpha = open;
 
+        searchBar.draw(ui);
         drawTooltip(dt);
         drawHelp();
     }
@@ -230,6 +232,12 @@ public final class ClickGui {
             bindingRow.binding = false;
             bindingRow = null;
         }
+        if (searchBar.mouseClicked(button)) {
+            if (focused != null) focused.blur();
+            focused = null;
+            return;
+        }
+        searchBar.unfocus();
         SettingWidget wasFocused = focused;
         focused = null;
         Panel top = topPanelAtMouse();
@@ -265,6 +273,11 @@ public final class ClickGui {
             GuiEvents.fireChanged();
             return;
         }
+        if (searchBar.keyPressed(key, mods)) return;
+        if (focused == null && key == GLFW.GLFW_KEY_F && UiInput.ctrl(mods)) {
+            searchBar.open();
+            return;
+        }
         if (focused != null) {
             if (key == GLFW.GLFW_KEY_ESCAPE) {
                 focused.blur();
@@ -284,6 +297,7 @@ public final class ClickGui {
     }
 
     public void charTyped(int codepoint) {
+        if (searchBar.charTyped(codepoint)) return;
         if (focused != null) focused.charTyped(codepoint);
     }
 
