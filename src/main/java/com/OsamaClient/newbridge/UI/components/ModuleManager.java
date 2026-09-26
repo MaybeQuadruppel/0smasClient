@@ -12,6 +12,7 @@ import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
 import com.OsamaClient.newbridge.Hacks.Visual.HealthIndicator;
 import com.OsamaClient.newbridge.Hacks.Visual.XRay;
 import com.OsamaClient.newbridge.Hacks.Visual.*;
+import com.OsamaClient.newbridge.UI.gui.ClickGuiModule;
 //import com.OsamaClient.newbridge.Hacks.Visual.Trajectories;
 
 import java.util.ArrayList;
@@ -74,7 +75,10 @@ public class ModuleManager {
         modules.add(new TrueSight());
         modules.add(new AutoEat());
         modules.add(new TeammateList());
-        modules.add(new com.OsamaClient.newbridge.UI.gui.ClickGuiModule());
+        modules.add(new ClickGuiModule());
+        modules.add(new HudOverlay());
+
+
 
     }
 

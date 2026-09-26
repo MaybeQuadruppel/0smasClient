@@ -1,10 +1,8 @@
 package com.OsamaClient.newbridge;
 
 import com.OsamaClient.newbridge.Hacks.Combat.AimAssist;
-import com.OsamaClient.newbridge.Hacks.Misc.ModuleList;
+import com.OsamaClient.newbridge.Hacks.Visual.ModuleList;
 import com.OsamaClient.newbridge.Hacks.Misc.Scaffold;
-import com.OsamaClient.newbridge.Hacks.Visual.Nametags;
-import com.OsamaClient.newbridge.Hacks.Visual.TeammateList;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import com.OsamaClient.newbridge.UI.gui.render.UiPipelines;
@@ -13,7 +11,6 @@ import com.OsamaClient.newbridge.event.EventBus;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -29,10 +26,6 @@ public class EntryPoint implements ClientModInitializer {
     public static EntryPoint INSTANCE;
 
     public static final EventBus EVENT_BUS = new EventBus();
-
-    private static final Identifier TEAMMATE_LIST_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "teammate_list");
-    private static final Identifier MODULE_LIST_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "module_list");
-    private static final Identifier NAMETAGS_HUD_ID = Identifier.fromNamespaceAndPath("newbridge", "nametags");
 
     @Override
     public void onInitializeClient() {
@@ -96,9 +89,8 @@ public class EntryPoint implements ClientModInitializer {
             }
         });
 
-        // HUD-Elemente der Module (kein GUI-System, nur die Modul-eigenen Overlays)
-        HudElementRegistry.addLast(TEAMMATE_LIST_HUD_ID, (guiGraphics, deltaTracker) -> TeammateList.draw(guiGraphics));
-        HudElementRegistry.addLast(MODULE_LIST_HUD_ID, (guiGraphics, deltaTracker) -> ModuleList.draw(guiGraphics));
-        HudElementRegistry.addLast(NAMETAGS_HUD_ID, (guiGraphics, deltaTracker) -> Nametags.draw(guiGraphics));
+        // TeammateList, Nametags, ModuleList und HudOverlay hängen NICHT mehr hier über
+        // HudElementRegistry - sie laufen alle über dieselbe eigene UiRenderer-Pipeline und werden
+        // deshalb zentral vom GameRendererUiMixin aus gezeichnet (siehe dessen Klassenkommentar).
     }
 }

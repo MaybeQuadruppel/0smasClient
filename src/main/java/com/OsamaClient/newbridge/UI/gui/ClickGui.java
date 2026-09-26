@@ -63,7 +63,7 @@ public final class ClickGui {
     private void buildPanels() {
         for (int i = 0; i < ORDER.length; i++) {
             Panel p = new Panel(ORDER[i], TITLES[i], ModuleManager.getModulesByCategory(ORDER[i]));
-            p.x = 8 + i * (Theme.PANEL_W + Theme.GAP);
+            p.x = 8 + i * (Theme.panelW() + Theme.GAP);
             p.y = 8;
             applyPending(p);
             panels.add(p);

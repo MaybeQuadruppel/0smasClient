@@ -52,7 +52,7 @@ public final class Panel {
     }
 
     boolean contains(float mx, float my) {
-        return mx >= dx && mx < dx + Theme.PANEL_W && my >= dy && my < dy + lastH;
+        return mx >= dx && mx < dx + Theme.panelW() && my >= dy && my < dy + lastH;
     }
 
     private float contentHeight() {
@@ -71,7 +71,7 @@ public final class Panel {
             rowVisible[i].update(ui.dt, speed);
         }
 
-        float w = Theme.PANEL_W;
+        float w = Theme.panelW();
         // keep the panel reachable after a window resize, without changing its saved position
         dx = dragging ? this.x : Math.max(0f, Math.min(this.x, ui.width() - w));
         dy = dragging ? this.y : Math.max(0f, Math.min(this.y, ui.height() - Theme.HEADER_H));
@@ -100,7 +100,7 @@ public final class Panel {
         // glow + body
         float g = Theme.glow();
         if (g > 0) ui.glow(x, yy, w, totalH, radius, 7f, Theme.accent(0.16f * g));
-        ui.round(x, yy, w, totalH, radius, Theme.PANEL_BG);
+        ui.round(x, yy, w, totalH, radius, Theme.panelBg());
 
         // header
         ui.text(title, x + Theme.PAD + 2f, yy, headerH, Theme.FONT, Theme.TEXT);
@@ -172,7 +172,7 @@ public final class Panel {
 
     void drag(Ui ui) {
         if (!dragging) return;
-        x = Math.round(Math.min(Math.max(ui.mouseX - dragDX, -Theme.PANEL_W + 20f), ui.width() - 20f));
+        x = Math.round(Math.min(Math.max(ui.mouseX - dragDX, -Theme.panelW() + 20f), ui.width() - 20f));
         y = Math.round(Math.min(Math.max(ui.mouseY - dragDY, 0f), ui.height() - Theme.HEADER_H));
     }
 
@@ -184,7 +184,7 @@ public final class Panel {
     boolean mouseScrolled(Ui ui, double amount) {
         if (!bodyHovered) return false;
         for (ModuleRow r : rows) if (r.mouseScrolled(ui, amount)) return true;
-        scrollTarget -= (float) amount * Theme.ROW_H * 2f;
+        scrollTarget -= (float) amount * Theme.rowH() * 2f;
         return true;
     }
 

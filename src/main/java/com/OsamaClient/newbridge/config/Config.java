@@ -3,6 +3,7 @@ package com.OsamaClient.newbridge.config;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import com.OsamaClient.newbridge.UI.gui.ClickGui;
 import com.OsamaClient.newbridge.UI.gui.GuiEvents;
+import com.OsamaClient.newbridge.Hacks.Visual.HudOverlay;
 import com.google.gson.JsonParser;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -66,8 +67,10 @@ public final class Config {
             String json = Files.readString(f, StandardCharsets.UTF_8);
             ConfigCodec.Data data = new ConfigCodec.Data(JsonParser.parseString(json).getAsJsonObject());
             Map<String, ConfigCodec.PanelState> panels = new HashMap<>();
-            ConfigCodec.decode(data, ModuleManager.modules, panels, REGISTRY_IDS, m -> m.toggle());
+            Map<String, ConfigCodec.WidgetPos> hud = new HashMap<>();
+            ConfigCodec.decode(data, ModuleManager.modules, panels, hud, REGISTRY_IDS, m -> m.toggle());
             ClickGui.INSTANCE.applyPanelStates(panels);
+            if (HudOverlay.instance != null) HudOverlay.instance.applyWidgetPositions(hud);
         } catch (Exception e) {
             LOG.error("Could not read {}, using defaults (kept a copy as .broken)", f, e);
             try {
@@ -82,7 +85,9 @@ public final class Config {
         if (!loaded) return; // never overwrite a config we didn't read
         Path f = file();
         try {
-            ConfigCodec.Data data = ConfigCodec.encode(ModuleManager.modules, ClickGui.INSTANCE.panelStates(), REGISTRY_IDS);
+            Map<String, ConfigCodec.WidgetPos> hud = HudOverlay.instance != null
+                    ? HudOverlay.instance.widgetPositions() : Map.of();
+            ConfigCodec.Data data = ConfigCodec.encode(ModuleManager.modules, ClickGui.INSTANCE.panelStates(), hud, REGISTRY_IDS);
             Files.createDirectories(f.getParent());
             Path tmp = f.resolveSibling(f.getFileName() + ".tmp");
             Files.writeString(tmp, ConfigCodec.toJson(data.root()), StandardCharsets.UTF_8);

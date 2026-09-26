@@ -43,6 +43,9 @@ public final class ConfigCodec {
 
     public record PanelState(float x, float y, boolean collapsed) {}
 
+    /** A single draggable HUD-overlay box's saved position (e.g. {@link com.OsamaClient.newbridge.Hacks.Visual.HudOverlay}). */
+    public record WidgetPos(float x, float y) {}
+
     public record Data(JsonObject root) {}
 
     private ConfigCodec() {}
@@ -51,7 +54,8 @@ public final class ConfigCodec {
 
     // ------------------------------------------------------------------ encode
 
-    public static Data encode(List<? extends Module> modules, Map<String, PanelState> panels, Ids ids) {
+    public static Data encode(List<? extends Module> modules, Map<String, PanelState> panels,
+                              Map<String, WidgetPos> hudWidgets, Ids ids) {
         JsonObject root = new JsonObject();
         root.addProperty("version", VERSION);
         JsonObject mods = new JsonObject();
@@ -78,6 +82,14 @@ public final class ConfigCodec {
             ps.add(k, o);
         });
         root.add("panels", ps);
+        JsonObject hud = new JsonObject();
+        hudWidgets.forEach((k, p) -> {
+            JsonObject o = new JsonObject();
+            o.addProperty("x", p.x());
+            o.addProperty("y", p.y());
+            hud.add(k, o);
+        });
+        root.add("hud", hud);
         return new Data(root);
     }
 
@@ -126,7 +138,7 @@ public final class ConfigCodec {
      * a failing callback is swallowed so one module can't stop the rest from loading.
      */
     public static void decode(Data data, List<? extends Module> modules, Map<String, PanelState> panelsOut,
-                              Ids ids, Consumer<Module> enable) {
+                              Map<String, WidgetPos> hudOut, Ids ids, Consumer<Module> enable) {
         JsonObject root = data.root();
         JsonObject mods = obj(root, "modules");
         if (mods != null) {
@@ -167,6 +179,16 @@ public final class ConfigCodec {
                 Boolean collapsed = bool(p.get("collapsed"));
                 if (x == null || y == null) continue;
                 panelsOut.put(e.getKey(), new PanelState(x.floatValue(), y.floatValue(), Boolean.TRUE.equals(collapsed)));
+            }
+        }
+        JsonObject hud = obj(root, "hud");
+        if (hud != null) {
+            for (Map.Entry<String, JsonElement> e : hud.entrySet()) {
+                if (!e.getValue().isJsonObject()) continue;
+                JsonObject p = e.getValue().getAsJsonObject();
+                Double x = number(p.get("x")), y = number(p.get("y"));
+                if (x == null || y == null) continue;
+                hudOut.put(e.getKey(), new WidgetPos(x.floatValue(), y.floatValue()));
             }
         }
     }

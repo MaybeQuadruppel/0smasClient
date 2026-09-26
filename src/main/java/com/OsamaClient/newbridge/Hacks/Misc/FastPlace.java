@@ -45,7 +45,6 @@ public class FastPlace extends Module {
                 }
             }
         } catch (Exception e) {
-            // Falls Feldname abweicht
         }
     }
 }

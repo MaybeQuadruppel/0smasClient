@@ -1,12 +1,19 @@
 package com.OsamaClient.newbridge.Hacks.Visual;
 
+import com.OsamaClient.newbridge.UI.components.ColorPicker;
 import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import com.OsamaClient.newbridge.UI.components.ModeButton;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
+import com.OsamaClient.newbridge.UI.components.ToggleButton;
+import com.OsamaClient.newbridge.UI.gui.Theme;
+import com.OsamaClient.newbridge.UI.gui.ClickGui;
+import com.OsamaClient.newbridge.UI.gui.render.Ui;
+import com.OsamaClient.newbridge.UI.gui.render.UiRenderer;
+import com.OsamaClient.newbridge.UI.gui.render.font.UiFont;
+import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -16,9 +23,6 @@ import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -30,16 +34,27 @@ public class Nametags extends Module {
 
     public static Nametags instance;
 
-    // ── Black & White Palette ─────────────────────────────────────────────
-    private static final int C_PANEL_BG     = 0xB2000000; // sehr transparentes Panel
-    private static final int C_TEXT         = 0xFFEEEEEE; // near-white text
-    private static final int C_TEXT_DIM     = 0xFF999999; // gedämpfter Text (Distanz)
-    private static final int C_ACCENT_DIM   = 0xFF999999; // grey accent (Outline)
+    private static final int C_PANEL_BG = 0xFF0A0A0C;
 
     public float range = 128f;
     public double fontScale = 0.8;
-    public String renderMode = "None"; // Fill, Outline, Both, None
+    public String renderMode = "Both"; // None, Outline, Fill, Both
     public EntityFilterPicker targetPicker;
+
+    // Neue Einstellungen für Farben, Rainbow und Sichtbarkeit
+    public final ColorPicker nameColor = new ColorPicker("Name Color", 0xFFFFFFFF, null)
+            .withDescription("Eigene Farbe für den Nametag-Text auswählen.");
+    public final ToggleButton useThemeColor = new ToggleButton("Use Theme Accent", false, null)
+            .withDescription("Nutzt die globale GUI-Akzentfarbe (unterstützt auch deren Rainbow).");
+    public final ToggleButton rainbowText = new ToggleButton("Rainbow Text", false, null)
+            .withDescription("Lässt die Textfarbe durch den Regenbogen wechseln.");
+    public final Slider rainbowSpeed = new Slider("Rainbow Speed", 0.1, 5.0, 1.0, 0.1, null)
+            .withDescription("Geschwindigkeit des Regenbogeneffekts.");
+    public final ToggleButton dropShadow = new ToggleButton("Drop Shadow", true, null)
+            .withDescription("Fügt einen Textschatten hinzu, um 'Weiß auf Hell' perfekt lesbar zu machen.");
+
+    private static final UiRenderer renderer = new UiRenderer();
+    private static final Ui ui = new Ui(renderer);
 
     public Nametags() {
         super("Nametags", "Displays 2D nametags above visible entities", Category.VISUAL);
@@ -50,23 +65,52 @@ public class Nametags extends Module {
 
         List<String> modes = List.of("None", "Outline", "Fill", "Both");
         this.settings.add(new ModeButton("Mode", modes, modes.indexOf(renderMode), val -> renderMode = val)
-                .withDescription("Selects box rendering style (Fill, Outline, Both, None)."));
-
+                .withDescription("Selects box rendering style."));
         this.settings.add(new Slider("Range", 1.0, 128.0, (double) range, val -> range = val.floatValue())
                 .withDescription("Maximum distance for nametags."));
         this.settings.add(new Slider("Scale", 0.5, 2.0, fontScale, val -> fontScale = val)
                 .withDescription("Adjusts nametag text scale."));
+
+        // Fügt die neuen Settings zum Menü (ClickGui) hinzu
+        this.settings.add(this.nameColor);
+        this.settings.add(this.useThemeColor);
+        this.settings.add(this.rainbowText);
+        this.settings.add(this.rainbowSpeed);
+        this.settings.add(this.dropShadow);
     }
 
-    public static void draw(GuiGraphicsExtractor g) {
+    /**
+     * Berechnet die finale Farbe des Textes basierend auf den Einstellungen.
+     */
+    public int getCustomTextColor() {
+        if (useThemeColor.enabled) {
+            return Theme.accent(); // Greift auf ClickGui-Farbe inkl. Rainbow zu
+        }
+        if (rainbowText.enabled) {
+            float speed = (float) rainbowSpeed.getValue();
+            float hue = (float) ((System.currentTimeMillis() % 100_000L) * 0.0001 * speed);
+            return ColorUtil.hsvToRgb(hue, 0.85f, 1f) | 0xFF000000;
+        }
+        return nameColor.getColor() | 0xFF000000;
+    }
+
+    public static void draw() {
         if (instance == null || !instance.enabled) return;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.gui.hud.isHidden() || mc.gameRenderer.mainCamera() == null) return;
+        // the ClickGui is drawn with its own renderer/pass right after ours; without this check the
+        // world-space nametags would render on top of (or clip through) the open panels
+        if (ClickGui.INSTANCE.isOpen() || mc.gui.screen() != null) return;
 
         Camera camera = mc.gameRenderer.mainCamera();
         Vec3 camPos = camera.position();
         float partialTick = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+
+        renderer.begin();
+        ui.scale = Theme.scale() * (float) instance.fontScale;
+        ui.alpha = 1f;
+        ui.hoverBlocked = true;
 
         for (Entity entity : mc.level.entitiesForRendering()) {
             if (!(entity instanceof LivingEntity living) || entity == mc.player || !entity.isAlive()) continue;
@@ -80,85 +124,75 @@ public class Nametags extends Module {
             double x = Mth.lerp(partialTick, entity.xo, entity.getX());
             double y = Mth.lerp(partialTick, entity.yo, entity.getY()) + entity.getBbHeight() + 0.3;
             double z = Mth.lerp(partialTick, entity.zo, entity.getZ());
-            Vec3 headPos = new Vec3(x, y, z);
-            Vector3f screenPos = projectToScreen(x, y, z, camPos, camera, mc);
-            if (screenPos == null) continue;
+            Vector3f fb = projectToFramebuffer(x, y, z, camPos, camera, mc);
+            if (fb == null) continue;
 
             String text = entity.getDisplayName().getString();
-            int accentColor = instance.targetPicker.getColor(filterKey);
+            int outlineColor = instance.targetPicker.getColor(filterKey);
             double distance = Math.sqrt(distSqr);
 
-            renderTag(g, mc, text, distance, screenPos.x(), screenPos.y(), accentColor);
+            renderTag(text, distance, fb.x() / ui.scale, fb.y() / ui.scale, outlineColor);
         }
+
+        renderer.flush();
+        UiFont.collect(600);
     }
 
-    private static void renderTag(GuiGraphicsExtractor g, Minecraft mc, String text, double distance, float x, float y, int accentColor) {
-        float scale = (float) instance.fontScale;
+    private static void renderTag(String text, double distance, float x, float y, int outlineColor) {
+        float size = Theme.FONT_SMALL;
         String distText = String.format("%.1fm", distance);
 
-        int textWidth = mc.font.width(text);
-        int distWidth = (int) (mc.font.width(distText) * 0.85f);
-        int lineHeight = mc.font.lineHeight;
+        float tw = ui.textWidth(text, size);
+        float dw = ui.textWidth(distText, size * 0.85f);
+        float lineH = size * 1.35f;
 
-        // Distanz-Fade: näher = kräftiger, am Range-Limit = fast unsichtbar
-        float distFactor = 1.0f - Mth.clamp((float) (distance / instance.range), 0f, 1f);
-        int alphaBoost = (int) (80 + 150 * distFactor); // 80..230
-
-        boolean doScale = scale != 1.0f;
-        if (doScale) {
-            g.pose().pushMatrix();
-            g.pose().scale(scale, scale);
-        }
-        float invScale = doScale ? (1f / scale) : 1f;
-
-        // Koordinaten innerhalb der skalieren Matrix berechnen
-        float scaledX = x * invScale;
-        float scaledY = y * invScale;
+        float distFactor = 1f - Mth.clamp((float) (distance / instance.range), 0f, 1f);
+        float fade = 0.3f + 0.7f * distFactor;
 
         String mode = instance.renderMode;
-        if (!mode.equals("None")) {
-            int boxWidth = Math.max(textWidth, distWidth) + 8;
-            int boxHeight = (int) (lineHeight * 1.85f) + 4;
-            int rectX1 = (int) (scaledX - boxWidth / 2f);
-            int rectY1 = (int) (scaledY - lineHeight - 2f);
-            int rectX2 = rectX1 + boxWidth;
-            int rectY2 = rectY1 + boxHeight;
 
+        // Die Box wurde etwas vergrößert, damit das Layout luftiger und nicht so reingequetscht aussieht
+        float boxW = Math.max(tw, dw) + 12f;
+        float boxH = lineH * 2f + 5f;
+        float boxX = x - boxW * 0.5f;
+        float boxY = y - lineH - 5f;
+        float radius = Theme.radius() * 0.8f;
+
+        ui.alpha = fade;
+        if (!mode.equals("None")) {
             if (mode.equals("Fill") || mode.equals("Both")) {
-                int fillAlpha = Math.min(255, (C_PANEL_BG >>> 24) * alphaBoost / 255);
-                int fillColor = (fillAlpha << 24) | (C_PANEL_BG & 0xFFFFFF);
-                g.fill(rectX1, rectY1, rectX2, rectY2, fillColor);
+                // Deckkraft des Hintergrunds etwas verstärkt für besseren Kontrast
+                ui.round(boxX, boxY, boxW, boxH, radius, ColorUtil.alpha(C_PANEL_BG, 0.85f));
             }
             if (mode.equals("Outline") || mode.equals("Both")) {
-                int outlineAlpha = Math.min(255, alphaBoost);
-                int outlineColor = (outlineAlpha << 24) | (C_ACCENT_DIM & 0xFFFFFF);
-                g.fill(rectX1, rectY1, rectX2, rectY1 + 1, outlineColor);
-                g.fill(rectX1, rectY2 - 1, rectX2, rectY2, outlineColor);
-                g.fill(rectX1, rectY1, rectX1 + 1, rectY2, outlineColor);
-                g.fill(rectX2 - 1, rectY1, rectX2, rectY2, outlineColor);
+                ui.outline(boxX, boxY, boxW, boxH, radius, 1f, ColorUtil.alpha(outlineColor, 0.85f));
             }
         }
 
-        int nameAlpha = Math.min(255, alphaBoost + 25);
-        int distAlpha = Math.min(255, alphaBoost);
-        int nameColor = (nameAlpha << 24) | (C_TEXT & 0xFFFFFF);
-        int distColor = (distAlpha << 24) | (C_TEXT_DIM & 0xFFFFFF);
+        int finalTextColor = instance.getCustomTextColor();
 
-        float nameX = scaledX - textWidth / 2f;
-        float nameY = scaledY - lineHeight;
-        g.text(mc.font, text, (int) nameX, (int) nameY, nameColor, true);
-
-        float distX = scaledX - distWidth / 2f;
-        float distY = scaledY + 1f;
-        g.text(mc.font, distText, (int) distX, (int) distY, distColor, true);
-
-        if (doScale) {
-            g.pose().popMatrix();
+        // Schatten rendern (leicht versetzt), falls in den Settings aktiviert
+        if (instance.dropShadow.enabled) {
+            ui.textCentered(text, x + 0.5f, boxY + 2.5f, lineH, size, ColorUtil.alpha(0xFF000000, fade * 0.9f));
+            ui.textCentered(distText, x + 0.5f, boxY + lineH + 1.5f, lineH, size * 0.85f, ColorUtil.alpha(0xFF000000, fade * 0.9f));
         }
+
+        // Regulärer Text (obendrüber)
+        ui.textCentered(text, x, boxY + 2.0f, lineH, size, finalTextColor);
+        ui.textCentered(distText, x, boxY + lineH + 1.0f, lineH, size * 0.85f, Theme.TEXT_DIM);
+        ui.alpha = 1f;
     }
 
+    private String getFilterKey(Entity entity) {
+        if (entity instanceof Player) return "Players";
+        if (entity instanceof ArmorStand) return "ArmorStands";
+        if (entity instanceof Enemy) return "Hostiles";
+        if (entity instanceof Animal) return "Animals";
+        if (entity instanceof Villager || entity instanceof WanderingTrader) return "NPCs";
+        return null;
+    }
 
-    private static Vector3f projectToScreen(double worldX, double worldY, double worldZ, Vec3 camPos, Camera camera, Minecraft mc) {
+    private static Vector3f projectToFramebuffer(double worldX, double worldY, double worldZ, Vec3 camPos, Camera camera, Minecraft mc) {
         float dx = (float) (worldX - camPos.x);
         float dy = (float) (worldY - camPos.y);
         float dz = (float) (worldZ - camPos.z);
@@ -172,34 +206,23 @@ public class Nametags extends Module {
         double baseFov = mc.options.fov().get();
         float effectScale = mc.options.fovEffectScale().get().floatValue();
         boolean isFirstPerson = mc.options.getCameraType().isFirstPerson();
-
         float fovModifier = mc.player.getFieldOfViewModifier(isFirstPerson, effectScale);
-
         double fov = baseFov * fovModifier;
 
         double halfFovRad = Math.toRadians(fov / 2.0);
         float scaleY = (float) (1.0 / Math.tan(halfFovRad));
-        double aspect = (double) mc.getWindow().getScreenWidth() / mc.getWindow().getScreenHeight();
+
+        int fbWidth = mc.getWindow().getWidth();
+        int fbHeight = mc.getWindow().getHeight();
+        double aspect = (double) fbWidth / fbHeight;
         float scaleX = (float) (scaleY / aspect);
 
         float ndcX = (viewSpace.x * scaleX) / z;
         float ndcY = (viewSpace.y * scaleY) / z;
 
-        int guiWidth = mc.getWindow().getGuiScaledWidth();
-        int guiHeight = mc.getWindow().getGuiScaledHeight();
-
-        float pixelX = (float) ((1.0 + ndcX) * 0.5 * guiWidth);
-        float pixelY = (float) ((1.0 - ndcY) * 0.5 * guiHeight);
+        float pixelX = (float) ((1.0 + ndcX) * 0.5 * fbWidth);
+        float pixelY = (float) ((1.0 - ndcY) * 0.5 * fbHeight);
 
         return new Vector3f(pixelX, pixelY, z);
-    }
-
-    private String getFilterKey(Entity entity) {
-        if (entity instanceof Player) return "Players";
-        if (entity instanceof ArmorStand) return "ArmorStands";
-        if (entity instanceof Enemy) return "Hostiles";
-        if (entity instanceof Animal) return "Animals";
-        if (entity instanceof Villager || entity instanceof WanderingTrader) return "NPCs";
-        return null;
     }
 }

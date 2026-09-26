@@ -45,7 +45,7 @@ public final class ModuleRow {
 
     public float height() {
         float e = expandA.value();
-        return Theme.ROW_H + (e > 0 ? e * settingsHeight() : 0);
+        return Theme.rowH() + (e > 0 ? e * settingsHeight() : 0);
     }
 
     public boolean isExpanded() { return expanded; }
@@ -58,7 +58,7 @@ public final class ModuleRow {
     void render(Ui ui, float x, float y, float w) {
         float speed = Theme.animSpeed();
         time += ui.dt;
-        hovered = ui.hovered(x, y, w, Theme.ROW_H);
+        hovered = ui.hovered(x, y, w, Theme.rowH());
         hoverA.setTarget(hovered ? 1f : 0f);
         toggleA.setTarget(module.enabled ? 1f : 0f);
         hoverA.update(ui.dt, speed);
@@ -67,7 +67,7 @@ public final class ModuleRow {
         if (hovered) ClickGui.INSTANCE.hint(module.description);
 
         float t = toggleA.value(), hv = hoverA.value();
-        float h = Theme.ROW_H;
+        float h = Theme.rowH();
         if (ui.visible(x, y, w, h)) {
             ui.rect(x, y, w, h, ColorUtil.lerp(Theme.ROW, Theme.ROW_HOVER, hv));
             if (t > 0.001f) {
@@ -102,17 +102,27 @@ public final class ModuleRow {
         float e = expandA.value();
         if (e > 0.001f) {
             float sh = settingsHeight() * e;
+            boolean highlight = Theme.settingHighlight();
             ui.pushClip(x, y + h, w, sh);
+            if (highlight) {
+                // distinct background block (lighter/bluer than a row) so the settings clearly read as
+                // "belonging" to this module rather than blending into the row list below it
+                ui.rect(x, y + h, w, sh, Theme.SETTING_BLOCK_BG);
+                ui.rect(x, y + h, w, Math.max(1f, 1f / ui.scale), Theme.SETTING_BLOCK_BORDER);
+            }
+            float indent = highlight ? 3f : 1f;
             float yy = y + h;
             for (SettingWidget sw : widgets) {
                 float wh = sw.height();
-                if (ui.visible(x, yy, w, wh) || sw.wantsKeyboard()) sw.render(ui, x + 1f, yy, w - 1f);
+                if (ui.visible(x, yy, w, wh) || sw.wantsKeyboard()) sw.render(ui, x + indent, yy, w - indent);
                 else sw.clearHover();
                 if (sw.isHovered()) ClickGui.INSTANCE.hint(sw.description());
                 yy += wh;
             }
-            // thin accent line on the left edge of the settings block
-            ui.rect(x, y + h, 1f, sh, Theme.accent(0.35f + 0.35f * t));
+            // accent bar on the left edge of the settings block; brighter/thicker when highlighted so it
+            // stays readable as a single continuous group even while individual rows animate in/out
+            float barW = highlight ? 2f : 1f;
+            ui.rect(x, y + h, barW, sh, Theme.accent((highlight ? 0.7f : 0.35f) + 0.3f * t));
             ui.popClip();
         }
     }
