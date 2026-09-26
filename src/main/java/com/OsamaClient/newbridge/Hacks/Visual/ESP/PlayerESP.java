@@ -4,6 +4,7 @@ import com.OsamaClient.newbridge.EntryPoint;
 import com.OsamaClient.newbridge.Hacks.Visual.Trajectories;
 import com.OsamaClient.newbridge.Hacks.Visual.render.RenderTypes;
 import com.OsamaClient.newbridge.Hacks.Visual.render.chams.ChamsBufferSource;
+import com.OsamaClient.newbridge.UI.components.ColorPicker;
 import com.OsamaClient.newbridge.UI.components.EntityFilterPicker;
 import com.OsamaClient.newbridge.UI.components.ModeButton;
 import com.OsamaClient.newbridge.UI.components.Module;
@@ -32,6 +33,10 @@ import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -49,6 +54,8 @@ import java.util.WeakHashMap;
 
 public class PlayerESP extends Module {
     public static PlayerESP INSTANCE;
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("newbridge/PlayerESP");
+    private boolean loggedVisibilityError = false;
 
     public float range = 128;
     public double outlineWidth = 2.0;
@@ -56,6 +63,18 @@ public class PlayerESP extends Module {
     public String renderMode = "Both";
     public boolean renderTracers = false;
     public boolean distanceColors = false;
+    /** Färbt Fill/Outline eines Ziels komplett in {@link #occludedColor} ein, sobald kein Sample-Punkt
+     *  des Ziels ein freies Block-Raycast zur Kamera hat (siehe {@link #isTargetVisible}) - sonst normale
+     *  Ziel-Farbe. Reines Block-Raycast statt GPU-Depth-Test, damit ein Ziel nie durch seinen eigenen
+     *  Körper "verdeckt" erscheinen kann. Wirkt nur auf Fill/Outline, nicht auf Skeleton/Tracer. */
+    public boolean splitVisibility = false;
+    public final ColorPicker occludedColor = new ColorPicker("Occluded Color", 0xFFFF3B3B, null);
+    /** Günstige "Fake-Glow"-Halo statt echtem Bloom/Post-Processing: siehe {@link #line}-Overload
+     *  weiter unten - zieht dieselbe Linie mehrfach mit wachsender Breite/sinkender Deckkraft.
+     *  Wirkt auf alle Linien-Draws dieses Moduls (Outline-Box, Skeleton, Tracer), egal ob
+     *  {@link #splitVisibility} an oder aus ist, weil alle davon durch denselben Low-Level-Aufruf laufen. */
+    public boolean glow = false;
+    public double glowStrength = 1.0;
     public EntityFilterPicker targetPicker;
 
     // --- SKELETON CACHES & FIELDS ---
@@ -119,6 +138,16 @@ public class PlayerESP extends Module {
         this.settings.add(new ToggleButton("Tracers", renderTracers, val -> renderTracers = val)
                 .withDescription("Draws tracer lines to entities."));
 
+        this.settings.add(new ToggleButton("Split Visibility", splitVisibility, val -> splitVisibility = val)
+                .withDescription("Fill/Outline: shows the part of a target you actually have line of sight to in its normal color, and the part hidden behind terrain in \"Occluded Color\" - instead of always drawing fully see-through."));
+        this.settings.add(occludedColor
+                .withDescription("Color for the part of the hitbox currently blocked by terrain (only with \"Split Visibility\")."));
+
+        this.settings.add(new ToggleButton("Glow", glow, val -> glow = val)
+                .withDescription("Adds a soft glow halo around all ESP lines (Outline, Skeleton, Tracers)."));
+        this.settings.add(new Slider("Glow Strength", 0.0, 3.0, glowStrength, val -> glowStrength = val)
+                .withDescription("How strong/wide the glow halo is."));
+
         EntryPoint.EVENT_BUS.subscribe(this);
     }
 
@@ -150,6 +179,33 @@ public class PlayerESP extends Module {
         collectTargets(client);
         if (targets.isEmpty()) return;
 
+        // Split Visibility: ob ein Ziel "sichtbar" oder "verdeckt" ist, wird jetzt per reinem
+        // Block-Raycast (Level#clip) entschieden statt per GPU-Depth-Test gegen den fertigen
+        // Depth-Buffer. Der Depth-Test-Ansatz (HitboxChamsPipeline) konnte strukturell nicht
+        // zwischen "von einer Wand verdeckt" und "vom eigenen Körper verdeckt" unterscheiden - die
+        // Rückseite der Box liegt aus Kamerasicht IMMER hinter der eigenen Körper-Vorderseite, ganz
+        // unabhängig von echten Wänden. Level#clip kennt gar keine Entities und kann daher nie am
+        // eigenen Modell "hängen bleiben".
+        boolean[] targetVisible = null;
+        if (splitVisibility && (drawFill || drawOutline)) {
+            try {
+                targetVisible = new boolean[targets.size()];
+                Vec3 eye = new Vec3(camX, camY, camZ);
+                for (int i = 0; i < targets.size(); i++) {
+                    targetVisible[i] = isTargetVisible(client.level, eye, targets.get(i), tickDelta, client.player);
+                }
+            } catch (RuntimeException e) {
+                // a broken raycast must never take the whole ESP down with it - fail open (draw
+                // everyone in their normal color this frame) instead of rendering nothing at all
+                if (!loggedVisibilityError) {
+                    loggedVisibilityError = true;
+                    LOG.error("Split Visibility raycast failed, falling back to normal colors", e);
+                }
+                targetVisible = null;
+            }
+        }
+        boolean[] visibleFlags = targetVisible;
+
         float startX = 0f, startY = 0f, startZ = 0f;
         if (renderTracers) {
             float pitch = camera.xRot();
@@ -172,7 +228,14 @@ public class PlayerESP extends Module {
                 VertexConsumer fillConsumer = bufferSource.getBuffer(RenderTypes.storageEspFillSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
                     LivingEntity living = targets.get(i);
-                    int color = Trajectories.targetedEntity == living ? 0x80FF0000 : halfAlpha(targetColors[i]);
+                    int color;
+                    if (Trajectories.targetedEntity == living) {
+                        color = 0x80FF0000;
+                    } else if (visibleFlags != null && !visibleFlags[i]) {
+                        color = halfAlpha(occludedColor.getColor() | 0xFF000000);
+                    } else {
+                        color = halfAlpha(targetColors[i]);
+                    }
                     renderRotatedBox(poseStack, fillConsumer, living, tickDelta, camX, camY, camZ, color, true, (float) outlineWidth);
                 }
             }
@@ -181,7 +244,11 @@ public class PlayerESP extends Module {
             if (drawOutline) {
                 VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
-                    renderRotatedBox(poseStack, lineConsumer, targets.get(i), tickDelta, camX, camY, camZ, targetColors[i], false, (float) outlineWidth);
+                    LivingEntity living = targets.get(i);
+                    int color = (visibleFlags != null && !visibleFlags[i])
+                            ? (occludedColor.getColor() | 0xFF000000)
+                            : targetColors[i];
+                    renderRotatedBox(poseStack, lineConsumer, living, tickDelta, camX, camY, camZ, color, false, (float) outlineWidth);
                 }
             }
 
@@ -491,6 +558,38 @@ public class PlayerESP extends Module {
         return null;
     }
 
+    /**
+     * True if there is a clear block-only line of sight from {@code from} to {@code to} - entities are
+     * never considered, so this can never "hang" on the target's own body the way a GPU depth-test
+     * against the finished depth buffer would.
+     */
+    private boolean isVisible(Level level, Vec3 from, Vec3 to, Entity self) {
+        ClipContext ctx = new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, self);
+        BlockHitResult result = level.clip(ctx);
+        return result.getType() == HitResult.Type.MISS;
+    }
+
+    /**
+     * A target counts as visible if ANY of a few sample points on it (feet/middle/head) has a clear
+     * block-only line of sight - so a target only partially peeking out from behind cover still shows
+     * up in its normal color instead of flipping fully to "occluded".
+     */
+    private boolean isTargetVisible(Level level, Vec3 eye, LivingEntity target, float tickDelta, Entity self) {
+        double x = Mth.lerp(tickDelta, target.xo, target.getX());
+        double y = Mth.lerp(tickDelta, target.yo, target.getY());
+        double z = Mth.lerp(tickDelta, target.zo, target.getZ());
+        float h = target.getBbHeight();
+        Vec3[] samples = {
+                new Vec3(x, y + h * 0.9, z),
+                new Vec3(x, y + h * 0.5, z),
+                new Vec3(x, y + h * 0.1, z)
+        };
+        for (Vec3 point : samples) {
+            if (isVisible(level, eye, point, self)) return true;
+        }
+        return false;
+    }
+
     private int getAdjustedColor(int argb, float alphaMultiplier) {
         int a = (argb >> 24) & 0xFF;
         int r = (argb >> 16) & 0xFF;
@@ -559,6 +658,31 @@ public class PlayerESP extends Module {
     private static void line(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
                              float x1, float y1, float z1, float x2, float y2, float z2,
                              int r, int g, int b, int a, float lineWidth) {
+        // Günstige "Fake-Glow"-Halo statt echtem Bloom/Post-Processing (das bräuchte einen extra
+        // Blur-Pass über einen eigenen Render-Target, wie ihn ClickGuis BlurRenderer für den GUI-
+        // Hintergrund macht - hier nicht nötig): dieselbe Linie einfach mehrfach zeichnen, breiter und
+        // blasser werdend, VOR der eigentlichen scharfen Linie, sodass die scharfe Linie oben landet.
+        // Läuft für ALLE Linien-Draws dieses Moduls (Outline-Box, Skeleton-Bones, Tracer), weil sie alle
+        // letztlich hier durchlaufen - unabhängig davon, ob Split Visibility an oder aus ist.
+        PlayerESP esp = INSTANCE;
+        if (esp != null && esp.glow && esp.glowStrength > 0.001 && a > 0) {
+            float strength = (float) esp.glowStrength;
+            int haloPasses = 3;
+            for (int i = haloPasses; i >= 1; i--) {
+                float haloWidth = lineWidth + i * 2.5f * strength;
+                float haloAlphaMul = Math.min(1f, strength) * (0.30f / i);
+                int haloA = (int) (a * haloAlphaMul);
+                if (haloA > 0) {
+                    drawLineSegment(matrix, normalMatrix, consumer, x1, y1, z1, x2, y2, z2, r, g, b, haloA, haloWidth);
+                }
+            }
+        }
+        drawLineSegment(matrix, normalMatrix, consumer, x1, y1, z1, x2, y2, z2, r, g, b, a, lineWidth);
+    }
+
+    private static void drawLineSegment(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
+                                        float x1, float y1, float z1, float x2, float y2, float z2,
+                                        int r, int g, int b, int a, float lineWidth) {
         float dx = x2 - x1;
         float dy = y2 - y1;
         float dz = z2 - z1;
