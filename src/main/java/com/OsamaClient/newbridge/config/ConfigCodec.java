@@ -39,6 +39,9 @@ public final class ConfigCodec {
         Object block(String id);
         String itemId(Object item);
         Object item(String id);
+        /** Entity types; default null so existing implementations keep compiling. */
+        default String entityTypeId(Object type) { return null; }
+        default Object entityType(String id) { return null; }
     }
 
     public record PanelState(float x, float y, boolean collapsed) {}
@@ -100,12 +103,12 @@ public final class ConfigCodec {
         if (c instanceof ColorPicker p) return new JsonPrimitive(ColorUtil.toHex(p.getColor()));
         if (c instanceof TextBox t) return new JsonPrimitive(t.getText());
         if (c instanceof BlockPicker b) {
-            JsonArray a = new JsonArray();
-            for (Object block : b.selectedBlocks) {
+            JsonObject o = new JsonObject();
+            b.selectedBlocks.forEach((block, color) -> {
                 String id = ids.blockId(block);
-                if (id != null) a.add(id);
-            }
-            return a;
+                if (id != null) o.addProperty(id, ColorUtil.toHex(color));
+            });
+            return o;
         }
         if (c instanceof ItemPicker i) {
             JsonObject o = new JsonObject();
@@ -126,6 +129,18 @@ public final class ConfigCodec {
             f.colors.forEach((k, v) -> colors.addProperty(k, ColorUtil.toHex(v)));
             o.add("filters", filters);
             o.add("colors", colors);
+            JsonObject entities = new JsonObject();
+            f.selectedEntities.forEach((type, color) -> {
+                String id = ids.entityTypeId(type);
+                if (id != null) entities.addProperty(id, ColorUtil.toHex(color));
+            });
+            o.add("entities", entities);
+            JsonArray excluded = new JsonArray();
+            for (Object type : f.excludedEntities) {
+                String id = ids.entityTypeId(type);
+                if (id != null) excluded.add(id);
+            }
+            o.add("excluded", excluded);
             return o;
         }
         return null;
@@ -211,11 +226,21 @@ public final class ConfigCodec {
         } else if (c instanceof TextBox t) {
             String s = string(v);
             if (s != null) t.setText(s);
-        } else if (c instanceof BlockPicker b && v.isJsonArray()) {
+        } else if (c instanceof BlockPicker b) {
             b.selectedBlocks.clear();
-            for (JsonElement e : v.getAsJsonArray()) {
-                Object block = ids.block(string(e));
-                if (block != null) b.selectedBlocks.add((net.minecraft.world.level.block.Block) block);
+            if (v.isJsonObject()) {
+                for (Map.Entry<String, JsonElement> e : v.getAsJsonObject().entrySet()) {
+                    Object block = ids.block(e.getKey());
+                    if (block == null) continue;
+                    Integer col = ColorUtil.parseHex(string(e.getValue()));
+                    b.selectedBlocks.put((net.minecraft.world.level.block.Block) block, col != null ? col : BlockPicker.DEFAULT_COLOR);
+                }
+            } else if (v.isJsonArray()) {
+                // legacy format from before per-block colors: plain array of block ids
+                for (JsonElement e : v.getAsJsonArray()) {
+                    Object block = ids.block(string(e));
+                    if (block != null) b.selectedBlocks.put((net.minecraft.world.level.block.Block) block, BlockPicker.DEFAULT_COLOR);
+                }
             }
         } else if (c instanceof ItemPicker i && v.isJsonObject()) {
             i.selectedItems.clear();
@@ -242,6 +267,23 @@ public final class ConfigCodec {
                 for (Map.Entry<String, JsonElement> e : colors.entrySet()) {
                     Integer col = ColorUtil.parseHex(string(e.getValue()));
                     if (col != null) f.colors.put(e.getKey(), col);
+                }
+            }
+            JsonObject entities = obj(v.getAsJsonObject(), "entities");
+            if (entities != null) {
+                f.selectedEntities.clear();
+                for (Map.Entry<String, JsonElement> e : entities.entrySet()) {
+                    Object type = ids.entityType(e.getKey());
+                    Integer col = ColorUtil.parseHex(string(e.getValue()));
+                    if (type != null) f.selectedEntities.put((net.minecraft.world.entity.EntityType<?>) type, col != null ? col : EntityFilterPicker.DEFAULT_COLOR);
+                }
+            }
+            JsonElement excluded = v.getAsJsonObject().get("excluded");
+            if (excluded != null && excluded.isJsonArray()) {
+                f.excludedEntities.clear();
+                for (JsonElement e : excluded.getAsJsonArray()) {
+                    Object type = ids.entityType(string(e));
+                    if (type != null) f.excludedEntities.add((net.minecraft.world.entity.EntityType<?>) type);
                 }
             }
         }

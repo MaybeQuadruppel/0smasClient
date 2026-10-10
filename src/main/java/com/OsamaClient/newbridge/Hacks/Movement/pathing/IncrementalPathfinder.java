@@ -19,6 +19,7 @@ public final class IncrementalPathfinder {
 
     private static final double MIN_IMPROVEMENT = 0.01;
     private static final int    MAX_TOTAL_ITERATIONS = 100_000;
+    private static final int    PATH_CLEARANCE_SQ = 2 * 2;
 
     private final Minecraft mc;
     private final Goal      goal;
@@ -74,11 +75,14 @@ public final class IncrementalPathfinder {
                 if (res.isImpossible()) continue;
 
                 BlockPos dp       = res.dest;
+                if (MoveBlacklist.isBlocked(current.x, current.y, current.z, dp.getX(), dp.getY(), dp.getZ())) continue;
+                if (isTooCloseToEarlierPath(current, dp)) continue;
                 PathNode neighbor = getOrCreate(dp.getX(), dp.getY(), dp.getZ());
 
                 double tentativeCost = current.cost + res.cost;
                 if (neighbor.cost - tentativeCost > MIN_IMPROVEMENT) {
                     neighbor.previous     = current;
+                    neighbor.moveFromPrevious = res;
                     neighbor.cost         = tentativeCost;
                     neighbor.combinedCost = tentativeCost + neighbor.estimatedCostToGoal;
 
@@ -123,21 +127,10 @@ public final class IncrementalPathfinder {
             PathNode to   = nodes.get(i + 1);
             BlockPos dest = new BlockPos(to.x, to.y, to.z);
 
-            MoveResult bestMove = null;
-            for (MoveType mt : MoveType.values()) {
-                MoveResult res = mt.apply(mc, from.x, from.y, from.z);
-                if (!res.isImpossible() && res.dest.equals(dest)) {
-                    bestMove = res;
-                    break;
-                }
-            }
-
-            if (bestMove == null) {
-                bestMove = new MoveResult(dest, ActionCosts.WALK_ONE_BLOCK_COST, new BlockPos[0]);
-            }
-
             waypoints.add(dest);
-            moves.add(bestMove);
+            moves.add(to.moveFromPrevious == null
+                    ? new MoveResult(dest, ActionCosts.WALK_ONE_BLOCK_COST, new BlockPos[0])
+                    : to.moveFromPrevious);
         }
 
         return new PathResult(waypoints, moves);
@@ -151,5 +144,20 @@ public final class IncrementalPathfinder {
             nodeMap.put(hash, node);
         }
         return node;
+    }
+
+    private boolean isTooCloseToEarlierPath(PathNode current, BlockPos candidate) {
+        PathNode earlier = current.previous;
+        int ignoredRecentNodes = 0;
+        while (earlier != null) {
+            if (ignoredRecentNodes++ >= 2) {
+                int dx = candidate.getX() - earlier.x;
+                int dy = candidate.getY() - earlier.y;
+                int dz = candidate.getZ() - earlier.z;
+                if (dx * dx + dy * dy + dz * dz <= PATH_CLEARANCE_SQ) return true;
+            }
+            earlier = earlier.previous;
+        }
+        return false;
     }
 }

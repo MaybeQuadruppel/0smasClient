@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import org.slf4j.Logger;
@@ -40,6 +41,13 @@ public final class Config {
         public Object item(String id) {
             Identifier rl = id == null ? null : Identifier.tryParse(id);
             return rl == null ? null : BuiltInRegistries.ITEM.getOptional(rl).orElse(null);
+        }
+
+        public String entityTypeId(Object type) { return BuiltInRegistries.ENTITY_TYPE.getKey((EntityType<?>) type).toString(); }
+
+        public Object entityType(String id) {
+            Identifier rl = id == null ? null : Identifier.tryParse(id);
+            return rl == null ? null : BuiltInRegistries.ENTITY_TYPE.getOptional(rl).orElse(null);
         }
     };
 

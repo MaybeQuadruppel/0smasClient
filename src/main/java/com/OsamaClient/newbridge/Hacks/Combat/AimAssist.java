@@ -12,6 +12,7 @@ import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Comparator;
 import java.util.List;
@@ -23,6 +24,7 @@ public class AimAssist extends Module {
 
     public static AimAssist INSTANCE;
     private final Random random = new Random();
+    private static final Random PATHING_RANDOM = new Random();
 
     // Settings
     public int mode = 0;
@@ -94,40 +96,48 @@ public class AimAssist extends Module {
     }
 
     private void applyHumanizedAim(Minecraft client, LivingEntity target) {
-        double dx = target.getX() - client.player.getX();
-        double dz = target.getZ() - client.player.getZ();
         float heightToUse = randomHeight ? currentAimHeight : staticHeight;
-        double targetPosDirY = target.getY() + (target.getEyeHeight() * heightToUse);
-        double playerPosDirY = client.player.getY() + client.player.getEyeHeight();
-        double dy = targetPosDirY - playerPosDirY;
+        Vec3 targetPos = new Vec3(target.getX(), target.getY() + target.getEyeHeight() * heightToUse, target.getZ());
+        smoothLookAt(client, targetPos, fov, smoothness);
+    }
 
+    /**
+     * Shared GCD-quantized rotation used by AimAssist and the navigation stack.
+     * A smoothing value of 2 means that each correction covers at most half of
+     * the remaining angle. FOV caps one correction but never leaves pathing
+     * unable to turn towards a waypoint behind the player.
+     */
+    public static double smoothLookAt(Minecraft client, Vec3 target, float fov, float smoothing) {
+        if (client.player == null) return 0.0;
+
+        Vec3 eyes = client.player.getEyePosition();
+        double dx = target.x - eyes.x;
+        double dy = target.y - eyes.y;
+        double dz = target.z - eyes.z;
         double distanceXZ = Math.sqrt(dx * dx + dz * dz);
 
         float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
         float targetPitch = (float) (-Math.toDegrees(Math.atan2(dy, distanceXZ)));
-
         float yawDiff = Mth.wrapDegrees(targetYaw - client.player.getYRot());
         float pitchDiff = Mth.wrapDegrees(targetPitch - client.player.getXRot());
+        double remaining = Math.max(Math.abs(yawDiff), Math.abs(pitchDiff));
 
-        if (Math.abs(yawDiff) <= fov) {
-            double sensitivity = client.options.sensitivity().get();
-            float f = (float) (sensitivity * 0.6F + 0.2F);
-            float gcd = f * f * f * 1.2F;
+        float maxFov = Math.max(1.0f, fov);
+        if (Math.abs(yawDiff) > maxFov) yawDiff = Math.copySign(maxFov, yawDiff);
 
-            float speedFactor = Math.max(0.1f, Math.min(smoothness, Math.abs(yawDiff) / 30f));
+        double sensitivity = client.options.sensitivity().get();
+        float f = (float) (sensitivity * 0.6F + 0.2F);
+        float gcd = f * f * f * 1.2F;
+        float fraction = 1.0f / Math.max(1.0f, smoothing);
+        float speedFactor = Math.max(0.1f, Math.min(fraction, Math.abs(yawDiff) / 30.0f));
+        float jitter = (PATHING_RANDOM.nextFloat() - 0.5f) * 0.12f;
+        float pct = Math.max(0.05f, Math.min(1.0f, speedFactor + jitter));
 
-            float jitter = (random.nextFloat() - 0.5f) * 0.12f;
-            float pct = speedFactor + jitter;
-
-            float moveYaw = yawDiff * pct;
-            float movePitch = pitchDiff * pct;
-
-            float roundedYaw = Math.round(moveYaw / gcd) * gcd;
-            float roundedPitch = Math.round(movePitch / gcd) * gcd;
-
-            client.player.setYRot(client.player.getYRot() + roundedYaw);
-            client.player.setXRot(Mth.clamp(client.player.getXRot() + roundedPitch, -90, 90));
-        }
+        float roundedYaw = Math.round((yawDiff * pct) / gcd) * gcd;
+        float roundedPitch = Math.round((pitchDiff * pct) / gcd) * gcd;
+        client.player.setYRot(client.player.getYRot() + roundedYaw);
+        client.player.setXRot(Mth.clamp(client.player.getXRot() + roundedPitch, -90, 90));
+        return remaining;
     }
 
     private void updateAimHeight() {

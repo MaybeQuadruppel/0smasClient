@@ -109,7 +109,7 @@ public class BlockESP extends Module {
             LevelChunkSection section = sections[i];
 
             if (section == null || section.hasOnlyAir()) continue;
-            if (!section.maybeHas(state -> blockPicker.selectedBlocks.contains(state.getBlock()))) continue;
+            if (!section.maybeHas(state -> blockPicker.selectedBlocks.containsKey(state.getBlock()))) continue;
 
             int yBase = chunk.getSectionYFromSectionIndex(i) << 4;
             int minX = chunk.getPos().getMinBlockX();
@@ -121,12 +121,9 @@ public class BlockESP extends Module {
                         BlockState state = section.getBlockState(x, y, z);
                         Block block = state.getBlock();
 
-                        if (blockPicker.selectedBlocks.contains(block)) {
+                        if (blockPicker.selectedBlocks.containsKey(block)) {
                             pos.set(minX + x, yBase + y, minZ + z);
-                            int color = 0x6600FFFF;
-                            try {
-                                color = RenderUtils.BLOCK_COLORS.getOrDefault(block, 0x6600FFFF);
-                            } catch (Exception ignored) {}
+                            int color = blockPicker.colorOf(block);
 
                             AABB bounds = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1.0, pos.getY() + 1.0, pos.getZ() + 1.0);
                             found.add(new RenderBox(bounds, color));

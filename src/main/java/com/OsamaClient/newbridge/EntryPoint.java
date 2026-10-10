@@ -3,6 +3,7 @@ package com.OsamaClient.newbridge;
 import com.OsamaClient.newbridge.Hacks.Combat.AimAssist;
 import com.OsamaClient.newbridge.Hacks.Visual.ModuleList;
 import com.OsamaClient.newbridge.Hacks.Misc.Scaffold;
+import com.OsamaClient.newbridge.Hacks.Movement.pathing.Navigator;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import com.OsamaClient.newbridge.UI.gui.render.UiPipelines;
@@ -87,6 +88,9 @@ public class EntryPoint implements ClientModInitializer {
                     }
                 }
             }
+
+            // Only one place writes movement keys and mining input each tick.
+            Navigator.INSTANCE.onTick(client);
         });
 
         // TeammateList, Nametags, ModuleList und HudOverlay hängen NICHT mehr hier über

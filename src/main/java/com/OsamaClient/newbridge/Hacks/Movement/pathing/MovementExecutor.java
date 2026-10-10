@@ -1,43 +1,61 @@
 package com.OsamaClient.newbridge.Hacks.Movement.pathing;
 
+import com.OsamaClient.newbridge.Hacks.Movement.pathing.BlockInteraction.AimTarget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.List;
 
 public final class MovementExecutor {
 
-    // ─── State ────────────────────────────────────────────────────────────────
+    private static final int IDLE_LIMIT  = 60;
+    private static final int STEP_LIMIT  = 900;
+    private static final int MINE_LIMIT  = 500;
+    private static final int AIM_LIMIT   = 50;
+    private static final int MAX_JUMPS   = 6;
 
-    private PathResult path       = null;
-    private int        stepIndex  = 0;
-    private int        mineIndex  = 0;
-    private StepState  stepState  = StepState.PREPPING;
+    private static final boolean SWING_ON_MINE = true;
 
-    // ─── Mining state ─────────────────────────────────────────────────────────
+    private enum Phase { PREP, RUN }
+    private enum Kind  { TRAVERSE, ASCEND, DESCEND, DIG_DOWN, PILLAR }
 
-    private BlockPos currentMineTarget = null;
-    private boolean  miningStarted     = false;
+    private PathResult path      = null;
+    private int        stepIndex = 0;
+    private int        mineIndex = 0;
+    private Phase      phase     = Phase.PREP;
 
-    // ─── Anti-stuck ───────────────────────────────────────────────────────────
+    private boolean failed         = false;
+    private int     completedSteps = 0;
 
-    private long lastProgressTime              = 0;
-    private Vec3 lastCheckPos                  = null;
-    private static final long STUCK_TIMEOUT_MS = 4000;
+    private int  stepTicks = 0;
+    private int  idleTicks = 0;
+    private Vec3 lastPos   = null;
 
-    // ─── Enums ────────────────────────────────────────────────────────────────
+    private BlockPos  mineTarget  = null;
+    private AimTarget aim         = null;
+    private int       aimTicks    = 0;
+    private int       mineTicks   = 0;
+    private int       noFaceTicks = 0;
+    private boolean   destroying  = false;
 
-    private enum StepState { PREPPING, RUNNING }
-
-    // ─── Public API ───────────────────────────────────────────────────────────
+    private int       jumpAttempts     = 0;
+    private int       jumpCooldown     = 0;
+    private int       placeCooldown    = 0;
+    private AimTarget placeAim         = null;
+    private int       placeAimAge      = 0;
+    private int       pillarNoAimTicks = 0;
 
     public boolean isActive() {
-        return path != null && stepIndex < path.moves.size() && !path.isEmpty();
+        return path != null && !path.isEmpty() && stepIndex < path.moves.size();
     }
 
     public int stepsRemaining() {
@@ -45,387 +63,392 @@ public final class MovementExecutor {
         return Math.max(0, path.moves.size() - stepIndex);
     }
 
+    public int getCompletedSteps() {
+        return completedSteps;
+    }
+
+    public boolean consumeFailure() {
+        boolean f = failed;
+        failed = false;
+        return f;
+    }
+
     public void setPath(PathResult path) {
-        this.path              = path;
-        this.stepIndex         = 0;
-        this.mineIndex         = 0;
-        this.stepState         = StepState.PREPPING;
-        this.currentMineTarget = null;
-        this.miningStarted     = false;
-        this.lastProgressTime  = System.currentTimeMillis();
-        this.lastCheckPos      = null;
+        this.path   = path;
+        this.stepIndex = 0;
+        this.failed = false;
+        resetStep();
     }
 
     public void stop(Minecraft mc) {
-        path              = null;
-        stepIndex         = 0;
-        mineIndex         = 0;
-        stepState         = StepState.PREPPING;
-        currentMineTarget = null;
-        miningStarted     = false;
+        path      = null;
+        stepIndex = 0;
+        resetStep();
         resetKeys(mc);
         if (mc.player != null && mc.gameMode != null) {
             mc.gameMode.stopDestroyBlock();
         }
     }
 
-    // ─── Main tick ────────────────────────────────────────────────────────────
+    public BlockPos getDestination() {
+        return (path != null && !path.isEmpty()) ? path.getDest() : null;
+    }
+
+    public List<BlockPos> getRemainingWaypoints() {
+        if (path == null || path.isEmpty() || stepIndex >= path.waypoints.size()) return List.of();
+        return List.copyOf(path.waypoints.subList(stepIndex, path.waypoints.size()));
+    }
+
+    private void resetStep() {
+        mineIndex        = 0;
+        phase            = Phase.PREP;
+        stepTicks        = 0;
+        idleTicks        = 0;
+        lastPos          = null;
+        jumpAttempts     = 0;
+        jumpCooldown     = 0;
+        placeCooldown    = 0;
+        placeAim         = null;
+        placeAimAge      = 0;
+        pillarNoAimTicks = 0;
+        resetMining();
+    }
+
+    private void resetMining() {
+        mineTarget  = null;
+        aim         = null;
+        aimTicks    = 0;
+        mineTicks   = 0;
+        noFaceTicks = 0;
+        destroying  = false;
+    }
+
+    private void fail(Minecraft mc, String reason) {
+        if (path != null && stepIndex + 1 < path.waypoints.size()) {
+            MoveBlacklist.add(path.waypoints.get(stepIndex), path.waypoints.get(stepIndex + 1));
+        }
+        chat(mc, "[Nav] Step failed: " + reason);
+        stop(mc);
+        failed = true;
+    }
 
     public void onTick(Minecraft mc) {
-        if (!isActive() || mc.player == null || mc.level == null) return;
+        if (!isActive() || mc.player == null || mc.level == null || mc.gameMode == null) return;
 
-        Vec3 playerPos = mc.player.position();
-
-        // Anti-stuck: reset timer on any XZ movement (Y changes during mining/falling)
-        long now = System.currentTimeMillis();
-        if (lastCheckPos == null ||
-                Math.abs(playerPos.x - lastCheckPos.x) > 0.02 ||
-                Math.abs(playerPos.z - lastCheckPos.z) > 0.02) {
-            lastCheckPos     = playerPos;
-            lastProgressTime = now;
-        }
-        // Also reset timer while actively mining
-        if (stepState == StepState.PREPPING && miningStarted) {
-            lastProgressTime = now;
-        }
-        if (now - lastProgressTime > STUCK_TIMEOUT_MS) {
-            chat(mc, "[Nav] Stuck! Recalculating.");
-            stop(mc);
+        if (mc.level.getFluidState(mc.player.blockPosition()).is(FluidTags.LAVA)) {
+            fail(mc, "lava at feet");
             return;
         }
 
-        MoveResult currentMove  = path.moves.get(stepIndex);
-        BlockPos   nextWaypoint = path.waypoints.get(stepIndex + 1);
-
-        switch (stepState) {
-
-            case PREPPING:
-                if (mineIndex < currentMove.positionsToBreak.length) {
-                    BlockPos   target = currentMove.positionsToBreak[mineIndex];
-                    BlockState state  = mc.level.getBlockState(target);
-
-                    if (state.isAir() || BlockHelper.miningCost(mc, target) == 0) {
-                        mineIndex++;
-                        currentMineTarget = null;
-                        miningStarted     = false;
-                        break;
-                    }
-
-                    if (!BlockHelper.canReach(mc, target)) {
-                        moveToward(mc, target, false);
-                        return;
-                    }
-
-                    int toolSlot = ToolSelector.selectBestPickaxe(mc, state);
-                    if (toolSlot == -1) {
-                        chat(mc, "[Nav] No tool available!");
-                        stop(mc);
-                        return;
-                    }
-                    mc.player.getInventory().setSelectedSlot(toolSlot);
-
-                    Direction face = getBestMinableFace(mc, target);
-                    if (face == null) {
-                        // All faces blocked — skip this block
-                        mineIndex++;
-                        currentMineTarget = null;
-                        miningStarted     = false;
-                        break;
-                    }
-
-                    Vec3 faceCenter = Vec3.atCenterOf(target).add(
-                            face.getStepX() * 0.5,
-                            face.getStepY() * 0.5,
-                            face.getStepZ() * 0.5);
-                    smoothLookAt(mc, faceCenter);
-
-                    if (!isLookingAt(mc, target)) {
-                        resetKeys(mc);
-                        return;
-                    }
-
-                    resetKeys(mc);
-
-                    if (!target.equals(currentMineTarget)) {
-                        if (miningStarted && mc.gameMode != null) {
-                            mc.gameMode.stopDestroyBlock();
-                        }
-                        if (mc.gameMode != null) mc.gameMode.startDestroyBlock(target, face);
-                        currentMineTarget = target;
-                        miningStarted     = true;
-                    } else {
-                        if (mc.gameMode != null) mc.gameMode.continueDestroyBlock(target, face);
-                    }
-                    return;
-
-                } else {
-                    currentMineTarget = null;
-                    miningStarted     = false;
-                    stepState         = StepState.RUNNING;
-                    if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
-                }
-                // fall through
-
-            case RUNNING:
-                if (isPillarMove(currentMove)) {
-                    executePillarUp(mc, nextWaypoint);
-                } else {
-                    moveToward(mc, nextWaypoint, true);
-                }
-
-                // ── Waypoint reached check ────────────────────────────────────
-                if (hasReachedWaypoint(mc, playerPos, nextWaypoint)) {
-                    stepIndex++;
-                    mineIndex         = 0;
-                    stepState         = StepState.PREPPING;
-                    currentMineTarget = null;
-                    miningStarted     = false;
-                    if (!isActive()) stop(mc);
-                }
-                break;
-        }
-    }
-
-    // ─── Waypoint reached ─────────────────────────────────────────────────────
-
-    /**
-     * Checks if the player has reached the next waypoint.
-     *
-     * Handles three cases:
-     * 1. Normal horizontal movement  → within 0.8 blocks on same Y
-     * 2. Going up (pillar/ascend)    → player Y matches waypoint Y
-     * 3. Going down (drop/dig)       → player Y matches waypoint Y
-     *    Special case: if waypoint is directly below and we just mined,
-     *    the player needs to fall — check Y level rather than XZ distance.
-     */
-    private boolean hasReachedWaypoint(Minecraft mc, Vec3 playerPos, BlockPos wp) {
-        BlockPos playerBlock = mc.player.blockPosition();
-        int playerY = playerBlock.getY();
-        int wpY     = wp.getY();
-
-        double distXZ = Math.sqrt(
-                Math.pow(playerPos.x - (wp.getX() + 0.5), 2) +
-                        Math.pow(playerPos.z - (wp.getZ() + 0.5), 2));
-
-        if (wpY == playerY) {
-            boolean inBlock = (playerBlock.getX() == wp.getX() && playerBlock.getZ() == wp.getZ());
-            return inBlock || distXZ < 0.3;
-        } else if (wpY < playerY) {
-            return playerY <= wpY && distXZ < 1.0;
+        stepTicks++;
+        Vec3 pos = mc.player.position();
+        if (lastPos == null || pos.distanceToSqr(lastPos) > 0.0009) {
+            lastPos   = pos;
+            idleTicks = 0;
         } else {
-            // Going UP
-            return playerY >= wpY && distXZ < 1.0;
+            idleTicks++;
         }
-    }
+        if (idleTicks > IDLE_LIMIT) { fail(mc, "no progress"); return; }
+        if (stepTicks > STEP_LIMIT) { fail(mc, "step timeout"); return; }
 
-    // ─── Face selection ───────────────────────────────────────────────────────
+        MoveResult move = path.moves.get(stepIndex);
+        BlockPos   from = path.waypoints.get(stepIndex);
+        BlockPos   to   = path.waypoints.get(stepIndex + 1);
+        Kind       kind = classify(from, to);
 
-    /**
-     * Returns the best face to mine — only considers faces where the
-     * adjacent block is fully passable (air, water, etc.).
-     * Among valid faces picks the one most directly facing the player's eyes.
-     */
-    private Direction getBestMinableFace(Minecraft mc, BlockPos target) {
-        if (mc.player == null || mc.level == null) return Direction.UP;
+        // ── PREP: Blöcke abbauen ──────────────────────────────────────────────
+        if (phase == Phase.PREP) {
+            if (!mc.player.onGround() && !inFluid(mc)) {
+                resetKeys(mc);
+                return;
+            }
+            if (!prepare(mc, move, from)) return;
+            phase = Phase.RUN;
+        }
 
-        Vec3 eyes   = mc.player.getEyePosition();
-        Vec3 center = Vec3.atCenterOf(target);
-
-        double ex = eyes.x - center.x;
-        double ey = eyes.y - center.y;
-        double ez = eyes.z - center.z;
-        double len = Math.sqrt(ex*ex + ey*ey + ez*ez);
-        if (len == 0) return Direction.UP;
-        ex /= len; ey /= len; ez /= len;
-
-        Direction bestFace = null;
-        double    bestDot  = -Double.MAX_VALUE;
-
-        for (Direction dir : Direction.values()) {
-            BlockPos adjacent = target.relative(dir);
-            if (!BlockHelper.fullyPassable(mc, adjacent)) continue;
-
-            double dot = dir.getStepX() * ex
-                    + dir.getStepY() * ey
-                    + dir.getStepZ() * ez;
-
-            if (dot > bestDot) {
-                bestDot  = dot;
-                bestFace = dir;
+        // ── GHOST BLOCK CHECK IN RUN PHASE ─────────────────────────────────────
+        // Falls der Server einen Block wiederhergestellt hat, gehen wir zurück in PREP
+        for (BlockPos b : move.positionsToBreak) {
+            BlockState bs = mc.level.getBlockState(b);
+            if (!bs.isAir() && !bs.getCollisionShape(mc.level, b).isEmpty()) {
+                phase = Phase.PREP;
+                mineIndex = 0;
+                resetMining();
+                return;
             }
         }
 
-        // Fallback: if all faces blocked (e.g. surrounded), use closest geometric face
-        if (bestFace == null) {
-            double ax = Math.abs(ex), ay = Math.abs(ey), az = Math.abs(ez);
-            if (ay >= ax && ay >= az) bestFace = ey > 0 ? Direction.UP   : Direction.DOWN;
-            else if (ax >= az)        bestFace = ex > 0 ? Direction.EAST  : Direction.WEST;
-            else                      bestFace = ez > 0 ? Direction.SOUTH : Direction.NORTH;
+        // ── RUN: Bewegung ─────────────────────────────────────────────────────
+        switch (kind) {
+            case PILLAR    -> runPillar(mc, from);
+            case ASCEND    -> runAscend(mc, to);
+            case TRAVERSE  -> walk(mc, to, true);
+            case DESCEND, DIG_DOWN -> walk(mc, to, false);
         }
 
-        return bestFace;
+        if (isActive() && hasReachedWaypoint(mc, kind, to)) {
+            completedSteps++;
+            stepIndex++;
+            resetStep();
+            if (!isActive()) stop(mc);
+        }
     }
 
-    // ─── Raycast check ────────────────────────────────────────────────────────
-
-    private boolean isLookingAt(Minecraft mc, BlockPos target) {
-        if (mc.hitResult == null) return false;
-        if (mc.hitResult.getType() != HitResult.Type.BLOCK) return false;
-        BlockHitResult bhr = (BlockHitResult) mc.hitResult;
-        return bhr.getBlockPos().equals(target);
+    private Kind classify(BlockPos from, BlockPos to) {
+        int dy = to.getY() - from.getY();
+        boolean horizontal = to.getX() != from.getX() || to.getZ() != from.getZ();
+        if (dy > 0) return horizontal ? Kind.ASCEND  : Kind.PILLAR;
+        if (dy < 0) return horizontal ? Kind.DESCEND : Kind.DIG_DOWN;
+        return Kind.TRAVERSE;
     }
 
-    // ─── Smooth look ──────────────────────────────────────────────────────────
+    private boolean prepare(Minecraft mc, MoveResult move, BlockPos from) {
+        BlockPos[] breaks = move.positionsToBreak;
 
-    private void smoothLookAt(Minecraft mc, Vec3 targetPos) {
-        if (mc.player == null) return;
+        while (mineIndex < breaks.length) {
+            BlockPos t = breaks[mineIndex];
+            BlockState bs = mc.level.getBlockState(t);
+            if (!mc.level.isLoaded(t) || bs.isAir() || bs.getCollisionShape(mc.level, t).isEmpty()) {
+                mineIndex++;
+                resetMining();
+                continue;
+            }
+            break;
+        }
 
-        Vec3   eyes = mc.player.getEyePosition();
-        double dx   = targetPos.x - eyes.x;
-        double dy   = targetPos.y - eyes.y;
-        double dz   = targetPos.z - eyes.z;
-        double dxz  = Math.sqrt(dx * dx + dz * dz);
+        if (mineIndex >= breaks.length) {
+            resetMining();
+            mc.gameMode.stopDestroyBlock();
+            return true;
+        }
 
-        float targetYaw   = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float targetPitch = (float)(-Math.toDegrees(Math.atan2(dy, dxz)));
-
-        float yawDiff   = Mth.wrapDegrees(targetYaw   - mc.player.getYRot());
-        float pitchDiff = Mth.wrapDegrees(targetPitch - mc.player.getXRot());
-
-        double sens = mc.options.sensitivity().get();
-        float  f    = (float)(sens * 0.6F + 0.2F);
-        float  gcd  = f * f * f * 1.2F;
-
-        float speedFactor = Math.max(0.15f, Math.min(0.6f, Math.abs(yawDiff) / 30f));
-        float jitter      = (float)(Math.random() - 0.5f) * 0.10f;
-        float pct         = speedFactor + jitter;
-
-        float roundedYaw   = Math.round((yawDiff   * pct) / gcd) * gcd;
-        float roundedPitch = Math.round((pitchDiff * pct) / gcd) * gcd;
-
-        mc.player.setYRot(mc.player.getYRot() + roundedYaw);
-        mc.player.setXRot(Mth.clamp(mc.player.getXRot() + roundedPitch, -90, 90));
+        mineBlock(mc, breaks[mineIndex], from);
+        return false;
     }
 
-    // ─── Movement ─────────────────────────────────────────────────────────────
+    private void mineBlock(Minecraft mc, BlockPos target, BlockPos from) {
+        BlockState state = mc.level.getBlockState(target);
 
-    private void moveToward(Minecraft mc, BlockPos target, boolean allowJump) {
-        Vec3 dest = new Vec3(target.getX() + 0.5, target.getY(), target.getZ() + 0.5);
-        smoothLookAt(mc, dest);
+        if (BlockHelper.miningCost(mc, target) >= ActionCosts.COST_INF) {
+            fail(mc, "cannot mine " + state.getBlock().getName().getString());
+            return;
+        }
+        if (BlockHelper.touchesLava(mc, target)) {
+            fail(mc, "lava next to " + target.toShortString());
+            return;
+        }
 
-        double dx  = dest.x - mc.player.getX();
-        double dz  = dest.z - mc.player.getZ();
+        int toolSlot = ToolSelector.selectBestPickaxe(mc, state);
+        if (toolSlot == -1) {
+            fail(mc, "no tool available");
+            return;
+        }
+        mc.player.getInventory().setSelectedSlot(toolSlot);
 
-        float targetYaw = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float yawDiff   = Mth.wrapDegrees(targetYaw - mc.player.getYRot());
+        BlockHitResult ray = BlockInteraction.rayFromLook(mc);
+        boolean looking = ray != null && ray.getBlockPos().equals(target);
+
+        if (!looking) {
+            if (aim == null || !target.equals(aim.block()) || aimTicks % 8 == 0) {
+                aim = BlockInteraction.findMineFace(mc, target);
+            }
+            aimTicks++;
+
+            if (aim == null) {
+                noFaceTicks++;
+                if (horizontalDist(mc, from) > 0.3 && noFaceTicks < 40) {
+                    walk(mc, from, false);
+                } else {
+                    resetKeys(mc);
+                    if (noFaceTicks > 15) fail(mc, "no visible face on " + target.toShortString());
+                }
+                return;
+            }
+
+            resetKeys(mc);
+            BlockInteraction.smoothLookAt(mc, aim.point());
+            if (aimTicks > AIM_LIMIT) fail(mc, "could not aim at " + target.toShortString());
+            return;
+        }
+
+        aimTicks    = 0;
+        noFaceTicks = 0;
+        resetKeys(mc);
+        if (aim != null && target.equals(aim.block())) {
+            BlockInteraction.smoothLookAt(mc, aim.point());
+        }
+
+        Direction face = ray.getDirection();
+        if (!target.equals(mineTarget)) {
+            if (destroying) mc.gameMode.stopDestroyBlock();
+            mc.gameMode.startDestroyBlock(target, face);
+            mineTarget = target;
+            destroying = true;
+        } else {
+            mc.gameMode.continueDestroyBlock(target, face);
+        }
+        if (SWING_ON_MINE) mc.player.swing(InteractionHand.MAIN_HAND);
+
+        idleTicks = 0;
+        if (++mineTicks > MINE_LIMIT) fail(mc, "mining takes too long");
+    }
+
+    private void walk(Minecraft mc, BlockPos wp, boolean allowSprint) {
+        if (isLavaNow(mc, wp)) {
+            resetKeys(mc);
+            return;
+        }
+
+        Vec3 dest = new Vec3(wp.getX() + 0.5, wp.getY(), wp.getZ() + 0.5);
+        double dist = horizontalDist(mc, wp);
+
+        mc.options.keyJump.setDown(inFluid(mc));
+
+        if (dist < 0.12) {
+            mc.options.keyUp.setDown(false);
+            mc.options.keySprint.setDown(false);
+            return;
+        }
+
+        BlockInteraction.smoothLookAt(mc, new Vec3(dest.x, mc.player.getEyeY(), dest.z));
+        float yawDiff = yawDiffTo(mc, dest);
 
         boolean facing = Math.abs(yawDiff) < 30f;
         mc.options.keyUp.setDown(facing);
-        mc.options.keySprint.setDown(facing && Math.abs(yawDiff) < 15f);
-
-        if (mc.player.isInWater() || mc.player.isInLava()) {
-            mc.options.keyJump.setDown(true);
-            return;
-        }
-        mc.options.keyJump.setDown(false);
-
-        if (allowJump && mc.player.onGround()) {
-            boolean blocked = mc.player.horizontalCollision;
-            boolean goingUp = target.getY() > mc.player.blockPosition().getY();
-            if (blocked || goingUp) mc.player.jumpFromGround();
-        }
+        mc.options.keySprint.setDown(allowSprint && facing && Math.abs(yawDiff) < 12f && dist > 0.8);
     }
 
-    // ─── Pillar Up ────────────────────────────────────────────────────────────
-
-    private boolean isPillarMove(MoveResult move) {
-        if (path == null || stepIndex >= path.waypoints.size() - 1) return false;
-        BlockPos src  = path.waypoints.get(stepIndex);
-        BlockPos dest = path.waypoints.get(stepIndex + 1);
-        return dest.getX() == src.getX()
-                && dest.getZ() == src.getZ()
-                && dest.getY() == src.getY() + 1;
-    }
-
-    private void executePillarUp(Minecraft mc, BlockPos dest) {
-        if (mc.player == null) return;
-
-        BlockPos currentBlock = path.waypoints.get(stepIndex);
-        double targetX = currentBlock.getX() + 0.5;
-        double targetZ = currentBlock.getZ() + 0.5;
-        double px = mc.player.getX();
-        double pz = mc.player.getZ();
-
-        double distToCenter = Math.sqrt(
-                (px - targetX) * (px - targetX) + (pz - targetZ) * (pz - targetZ));
-
-        if (distToCenter > 0.15) {
-            moveToward(mc, currentBlock, false);
+    private void runAscend(Minecraft mc, BlockPos to) {
+        if (isLavaNow(mc, to)) {
+            resetKeys(mc);
             return;
         }
 
+        Vec3 dest = new Vec3(to.getX() + 0.5, to.getY(), to.getZ() + 0.5);
+        double dist = horizontalDist(mc, to);
+
+        BlockInteraction.smoothLookAt(mc, new Vec3(dest.x, mc.player.getEyeY(), dest.z));
+        float yawDiff = yawDiffTo(mc, dest);
+        boolean facing = Math.abs(yawDiff) < 20f;
+
+        boolean onGround = mc.player.onGround();
+        if (jumpCooldown > 0) jumpCooldown--;
+
+        mc.options.keyUp.setDown(facing || !onGround);
+        mc.options.keySprint.setDown(false);
+
+        boolean jump = false;
+        if (onGround && facing && jumpCooldown == 0
+                && (dist <= 1.35 || (mc.player.horizontalCollision && dist < 2.0))) {
+            if (++jumpAttempts > MAX_JUMPS) {
+                fail(mc, "cannot climb onto " + to.toShortString());
+                return;
+            }
+            jump = true;
+            jumpCooldown = 10;
+        }
+        mc.options.keyJump.setDown(jump || inFluid(mc));
+    }
+
+    private void runPillar(Minecraft mc, BlockPos from) {
+        if (placeCooldown > 0) placeCooldown--;
+        if (jumpCooldown  > 0) jumpCooldown--;
+
+        boolean onGround = mc.player.onGround();
+        double  dist     = horizontalDist(mc, from);
+
+        if (onGround && dist > 0.2) {
+            walk(mc, from, false);
+            return;
+        }
         resetKeys(mc);
 
-        if (mc.player.onGround()) {
-            BlockPos   head1      = mc.player.blockPosition().above();
-            BlockState head1State = mc.level.getBlockState(head1);
-            if (!head1State.isAir()) {
-                Direction face = getBestMinableFace(mc, head1);
-                if (face != null) smoothLookAt(mc, Vec3.atCenterOf(head1).add(
-                        face.getStepX() * 0.5, face.getStepY() * 0.5, face.getStepZ() * 0.5));
-                return;
-            }
+        BlockState atPlace = mc.level.getBlockState(from);
+        if (!atPlace.isAir() && !atPlace.getCollisionShape(mc.level, from).isEmpty()) return;
 
-            BlockPos   head2      = mc.player.blockPosition().above(2);
-            BlockState head2State = mc.level.getBlockState(head2);
-            if (!head2State.isAir() && BlockHelper.miningCost(mc, head2) < ActionCosts.COST_INF) {
-                Direction face = getBestMinableFace(mc, head2);
-                if (face != null) smoothLookAt(mc, Vec3.atCenterOf(head2).add(
-                        face.getStepX() * 0.5, face.getStepY() * 0.5, face.getStepZ() * 0.5));
-                return;
-            }
+        int slot = BlockHelper.findPlaceableSlot(mc);
+        if (slot < 0) {
+            fail(mc, "no placeable blocks in hotbar");
+            return;
+        }
+        mc.player.getInventory().setSelectedSlot(slot);
 
-            smoothLookAt(mc, Vec3.atCenterOf(currentBlock.above(2)));
-            mc.player.jumpFromGround();
+        if (placeAim == null || (placeAimAge++ % 4 == 0)) {
+            placeAim = BlockInteraction.findPlaceFace(mc, from);
+        }
+        if (placeAim == null) {
+            if (++pillarNoAimTicks > 20) fail(mc, "nothing to place against at " + from.toShortString());
+            return;
+        }
+        pillarNoAimTicks = 0;
 
-        } else {
-            smoothLookAt(mc, Vec3.atCenterOf(mc.player.blockPosition().below()));
+        BlockHitResult ray = BlockInteraction.rayFromLook(mc);
+        boolean valid = ray != null
+                && ray.getBlockPos().relative(ray.getDirection()).equals(from)
+                && BlockInteraction.isSupport(mc, ray.getBlockPos());
 
-            int placeSlot = findPlaceableBlockSlot(mc);
-            if (placeSlot != -1) {
-                mc.player.getInventory().setSelectedSlot(placeSlot);
-                mc.options.keyAttack.setDown(false);
+        if (!valid) {
+            BlockInteraction.smoothLookAt(mc, placeAim.point());
+            return;
+        }
 
-                BlockPos   below      = mc.player.blockPosition().below();
-                BlockState belowState = mc.level.getBlockState(below);
-                if (belowState.isAir()) {
-                    mc.gameMode.useItemOn(
-                            mc.player,
-                            net.minecraft.world.InteractionHand.MAIN_HAND,
-                            new net.minecraft.world.phys.BlockHitResult(
-                                    Vec3.atCenterOf(below),
-                                    Direction.UP,
-                                    below,
-                                    false
-                            )
-                    );
+        if (onGround) {
+            if (jumpCooldown == 0) {
+                if (++jumpAttempts > MAX_JUMPS) {
+                    fail(mc, "pillar: jump/place failed too often");
+                    return;
                 }
-            } else {
-                moveToward(mc, dest, true);
+                mc.options.keyJump.setDown(true);
+                jumpCooldown = 8;
             }
+            return;
+        }
+
+        if (placeCooldown == 0 && !mc.player.getBoundingBox().intersects(new AABB(from))) {
+            mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, ray);
+            mc.player.swing(InteractionHand.MAIN_HAND);
+            placeCooldown = 4;
         }
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────
+    private boolean hasReachedWaypoint(Minecraft mc, Kind kind, BlockPos wp) {
+        BlockPos pb     = mc.player.blockPosition();
+        double   distXZ = horizontalDist(mc, wp);
+        boolean  inXZ   = pb.getX() == wp.getX() && pb.getZ() == wp.getZ();
 
-    private int findPlaceableBlockSlot(Minecraft mc) {
-        if (mc.player == null) return -1;
-        for (int slot = 0; slot < 9; slot++) {
-            net.minecraft.world.item.ItemStack stack = mc.player.getInventory().getItem(slot);
-            if (!stack.isEmpty() && stack.getItem() instanceof net.minecraft.world.item.BlockItem)
-                return slot;
+        if (kind == Kind.TRAVERSE) {
+            return pb.getY() == wp.getY() && (inXZ || distXZ < 0.3);
         }
-        return -1;
+
+        if (!mc.player.onGround()) return false;
+
+        boolean levelOk = (kind == Kind.ASCEND || kind == Kind.PILLAR)
+                ? pb.getY() >= wp.getY()
+                : pb.getY() <= wp.getY();
+        return levelOk && (inXZ || distXZ < 0.5);
+    }
+
+    private double horizontalDist(Minecraft mc, BlockPos wp) {
+        double dx = mc.player.getX() - (wp.getX() + 0.5);
+        double dz = mc.player.getZ() - (wp.getZ() + 0.5);
+        return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    private float yawDiffTo(Minecraft mc, Vec3 dest) {
+        double dx = dest.x - mc.player.getX();
+        double dz = dest.z - mc.player.getZ();
+        float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        return Mth.wrapDegrees(targetYaw - mc.player.getYRot());
+    }
+
+    private boolean inFluid(Minecraft mc) {
+        return mc.player.isInWater() || mc.player.isInLava();
+    }
+
+    private boolean isLavaNow(Minecraft mc, BlockPos pos) {
+        if (mc.level == null) return false;
+        return mc.level.getFluidState(pos).is(FluidTags.LAVA)
+                || mc.level.getFluidState(pos.above()).is(FluidTags.LAVA);
     }
 
     public void resetKeys(Minecraft mc) {
@@ -440,11 +463,8 @@ public final class MovementExecutor {
     }
 
     private void chat(Minecraft mc, String msg) {
-        if (mc.gui != null) {
+        if (mc.gui != null && mc.player != null) {
             mc.player.sendSystemMessage(Component.literal(msg));
         }
-    }
-    public BlockPos getDestination() {
-        return (path != null && !path.isEmpty()) ? path.getDest() : null;
     }
 }

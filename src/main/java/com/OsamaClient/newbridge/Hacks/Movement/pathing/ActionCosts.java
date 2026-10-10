@@ -21,6 +21,7 @@ public interface ActionCosts {
 
     double WATER_PENALTY           = WALK_ONE_IN_WATER_COST * 3.0;
     double MINING_OVERHEAD         = WALK_ONE_BLOCK_COST * 2.0;
+    double CARVED_TUNNEL_PENALTY   = WALK_ONE_BLOCK_COST * 8.0;
 
     /**
      * Converts fall distance to ticks using Minecraft's velocity formula.

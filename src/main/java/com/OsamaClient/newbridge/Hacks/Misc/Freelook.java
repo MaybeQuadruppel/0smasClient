@@ -1,18 +1,23 @@
 package com.OsamaClient.newbridge.Hacks.Misc;
 
 import com.OsamaClient.newbridge.UI.components.Module;
-import net.minecraft.client.Minecraft;
+import com.OsamaClient.newbridge.UI.components.ToggleButton;
 import net.minecraft.client.CameraType;
+import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
 public class Freelook extends Module {
 
     public static Freelook instance;
     public float maxYaw = 360.0f;
+    public boolean noClip = true;
 
     public Freelook() {
         super("Freelook", "Free third person perspective (hold Left Alt)", Category.MISC);
         instance = this;
+
+        this.settings.add(new ToggleButton("NoClip", noClip, val -> noClip = val)
+                .withDescription("Allows the camera to pass through blocks while freelooking."));
     }
 
     @Override
@@ -26,6 +31,10 @@ public class Freelook extends Module {
         return instance != null
                 && instance.enabled
                 && isAltHeld();
+    }
+
+    public static boolean isNoClipActive() {
+        return isFreelooking() && instance.noClip;
     }
 
     public static boolean isAltHeld() {

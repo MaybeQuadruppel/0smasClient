@@ -79,7 +79,7 @@ public class PlayerESP extends Module {
 
     // --- SKELETON CACHES & FIELDS ---
     private final ChamsBufferSource bufferSource = new ChamsBufferSource();
-    private final List<LivingEntity> targets = new ArrayList<>();
+    private final List<Entity> targets = new ArrayList<>();
     private int[] targetColors = new int[64];
     private static final Map<Entity, LivingEntityRenderState> STATE_CACHE = new WeakHashMap<>();
     private static final Map<ModelPart, Map<String, ModelPart>> CHILDREN_CACHE = new WeakHashMap<>();
@@ -227,7 +227,7 @@ public class PlayerESP extends Module {
             if (drawFill) {
                 VertexConsumer fillConsumer = bufferSource.getBuffer(RenderTypes.storageEspFillSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
-                    LivingEntity living = targets.get(i);
+                    Entity living = targets.get(i);
                     int color;
                     if (Trajectories.targetedEntity == living) {
                         color = 0x80FF0000;
@@ -244,7 +244,7 @@ public class PlayerESP extends Module {
             if (drawOutline) {
                 VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
-                    LivingEntity living = targets.get(i);
+                    Entity living = targets.get(i);
                     int color = (visibleFlags != null && !visibleFlags[i])
                             ? (occludedColor.getColor() | 0xFF000000)
                             : targetColors[i];
@@ -256,7 +256,7 @@ public class PlayerESP extends Module {
             if (drawSkeleton) {
                 VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
-                    LivingEntity living = targets.get(i);
+                    if (!(targets.get(i) instanceof LivingEntity living)) continue; // skeleton needs a living model
                     int color = targetColors[i];
                     EntityRenderer<?, ?> renderer = client.getEntityRenderDispatcher().getRenderer(living);
                     if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> livingRenderer)) continue;
@@ -298,7 +298,7 @@ public class PlayerESP extends Module {
             if (renderTracers) {
                 VertexConsumer tracerConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
-                    LivingEntity living = targets.get(i);
+                    Entity living = targets.get(i);
                     int color = targetColors[i];
                     double x = Mth.lerp(tickDelta, living.xo, living.getX()) - camX;
                     double y = Mth.lerp(tickDelta, living.yo, living.getY()) - camY;
@@ -329,20 +329,23 @@ public class PlayerESP extends Module {
     private void collectTargets(Minecraft client) {
         targets.clear();
         for (Entity entity : client.level.entitiesForRendering()) {
-            if (!(entity instanceof LivingEntity living) || entity == client.player || !entity.isAlive()) continue;
+            if (entity == client.player || !entity.isAlive()) continue;
 
             boolean isTrajTarget = (Trajectories.targetedEntity == entity);
             if (!isTrajTarget && client.player.distanceToSqr(entity) > range * range) continue;
 
             String filterKey = getFilterKey(entity);
-            boolean isEnabledInPicker = filterKey != null && targetPicker != null && targetPicker.isFilterEnabled(filterKey);
+            boolean isEnabledInPicker = targetPicker != null
+                    && !targetPicker.isEntityExcluded(entity.getType())
+                    && ((filterKey != null && targetPicker.isFilterEnabled(filterKey))
+                    || targetPicker.isEntitySelected(entity.getType()));
             if (!isTrajTarget && !isEnabledInPicker) continue;
 
             if (targets.size() == targetColors.length) {
                 targetColors = Arrays.copyOf(targetColors, targetColors.length * 2);
             }
-            targetColors[targets.size()] = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, living, filterKey, 1.0f);
-            targets.add(living);
+            targetColors[targets.size()] = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, entity, filterKey, 1.0f);
+            targets.add(entity);
         }
     }
 
@@ -351,12 +354,12 @@ public class PlayerESP extends Module {
         return (((argb >>> 24) >> 1) << 24) | (argb & 0x00FFFFFF);
     }
 
-    private int getEntityColor(Player clientPlayer, LivingEntity target, String filterKey, float alphaMultiplier) {
+    private int getEntityColor(Player clientPlayer, Entity target, String filterKey, float alphaMultiplier) {
         int color;
         if (distanceColors) {
             color = getDistanceColor(clientPlayer, target, alphaMultiplier);
         } else {
-            color = getAdjustedColor(targetPicker.getColor(filterKey), alphaMultiplier);
+            color = getAdjustedColor(targetPicker.getColor(target.getType(), filterKey), alphaMultiplier);
         }
 
         if (TeamUtils.isTeammate(target)) {
@@ -503,7 +506,7 @@ public class PlayerESP extends Module {
         });
     }
 
-    private int getDistanceColor(Player clientPlayer, LivingEntity target, float alphaMultiplier) {
+    private int getDistanceColor(Player clientPlayer, Entity target, float alphaMultiplier) {
         double distance = Math.sqrt(clientPlayer.distanceToSqr(target));
         double percent = Math.min(1.0, distance / 60.0);
         int r, g;
@@ -521,14 +524,14 @@ public class PlayerESP extends Module {
         return (a << 24) | (r << 16) | (g << 8) | 0;
     }
 
-    private void renderRotatedBox(PoseStack poseStack, VertexConsumer consumer, LivingEntity entity, float tickDelta, double camX, double camY, double camZ, int color, boolean isFill, float lineWidth) {
+    private void renderRotatedBox(PoseStack poseStack, VertexConsumer consumer, Entity entity, float tickDelta, double camX, double camY, double camZ, int color, boolean isFill, float lineWidth) {
         double x = Mth.lerp(tickDelta, entity.xo, entity.getX()) - camX;
         double y = Mth.lerp(tickDelta, entity.yo, entity.getY()) - camY;
         double z = Mth.lerp(tickDelta, entity.zo, entity.getZ()) - camZ;
 
         float w = entity.getBbWidth() / 2f;
         float h = entity.getBbHeight();
-        float yaw = Mth.lerp(tickDelta, entity.yBodyRotO, entity.yBodyRot);
+        float yaw = entity instanceof LivingEntity le ? Mth.lerp(tickDelta, le.yBodyRotO, le.yBodyRot) : 0f;
 
         poseStack.pushPose();
         poseStack.translate(x, y, z);
@@ -574,7 +577,7 @@ public class PlayerESP extends Module {
      * block-only line of sight - so a target only partially peeking out from behind cover still shows
      * up in its normal color instead of flipping fully to "occluded".
      */
-    private boolean isTargetVisible(Level level, Vec3 eye, LivingEntity target, float tickDelta, Entity self) {
+    private boolean isTargetVisible(Level level, Vec3 eye, Entity target, float tickDelta, Entity self) {
         double x = Mth.lerp(tickDelta, target.xo, target.getX());
         double y = Mth.lerp(tickDelta, target.yo, target.getY());
         double z = Mth.lerp(tickDelta, target.zo, target.getZ());

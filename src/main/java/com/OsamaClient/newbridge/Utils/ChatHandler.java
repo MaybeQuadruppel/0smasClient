@@ -3,6 +3,7 @@ package com.OsamaClient.newbridge.Utils;
 import com.OsamaClient.newbridge.Hacks.Movement.GoTo;
 import com.OsamaClient.newbridge.Hacks.Movement.Teleport;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.Navigator;
+import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -19,21 +20,25 @@ public class ChatHandler {
 
                 // Stop-Funktionalität über den neuen Navigator
                 if (args.length == 2 && args[1].equalsIgnoreCase("stop")) {
-                    Navigator.INSTANCE.stop(mc);
+                    GoTo goToModule = getGoToModule();
+                    if (goToModule != null) goToModule.onDisable();
+                    else Navigator.INSTANCE.cancel(mc, Navigator.OWNER_GOTO);
                     mc.player.sendSystemMessage(Component.literal("§c[GoTo] Navigation stopped."));
                     return false;
                 }
 
                 try {
-                    // Erstellt das Modul-Objekt
-                    GoTo goToModule = new GoTo();
+                    GoTo goToModule = getGoToModule();
+                    if (goToModule == null) {
+                        mc.player.sendSystemMessage(Component.literal("§c[GoTo] Module is not initialized."));
+                        return false;
+                    }
 
                     if (args.length == 3) {
                         int x = Integer.parseInt(args[1]);
                         int z = Integer.parseInt(args[2]);
                         int y = (int) mc.player.getY(); // Nutzt aktuelle Y-Höhe des Spielers
 
-                        goToModule.enabled = true; // Sicherstellen, dass das Modul ticken darf
                         goToModule.setTarget(x, y, z);
                         mc.player.sendSystemMessage(Component.literal("§a[GoTo] Walking to X: " + x + " Z: " + z));
                     }
@@ -42,7 +47,6 @@ public class ChatHandler {
                         int y = Integer.parseInt(args[2]);
                         int z = Integer.parseInt(args[3]);
 
-                        goToModule.enabled = true; // Sicherstellen, dass das Modul ticken darf
                         goToModule.setTarget(x, y, z);
                         mc.player.sendSystemMessage(Component.literal("§a[GoTo] Walking to X: " + x + " Y: " + y + " Z: " + z));
                     }
@@ -90,5 +94,9 @@ public class ChatHandler {
             }
             return true;
         });
+    }
+
+    private static GoTo getGoToModule() {
+        return ModuleManager.getModuleByName("GoTo") instanceof GoTo goTo ? goTo : null;
     }
 }

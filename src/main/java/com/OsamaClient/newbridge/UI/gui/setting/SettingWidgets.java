@@ -11,13 +11,17 @@ import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.TextBox;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Maps a setting data holder to its inline editor. */
 public final class SettingWidgets {
@@ -47,7 +51,7 @@ public final class SettingWidgets {
         if (c instanceof ModeButton m) return new ModeWidget(m);
         if (c instanceof ColorPicker p) return new ColorWidget(p);
         if (c instanceof TextBox t) return new TextWidget(t);
-        if (c instanceof EntityFilterPicker f) return new EntityFilterWidget(f);
+        if (c instanceof EntityFilterPicker f) return new EntityFilterWidget(f, new ListPickerWidget(f, entities(f)), new ListPickerWidget(f, excludedEntities(f)));
         if (c instanceof BlockPicker b) return new ListPickerWidget(b, blocks(b));
         if (c instanceof ItemPicker i) return new ListPickerWidget(i, items(i));
         if (c instanceof EnchantmentPicker e) return new ListPickerWidget(e, enchantments(e));
@@ -63,24 +67,129 @@ public final class SettingWidgets {
             public List<ListPickerWidget.Entry> entries() {
                 if (all == null) {
                     all = new ArrayList<>();
+                    Set<Set<Block>> processedFamilies = new HashSet<>();
+
                     for (Block b : BuiltInRegistries.BLOCK) {
                         String id = BuiltInRegistries.BLOCK.getKey(b).toString();
                         if (id.equals("minecraft:air")) continue;
-                        all.add(new ListPickerWidget.Entry(b, id, b.getName().getString()));
+
+                        Set<Block> family = BlockPicker.familyOf(b);
+                        if (family.size() > 1) {
+                            if (processedFamilies.contains(family)) continue;
+                            processedFamilies.add(family);
+
+                            String name = family.contains(Blocks.SHULKER_BOX)
+                                    ? "Shulker Box"
+                                    : "Copper Chest";
+                            all.add(new ListPickerWidget.Entry(b, id, name));
+                        } else {
+                            all.add(new ListPickerWidget.Entry(b, id, b.getName().getString()));
+                        }
                     }
                     all.sort(Comparator.comparing(ListPickerWidget.Entry::name, String.CASE_INSENSITIVE_ORDER));
                 }
                 return all;
             }
 
-            public boolean selected(Object key) { return picker.selectedBlocks.contains(key); }
+            public boolean selected(Object key) {
+                Block b = (Block) key;
+                return picker.selectedBlocks.keySet().containsAll(BlockPicker.familyOf(b));
+            }
 
             public void toggle(Object key) {
                 Block b = (Block) key;
-                if (!picker.selectedBlocks.remove(b)) picker.selectedBlocks.add(b);
+                picker.toggle(b);
             }
 
-            public int selectedCount() { return picker.selectedBlocks.size(); }
+            public int selectedCount() {
+                int count = 0;
+                for (ListPickerWidget.Entry e : entries()) {
+                    if (selected(e.key())) count++;
+                }
+                return count;
+            }
+
+            public int dot(Object key) {
+                Block b = (Block) key;
+                return picker.selectedBlocks.getOrDefault(b, 0);
+            }
+
+            public SettingWidget editor(ListPickerWidget.Entry e) {
+                Block b = (Block) e.key();
+                ColorWidget w = new ColorWidget(picker, e.name(),
+                        () -> picker.colorOf(b),
+                        c -> { if (picker.selectedBlocks.containsKey(b)) picker.setColor(b, c); }, false);
+                w.setOpen(true);
+                return w;
+            }
+        };
+    }
+
+    private static ListPickerWidget.Source entities(EntityFilterPicker picker) {
+        return new ListPickerWidget.Source() {
+            public String label() { return "Entities"; }
+
+            public List<ListPickerWidget.Entry> entries() { return entityEntries(); }
+
+            public boolean selected(Object key) { return picker.selectedEntities.containsKey(key); }
+
+            public void toggle(Object key) {
+                EntityType<?> t = (EntityType<?>) key;
+                if (picker.selectedEntities.remove(t) == null) {
+                    picker.selectedEntities.put(t, EntityFilterPicker.DEFAULT_COLOR);
+                    picker.excludedEntities.remove(t); // include and exclude are mutually exclusive
+                }
+            }
+
+            public int selectedCount() { return picker.selectedEntities.size(); }
+
+            public int dot(Object key) { return picker.selectedEntities.getOrDefault(key, 0); }
+
+            public SettingWidget editor(ListPickerWidget.Entry e) {
+                EntityType<?> t = (EntityType<?>) e.key();
+                ColorWidget w = new ColorWidget(picker, e.name(),
+                        () -> picker.selectedEntities.getOrDefault(t, EntityFilterPicker.DEFAULT_COLOR),
+                        c -> { if (picker.selectedEntities.containsKey(t)) picker.selectedEntities.put(t, c); }, false);
+                w.setOpen(true);
+                return w;
+            }
+        };
+    }
+
+    private static List<ListPickerWidget.Entry> entityEntries;
+
+    /** Every entity type, sorted by name (built once, shared by the include and exclude lists). */
+    private static List<ListPickerWidget.Entry> entityEntries() {
+        if (entityEntries == null) {
+            List<ListPickerWidget.Entry> all = new ArrayList<>();
+            for (EntityType<?> t : BuiltInRegistries.ENTITY_TYPE) {
+                String id = BuiltInRegistries.ENTITY_TYPE.getKey(t).toString();
+                all.add(new ListPickerWidget.Entry(t, id, t.getDescription().getString()));
+            }
+            all.sort(Comparator.comparing(ListPickerWidget.Entry::name, String.CASE_INSENSITIVE_ORDER));
+            entityEntries = all;
+        }
+        return entityEntries;
+    }
+
+    /** Entity types that are never shown, even if their group is enabled. */
+    private static ListPickerWidget.Source excludedEntities(EntityFilterPicker picker) {
+        return new ListPickerWidget.Source() {
+            public String label() { return "Excluded"; }
+
+            public List<ListPickerWidget.Entry> entries() { return entityEntries(); }
+
+            public boolean selected(Object key) { return picker.excludedEntities.contains(key); }
+
+            public void toggle(Object key) {
+                EntityType<?> t = (EntityType<?>) key;
+                if (!picker.excludedEntities.remove(t)) {
+                    picker.excludedEntities.add(t);
+                    picker.selectedEntities.remove(t); // include and exclude are mutually exclusive
+                }
+            }
+
+            public int selectedCount() { return picker.excludedEntities.size(); }
         };
     }
 

@@ -2,6 +2,7 @@ package com.OsamaClient.newbridge.Hacks.Movement.pathing;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -118,6 +119,9 @@ public enum MoveType {
             BlockPos dest      = new BlockPos(x, y - 1, z); // direkt unter den Füßen
             BlockPos floor     = new BlockPos(x, y - 2, z); // neuer Boden
 
+            if (!BlockHelper.isLoaded(mc, headBlock) || !BlockHelper.isLoaded(mc, dest)
+                    || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
+
             // Kopfblock muss abbaubar sein
             double costHead = BlockHelper.miningCost(mc, headBlock);
             if (costHead == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
@@ -158,8 +162,14 @@ public enum MoveType {
             // Kopffreiheit auf dem neuen Level
             BlockPos destHead = new BlockPos(x, y + 2, z);
             BlockPos floor    = new BlockPos(x, y - 1, z);
+            if (!BlockHelper.isLoaded(mc, destFeet) || !BlockHelper.isLoaded(mc, destHead)
+                    || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
+            // Boden darf Luft sein: in einer Pillar-Kette platzieren die vorherigen Schritte genau
+            // diesen Block, der A* sieht ihn aber noch nicht in der Welt. Ohne das konnte der Pfad
+            // immer nur EINEN Pillar-Schritt lang sein -> ständiges Neuberechnen.
+            // Der Executor prüft zur Laufzeit, ob wirklich etwas zum Platzieren da ist.
             BlockState floorState = mc.level.getBlockState(floor);
-            if (!floorState.isSolid()) return MoveResult.IMPOSSIBLE;
+            if (!floorState.isSolid() && !floorState.isAir()) return MoveResult.IMPOSSIBLE;
 
             double costFeet = BlockHelper.miningCost(mc, destFeet);
             double costHead = BlockHelper.miningCost(mc, destHead);
@@ -180,7 +190,8 @@ public enum MoveType {
             if (mineCost > 0) mineCost += ActionCosts.MINING_OVERHEAD;
             mineCost += fallingCost;
 
-            double cost = ActionCosts.JUMP_ONE_BLOCK_COST + ActionCosts.WALK_ONE_BLOCK_COST + mineCost;
+            // + Platzieren/Warten (Sprung + Block setzen dauert real ~10 Ticks)
+            double cost = ActionCosts.JUMP_ONE_BLOCK_COST + ActionCosts.WALK_ONE_BLOCK_COST + 8.0 + mineCost;
             return new MoveResult(destFeet, cost, toBreak.toArray(new BlockPos[0]));
         }
     };
@@ -200,20 +211,16 @@ public enum MoveType {
     // ─── Shared helpers ───────────────────────────────────────────────────────
 
     protected static boolean hasPlaceableBlock(Minecraft mc) {
-        if (mc.player == null) return false;
-        for (int slot = 0; slot < 9; slot++) {
-            net.minecraft.world.item.ItemStack stack = mc.player.getInventory().getItem(slot);
-            if (stack.isEmpty()) continue;
-            net.minecraft.world.item.Item item = stack.getItem();
-            if (item instanceof net.minecraft.world.item.BlockItem) return true;
-        }
-        return false;
+        return BlockHelper.hasPlaceableBlock(mc);
     }
 
     protected static MoveResult traverse(Minecraft mc, int sx, int sy, int sz, int dx, int dy, int dz) {
         BlockPos dest     = new BlockPos(dx, dy, dz);
         BlockPos destHead = new BlockPos(dx, dy + 1, dz);
         BlockPos floor    = new BlockPos(dx, dy - 1, dz);
+
+        if (!BlockHelper.isLoaded(mc, dest) || !BlockHelper.isLoaded(mc, destHead)
+                || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
 
         double costFeet = BlockHelper.miningCost(mc, dest);
         double costHead = BlockHelper.miningCost(mc, destHead);
@@ -222,16 +229,22 @@ public enum MoveType {
         BlockState floorState = mc.level.getBlockState(floor);
         if (!floorState.isSolid() && !isWalkableFluid(floorState)) return MoveResult.IMPOSSIBLE;
 
+        // Existing tunnels are often less useful for exploration, but they are
+        // still valid routes. A penalty lets A* use one when it is the only path.
+        Direction travelDir = (dx != sx) ? (dx > sx ? Direction.EAST : Direction.WEST)
+                : (dz > sz ? Direction.SOUTH : Direction.NORTH);
+        boolean carvedTunnel = BlockHelper.isCarvedTunnel(mc, dest, travelDir);
+
         // Falling block check: würde Gravel/Sand über dest oder destHead in den Weg fallen?
         double fallingCostFeet = BlockHelper.fallingBlockColumnCost(mc, dest);
         double fallingCostHead = BlockHelper.fallingBlockColumnCost(mc, destHead);
         if (fallingCostFeet == ActionCosts.COST_INF || fallingCostHead == ActionCosts.COST_INF)
             return MoveResult.IMPOSSIBLE;
 
+        // Wasser als Ziel ist bereits über miningCost() (FORBIDDEN) ausgeschlossen,
+        // Flüssigkeiten werden also nie mehr als Weg benutzt.
         double moveCost = ActionCosts.WALK_ONE_BLOCK_COST;
-
-        // Water penalty at destination
-        if (isWater(mc.level.getBlockState(dest))) moveCost += ActionCosts.WATER_PENALTY;
+        if (carvedTunnel) moveCost += ActionCosts.CARVED_TUNNEL_PENALTY;
 
         double mineCost = 0;
         java.util.List<BlockPos> toBreakList = new java.util.ArrayList<>();
@@ -258,6 +271,11 @@ public enum MoveType {
         BlockPos destFeet  = new BlockPos(tx, destY, tz);
         BlockPos destHead  = new BlockPos(tx, destY + 1, tz);
         BlockPos srcFloor  = new BlockPos(tx, sy, tz);
+
+        if (!BlockHelper.isLoaded(mc, jumpClear) || !BlockHelper.isLoaded(mc, destFeet)
+                || !BlockHelper.isLoaded(mc, destHead) || !BlockHelper.isLoaded(mc, srcFloor)) {
+            return MoveResult.IMPOSSIBLE;
+        }
 
         BlockState srcFloorState = mc.level.getBlockState(srcFloor);
         if (!srcFloorState.isSolid()) return MoveResult.IMPOSSIBLE;
@@ -297,6 +315,11 @@ public enum MoveType {
         BlockPos destHead = new BlockPos(tx, sy, tz);     // Kopfhoehe am Ziel (sy)
         BlockPos floor    = new BlockPos(tx, destY - 1, tz);
 
+        if (!BlockHelper.isLoaded(mc, srcHead) || !BlockHelper.isLoaded(mc, destFeet)
+                || !BlockHelper.isLoaded(mc, destHead) || !BlockHelper.isLoaded(mc, floor)) {
+            return MoveResult.IMPOSSIBLE;
+        }
+
         double costSrcHead = BlockHelper.miningCost(mc, srcHead);
         double costFeet    = BlockHelper.miningCost(mc, destFeet);
         double costHead    = BlockHelper.miningCost(mc, destHead);
@@ -328,6 +351,8 @@ public enum MoveType {
     }
 
     protected static boolean isWalkableFluid(BlockState state) {
-        return state.getFluidState().is(FluidTags.WATER);
+        // Flüssigkeiten werden jetzt komplett gemieden (auch als "begehbarer" Boden,
+        // z.B. flaches Wasser) -> der Pathfinder läuft drumherum statt hindurch.
+        return false;
     }
 }

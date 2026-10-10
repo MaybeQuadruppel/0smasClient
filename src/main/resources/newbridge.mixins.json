@@ -23,6 +23,13 @@
     "MinecraftMixin"
   ],
   "client": [
+    "emote.LayerDefinitionAccessor",
+    "emote.EntityModelSetMixin",
+    "emote.HumanoidModelMixin",
+    "emote.InventoryScreenMixin",
+    "emote.PlayerModelEmoteMixin",
+    "emote.AvatarRenderStateEmoteMixin",
+    "emote.AvatarRendererEmoteMixin",
     "ONETAPMIXIN",
     "SupressMixin",
     "camera.CameraMixin",
@@ -39,7 +46,8 @@
     "chams.RenderSetupAccessor",
     "chams.RenderTypeStateAccessor",
     "xray.AbstractBlockStateMixin",
-    "xray.BlockEntityRenderDispatcherMixin"
+    "xray.BlockEntityRenderDispatcherMixin",
+    "camera.CameraNoClipMixin"
   ],
   "injectors": {
     "defaultRequire": 1

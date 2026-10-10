@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.UI.gui;
 
+import com.OsamaClient.newbridge.Hacks.Player.Emotes.EmoteWheel;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import com.OsamaClient.newbridge.config.ConfigCodec;
@@ -32,8 +33,9 @@ public final class ClickGui {
 
     private static final Module.Category[] ORDER = {
             Module.Category.COMBAT, Module.Category.MOVEMENT, Module.Category.VISUAL,
-            Module.Category.MISC, Module.Category.Donut, Module.Category.CLIENT};
-    private static final String[] TITLES = {"Combat", "Movement", "Visual", "Misc", "Donut", "Client"};
+            Module.Category.MISC, Module.Category.Donut, Module.Category.CLIENT, Module.Category.PLAYER,
+            Module.Category.TROLL};
+    private static final String[] TITLES = {"Combat", "Movement", "Visual", "Misc", "Donut", "Client", "Player", "Troll"};
 
     private final UiRenderer renderer = new UiRenderer();
     private final BlurRenderer blur = new BlurRenderer();
@@ -138,6 +140,7 @@ public final class ClickGui {
     public void shutdown() {
         renderer.close();
         blur.close();
+        EmoteWheel.INSTANCE.shutdown();
         UiFont.closeAll();
     }
 

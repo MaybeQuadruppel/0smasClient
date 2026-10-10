@@ -18,6 +18,8 @@ public class EntityFilterWidget extends SettingWidget {
     private boolean open;
     private final List<Entry> entries = new ArrayList<>();
     private boolean headerHovered;
+    /** Searchable list of every entity type (arrow, snowball, zombie, ...), each with its own color. */
+    private final ListPickerWidget[] lists;
 
     private final class Entry {
         final String key;
@@ -35,15 +37,17 @@ public class EntityFilterWidget extends SettingWidget {
         float height() { return Theme.SETTING_H + color.height(); }
     }
 
-    public EntityFilterWidget(EntityFilterPicker picker) {
+    public EntityFilterWidget(EntityFilterPicker picker, ListPickerWidget... lists) {
         super(picker);
         this.picker = picker;
+        this.lists = lists;
         for (String k : picker.filters.keySet()) entries.add(new Entry(k));
     }
 
     private float bodyHeight() {
         float h = 0;
         for (Entry e : entries) h += e.height();
+        for (ListPickerWidget l : lists) h += l.height();
         return h;
     }
 
@@ -67,6 +71,7 @@ public class EntityFilterWidget extends SettingWidget {
         float e = openA.value();
         if (e < 0.001f) {
             for (Entry en : entries) en.hovered = en.swatchHovered = false;
+            for (ListPickerWidget l : lists) l.clearHover();
             return;
         }
         ui.pushClip(x, y + h, w, bodyHeight() * e);
@@ -94,6 +99,10 @@ public class EntityFilterWidget extends SettingWidget {
             float ch = en.color.height();
             yy += ch;
         }
+        for (ListPickerWidget l : lists) {
+            l.render(ui, x + 2f, yy, w - 2f);
+            yy += l.height();
+        }
         ui.popClip();
     }
 
@@ -116,12 +125,21 @@ public class EntityFilterWidget extends SettingWidget {
             }
             if (en.color.isOpen() && en.color.isHovered()) return en.color.mouseClicked(ui, button, mods) || true;
         }
+        for (ListPickerWidget l : lists) if (l.isHovered()) return l.mouseClicked(ui, button, mods) || true;
         return true;
     }
 
     @Override
     public void mouseReleased(Ui ui, int button) {
         for (Entry en : entries) en.color.mouseReleased(ui, button);
+        for (ListPickerWidget l : lists) l.mouseReleased(ui, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(Ui ui, double amount) {
+        if (!open) return false;
+        for (ListPickerWidget l : lists) if (l.isHovered()) return l.mouseScrolled(ui, amount);
+        return false;
     }
 
     // hex editing of an embedded picker
@@ -131,22 +149,32 @@ public class EntityFilterWidget extends SettingWidget {
     }
 
     @Override
-    public boolean wantsKeyboard() { return editing() != null; }
+    public boolean wantsKeyboard() { return editing() != null || typing() != null; }
+
+    private ListPickerWidget typing() {
+        for (ListPickerWidget l : lists) if (l.wantsKeyboard()) return l;
+        return null;
+    }
 
     @Override
     public void blur() {
         ColorWidget c = editing();
         if (c != null) c.blur();
+        for (ListPickerWidget l : lists) l.blur();
     }
 
     @Override
     public boolean keyPressed(int key, int mods) {
+        ListPickerWidget t = typing();
+        if (t != null) return t.keyPressed(key, mods);
         ColorWidget c = editing();
         return c != null && c.keyPressed(key, mods);
     }
 
     @Override
     public boolean charTyped(int codepoint) {
+        ListPickerWidget t = typing();
+        if (t != null) return t.charTyped(codepoint);
         ColorWidget c = editing();
         return c != null && c.charTyped(codepoint);
     }

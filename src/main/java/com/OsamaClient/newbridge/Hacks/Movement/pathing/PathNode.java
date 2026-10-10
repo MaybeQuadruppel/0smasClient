@@ -21,6 +21,9 @@ public final class PathNode implements Comparable<PathNode> {
     /** Parent node for path reconstruction */
     public PathNode previous;
 
+    /** Exact move selected when this node was reached. */
+    public MoveResult moveFromPrevious;
+
     /** Position in the binary heap (-1 = not in heap) */
     public int heapPosition = -1;
 
@@ -32,6 +35,7 @@ public final class PathNode implements Comparable<PathNode> {
         this.estimatedCostToGoal = goal.heuristic(x, y, z);
         this.combinedCost = this.cost + this.estimatedCostToGoal;
         this.previous = null;
+        this.moveFromPrevious = null;
     }
 
     public boolean isOpen() {

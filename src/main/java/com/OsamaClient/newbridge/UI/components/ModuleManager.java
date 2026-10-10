@@ -6,6 +6,8 @@ import com.OsamaClient.newbridge.Hacks.Movement.*;
 import com.OsamaClient.newbridge.Hacks.Donut.*;
 //import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
 //import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
+import com.OsamaClient.newbridge.Hacks.Player.Emotes.EmoteModule;
+import com.OsamaClient.newbridge.Hacks.Troll.*;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.BlockESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.ItemESP;
 import com.OsamaClient.newbridge.Hacks.Visual.ESP.PlayerESP;
@@ -77,6 +79,20 @@ public class ModuleManager {
         modules.add(new TeammateList());
         modules.add(new ClickGuiModule());
         modules.add(new HudOverlay());
+        modules.add(new BaseFinder());
+        modules.add(new StraightMine());
+        modules.add(new RtpFinder());
+        modules.add(new EmoteModule());
+        modules.add(new Spam());
+        modules.add(new Mimic());
+        modules.add(new Derp());
+        modules.add(new Shadow());
+        modules.add(new BowAimbot());
+        modules.add(new Speed());
+        modules.add(new HighJump());
+        modules.add(new Parkour());
+        modules.add(new AutoRespawn());
+        modules.add(new AutoTool());
 
 
 
