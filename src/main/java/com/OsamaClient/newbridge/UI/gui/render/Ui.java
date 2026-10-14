@@ -106,6 +106,14 @@ public final class Ui {
         r.image(img, x0, y0, x1, y1, a(0xFFFFFFFF));
     }
 
+    /** Zeichnet ein Sprite aus einem Minecraft-Atlas (z.B. Block-Textur) pixelscharf in das Rechteck (Units). */
+    public void sprite(net.minecraft.client.renderer.texture.TextureAtlasSprite sprite, float x, float y, float w, float h) {
+        if (sprite == null) return;
+        float x0 = snap(x), y0 = snap(y), x1 = snap(x + w), y1 = snap(y + h);
+        r.image(AtlasTexture.of(sprite.atlasLocation()), x0, y0, x1, y1,
+                sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(), a(0xFFFFFFFF));
+    }
+
     // ------------------------------------------------------------------ text
 
     public FontAtlas font(float sizeUnits) {

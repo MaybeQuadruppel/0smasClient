@@ -28,12 +28,16 @@ public class ListPickerWidget extends SettingWidget {
         int selectedCount();
         /** Color dot shown next to a selected entry, or 0 for none. */
         default int dot(Object key) { return 0; }
+        /** Small icon (e.g. the block texture) shown in front of the entry name, or null. */
+        default net.minecraft.client.renderer.texture.TextureAtlasSprite icon(Object key) { return null; }
+        /** true = reserve the icon column for every row so names stay aligned. */
+        default boolean hasIcons() { return false; }
         /** Editor for a selected entry (RMB), or null. */
         default SettingWidget editor(Entry e) { return null; }
     }
 
     private static final int VISIBLE = 6;
-    private static final float ITEM_H = 8f, SEARCH_H = 8f;
+    private static final float ITEM_H = 9f, SEARCH_H = 8f, ICON = 6.4f;
 
     private final Source source;
     private final Anim openA = new Anim(0f, 14f), scrollA = new Anim(0f, 18f);
@@ -51,6 +55,13 @@ public class ListPickerWidget extends SettingWidget {
         super(setting);
         this.source = source;
         search.maxLength = 32;
+    }
+
+    /** Opens/closes the list (also used by tests). */
+    public void setOpen(boolean value) {
+        open = value;
+        openA.setTarget(open ? 1f : 0f);
+        if (!open) search.end(); else lastQuery = null;
     }
 
     private float bodyHeight() {
@@ -117,15 +128,20 @@ public class ListPickerWidget extends SettingWidget {
             boolean hov = ui.hovered(left, iy, iw, ITEM_H);
             if (hov) hoveredIndex = i;
             boolean sel = source.selected(en.key());
-            if (hov) ui.rect(left, iy, iw, ITEM_H, 0x14FFFFFF);
-            if (sel) ui.rect(left, iy + 1.5f, 1f, ITEM_H - 3f, Theme.accent());
+            if (sel) ui.round(left, iy + 0.4f, iw, ITEM_H - 0.8f, 1.5f, Theme.accent(0.14f));
+            if (hov) ui.round(left, iy + 0.4f, iw, ITEM_H - 0.8f, 1.5f, 0x16FFFFFF);
+            if (sel) ui.round(left, iy + 1.8f, 1f, ITEM_H - 3.6f, 0.5f, Theme.accent());
             float tx = left + 2.5f;
+            if (source.hasIcons()) {
+                var icon = source.icon(en.key());
+                if (icon != null) ui.sprite(icon, tx, iy + (ITEM_H - ICON) * 0.5f, ICON, ICON);
+                tx += ICON + 2f;
+            }
             int dot = sel ? source.dot(en.key()) : 0;
             if (dot != 0) {
-                ui.round(tx, iy + ITEM_H * 0.5f - 1.25f, 2.5f, 2.5f, 1.25f, dot | 0xFF000000);
-                tx += 4f;
+                ui.round(left + iw - 5.5f, iy + ITEM_H * 0.5f - 1.25f, 2.5f, 2.5f, 1.25f, dot | 0xFF000000);
             }
-            ui.text(ui.ellipsize(en.name(), left + iw - tx - 2f, 6f), tx, iy, ITEM_H, 6f,
+            ui.text(ui.ellipsize(en.name(), left + iw - tx - 8f, 6f), tx, iy, ITEM_H, 6f,
                     sel ? Theme.accent() : hov ? Theme.TEXT : Theme.TEXT_DIM);
         }
         if (filtered.isEmpty()) ui.textCentered("No matches", left + iw * 0.5f, ly, ITEM_H * 2, 6f, Theme.TEXT_DIM);

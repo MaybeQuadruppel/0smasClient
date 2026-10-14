@@ -58,11 +58,31 @@ public final class SettingWidgets {
         return new LabelWidget(c);
     }
 
+    /** Texture of a block as small icon (particle sprite = the recognizable face), cached. */
+    private static final java.util.Map<Block, net.minecraft.client.renderer.texture.TextureAtlasSprite> BLOCK_ICONS = new java.util.HashMap<>();
+
+    public static net.minecraft.client.renderer.texture.TextureAtlasSprite blockIcon(Block b) {
+        var c = BLOCK_ICONS.get(b);
+        if (c != null) return c;
+        try {
+            var mm = net.minecraft.client.Minecraft.getInstance().getModelManager();
+            c = mm.getBlockStateModelSet().getParticleMaterial(b.defaultBlockState()).sprite();
+            BLOCK_ICONS.put(b, c);
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return c;
+    }
+
     private static ListPickerWidget.Source blocks(BlockPicker picker) {
         return new ListPickerWidget.Source() {
             private List<ListPickerWidget.Entry> all;
 
             public String label() { return picker.getLabel(); }
+
+            public boolean hasIcons() { return true; }
+
+            public net.minecraft.client.renderer.texture.TextureAtlasSprite icon(Object key) { return blockIcon((Block) key); }
 
             public List<ListPickerWidget.Entry> entries() {
                 if (all == null) {
@@ -199,6 +219,12 @@ public final class SettingWidgets {
 
             public String label() { return picker.getLabel(); }
 
+            public boolean hasIcons() { return true; }
+
+            public net.minecraft.client.renderer.texture.TextureAtlasSprite icon(Object key) {
+                return key instanceof net.minecraft.world.item.BlockItem bi ? blockIcon(bi.getBlock()) : null;
+            }
+
             public List<ListPickerWidget.Entry> entries() {
                 if (all == null) {
                     all = new ArrayList<>();
@@ -265,4 +291,4 @@ public final class SettingWidgets {
             }
         };
     }
-}
+}

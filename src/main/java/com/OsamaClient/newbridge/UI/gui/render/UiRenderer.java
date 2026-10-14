@@ -183,17 +183,22 @@ public final class UiRenderer {
 
     /** Bild-Quad (volle Farbe aus der Textur, multipliziert mit argb) in Framebuffer-Pixeln. */
     public void image(UiImage img, float x0, float y0, float x1, float y1, int argb) {
+        image(img, x0, y0, x1, y1, 0f, 0f, 1f, 1f, argb);
+    }
+
+    /** Bild-Quad mit Ausschnitt (u0,v0)-(u1,v1) einer beliebigen Textur (z.B. ein Sprite aus dem Block-Atlas). */
+    public void image(UiTexture img, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, int argb) {
         if ((argb >>> 24) == 0) return;
         if (clipped(x0, y0, x1 - x0, y1 - y0)) return;
         command(TYPE_IMAGE, img, text.vertexCount());
         ByteBuffer b = text.reserve(4);
-        b.putFloat(x0).putFloat(y0).putFloat(0f).putFloat(0f).putFloat(0f);
+        b.putFloat(x0).putFloat(y0).putFloat(0f).putFloat(u0).putFloat(v0);
         QuadBuffer.putColor(b, argb);
-        b.putFloat(x0).putFloat(y1).putFloat(0f).putFloat(0f).putFloat(1f);
+        b.putFloat(x0).putFloat(y1).putFloat(0f).putFloat(u0).putFloat(v1);
         QuadBuffer.putColor(b, argb);
-        b.putFloat(x1).putFloat(y1).putFloat(0f).putFloat(1f).putFloat(1f);
+        b.putFloat(x1).putFloat(y1).putFloat(0f).putFloat(u1).putFloat(v1);
         QuadBuffer.putColor(b, argb);
-        b.putFloat(x1).putFloat(y0).putFloat(0f).putFloat(1f).putFloat(0f);
+        b.putFloat(x1).putFloat(y0).putFloat(0f).putFloat(u1).putFloat(v0);
         QuadBuffer.putColor(b, argb);
     }
 

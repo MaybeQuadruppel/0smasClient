@@ -50,6 +50,10 @@ public final class ModuleRow {
 
     public boolean isExpanded() { return expanded; }
 
+    public Module module() { return module; }
+
+    public List<SettingWidget> widgets() { return widgets; }
+
     public void setExpanded(boolean expanded) {
         this.expanded = expanded && !widgets.isEmpty();
         expandA.setTarget(this.expanded ? 1f : 0f);

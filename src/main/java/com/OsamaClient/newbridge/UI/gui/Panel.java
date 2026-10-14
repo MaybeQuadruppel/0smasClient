@@ -41,6 +41,18 @@ public final class Panel {
         for (int i = 0; i < rowVisible.length; i++) rowVisible[i] = new Anim(1f, 16f);
     }
 
+    public List<ModuleRow> rows() { return rows; }
+
+    /** Scrolls the list so that the row is at the top (also used by tests). */
+    public void scrollToRow(ModuleRow row) {
+        float off = 0;
+        for (ModuleRow r : rows) {
+            if (r == row) break;
+            off += r.height();
+        }
+        scrollTarget = off;
+    }
+
     public void setCollapsed(boolean c) {
         collapsed = c;
         openA.setTarget(c ? 0f : 1f);

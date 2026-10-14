@@ -69,6 +69,7 @@ public class ModuleManager {
         modules.add(new com.OsamaClient.newbridge.Hacks.Misc.AntiAfk());
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.FastLadder());
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.Glide());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Combat.ClickBurst());
 //        modules.add(new TestEnderChestESP());
         modules.add(new ClickTP());
         modules.add(new AutoTrade());
