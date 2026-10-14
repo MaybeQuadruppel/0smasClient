@@ -31,6 +31,8 @@ import java.util.function.Consumer;
 public final class ConfigCodec {
 
     public static final int VERSION = 1;
+    /** Key codes are SDL3 scancodes since Minecraft 26.3; files without this marker hold GLFW key codes. */
+    public static final String KEY_FORMAT = "scancode";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     /** Registry id lookups for block / item pickers (null = unknown). */
@@ -61,6 +63,7 @@ public final class ConfigCodec {
                               Map<String, WidgetPos> hudWidgets, Ids ids) {
         JsonObject root = new JsonObject();
         root.addProperty("version", VERSION);
+        root.addProperty("keyFormat", KEY_FORMAT);
         JsonObject mods = new JsonObject();
         for (Module m : modules) {
             JsonObject o = new JsonObject();
@@ -155,6 +158,8 @@ public final class ConfigCodec {
     public static void decode(Data data, List<? extends Module> modules, Map<String, PanelState> panelsOut,
                               Map<String, WidgetPos> hudOut, Ids ids, Consumer<Module> enable) {
         JsonObject root = data.root();
+        JsonElement kf = root.get("keyFormat");
+        boolean legacyKeys = kf == null || !kf.isJsonPrimitive() || !KEY_FORMAT.equals(kf.getAsString());
         JsonObject mods = obj(root, "modules");
         if (mods != null) {
             for (Module m : modules) {
@@ -174,7 +179,7 @@ public final class ConfigCodec {
                     }
                 }
                 Integer key = integer(o.get("key"));
-                if (key != null) m.key = key;
+                if (key != null) m.key = legacyKeys ? com.OsamaClient.newbridge.UI.gui.input.Keys.fromGlfw(key) : key;
                 Boolean enabled = bool(o.get("enabled"));
                 if (Boolean.TRUE.equals(enabled) && !m.enabled) {
                     try {
@@ -343,4 +348,4 @@ public final class ConfigCodec {
         JsonPrimitive p = prim(e);
         return p != null && p.isString() ? p.getAsString() : null;
     }
-}
+}

@@ -8,7 +8,7 @@ import com.OsamaClient.newbridge.Utils.TeamUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.AxeItem;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -61,7 +61,7 @@ public class ShieldDisable extends Module {
             client.execute(() -> {
 
                 client.gameMode.attack(client.player, target);
-                client.player.swing(InteractionHand.MAIN_HAND);
+                com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
 
                 scheduler.schedule(() -> {
                     client.execute(() -> {
@@ -69,7 +69,7 @@ public class ShieldDisable extends Module {
 
                         if (autoStrikeBack) {
                             client.gameMode.attack(client.player, target);
-                            client.player.swing(InteractionHand.MAIN_HAND);
+                            com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
                         }
 
                         isExecuting = false;
@@ -82,10 +82,10 @@ public class ShieldDisable extends Module {
     private int findAxe(Minecraft client) {
         for (int i = 0; i < 9; i++) {
             ItemStack stack = client.player.getInventory().getItem(i);
-            if (stack.getItem() instanceof AxeItem) {
+            if (stack.is(ItemTags.AXES)) {
                 return i;
             }
         }
         return -1;
     }
-}
+}

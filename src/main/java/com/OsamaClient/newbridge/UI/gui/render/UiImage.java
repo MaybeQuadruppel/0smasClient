@@ -2,9 +2,9 @@ package com.OsamaClient.newbridge.UI.gui.render;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 
 /** CPU-Bild (ARGB) als Textur für den UiRenderer, z.B. die Minimap. Hochgeladen nur wenn geändert. */
 public final class UiImage implements UiTexture {

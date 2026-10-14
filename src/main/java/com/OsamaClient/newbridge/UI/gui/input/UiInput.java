@@ -3,7 +3,7 @@ package com.OsamaClient.newbridge.UI.gui.input;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 /** Raw window input: mouse position in framebuffer pixels (never MC's GUI-scaled coordinates). */
 public final class UiInput {
@@ -23,12 +23,12 @@ public final class UiInput {
     }
 
     public static boolean keyDown(int key) {
-        return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key);
+        return InputConstants.isKeyDown(key);
     }
 
-    public static boolean ctrl(int mods) { return (mods & GLFW.GLFW_MOD_CONTROL) != 0; }
+    public static boolean ctrl(int mods) { return (mods & Keys.MOD_CONTROL) != 0; }
 
-    public static boolean shift(int mods) { return (mods & GLFW.GLFW_MOD_SHIFT) != 0; }
+    public static boolean shift(int mods) { return (mods & Keys.MOD_SHIFT) != 0; }
 
     public static String clipboard() {
         String s = Minecraft.getInstance().keyboardHandler.getClipboard();

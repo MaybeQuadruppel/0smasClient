@@ -27,7 +27,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluids;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +70,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext ctx) {
         try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
-            sp.getClientLevel().waitForChunksRender();
+            sp.getConnection().waitForChunksRender();
             TestServerContext srv = sp.getServer();
             srv.runCommand("gamemode survival @a");
             srv.runCommand("difficulty peaceful");
@@ -104,6 +104,10 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("macros: macro runs a .client command (creates waypoint)", () -> testMacros(ctx));
             run("autolog: triggers on low health (dry run) and disables itself", () -> testAutoLog(ctx));
             run("waypoints: death waypoint on death", () -> testDeathWaypoint(ctx, srv));
+            run("norender: scoreboard/crosshair/title/item-name hooks applied", () -> testNoRenderHooks());
+            run("glide: limits the fall speed", () -> testGlide(ctx, srv));
+            run("fastladder: climbs faster than vanilla", () -> testFastLadder(ctx, srv));
+            run("antiafk: acts after the interval", () -> testAntiAfk(ctx, srv));
         } finally {
             writeReport(ctx);
         }
@@ -367,11 +371,11 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         AtomicReference<Integer> afterKey = new AtomicReference<>(), afterUndo = new AtomicReference<>(), afterRedo = new AtomicReference<>();
         ctx.runOnClient(mc -> {
             Map<?, java.util.NavigableMap<Float, float[]>> keys = (Map<?, java.util.NavigableMap<Float, float[]>>) f.get(EmoteEditor.INSTANCE);
-            EmoteEditor.INSTANCE.keyPressed(GLFW.GLFW_KEY_K, 0);
+            EmoteEditor.INSTANCE.keyPressed(Keys.KEY_K, 0);
             afterKey.set(total(keys));
-            EmoteEditor.INSTANCE.keyPressed(GLFW.GLFW_KEY_Z, GLFW.GLFW_MOD_CONTROL);
+            EmoteEditor.INSTANCE.keyPressed(Keys.KEY_Z, Keys.MOD_CONTROL);
             afterUndo.set(total(keys));
-            EmoteEditor.INSTANCE.keyPressed(GLFW.GLFW_KEY_Y, GLFW.GLFW_MOD_CONTROL);
+            EmoteEditor.INSTANCE.keyPressed(Keys.KEY_Y, Keys.MOD_CONTROL);
             afterRedo.set(total(keys));
         });
         ctx.takeScreenshot("newbridge_emote_editor");
@@ -639,6 +643,79 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         ctx.waitTicks(20);
         assertTrue(ctx.computeOnClient(mc -> hasDeathWaypoint()), "no death waypoint was created");
     }
+
+
+    private void testNoRenderHooks() {
+        try {
+            Class<?> hud = Class.forName("net.minecraft.client.gui.Hud");
+            StringBuilder names = new StringBuilder();
+            for (var m : hud.getDeclaredMethods()) names.append(m.getName()).append(' ');
+            String all = names.toString();
+            for (String h : new String[]{"onExtractScoreboard", "onExtractCrosshair", "onExtractTitle", "onExtractSelectedItemName",
+                    "onExtractPumpkinOverlay", "onExtractPortalOverlay", "onExtractVignetteOverlay"}) {
+                assertTrue(all.contains(h), "NoRender hook missing in Hud: " + h);
+            }
+        } catch (ClassNotFoundException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private void testGlide(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        prepareInventory(srv);
+        teleport(ctx, srv, 0, Y + 4, 0);
+        ctx.runOnClient(mc -> { var g = com.OsamaClient.newbridge.Hacks.Movement.Glide.INSTANCE; g.fallSpeed = 0.08; g.sneakToDrop = false; if (!g.enabled) g.toggle(); });
+        srv.runCommand(String.format(java.util.Locale.ROOT, "tp @a %.1f %d %.1f", ox + 0.5, Y + 40, oz + 0.5));
+        ctx.waitTicks(25);
+        double vy = ctx.computeOnClient(mc -> mc.player.getDeltaMovement().y);
+        double y = ctx.computeOnClient(mc -> mc.player.getY());
+        ctx.runOnClient(mc -> { var g = com.OsamaClient.newbridge.Hacks.Movement.Glide.INSTANCE; if (g.enabled) g.toggle(); });
+        // ohne Glide waere vy nach ~25 Ticks Fall bei etwa -1.0
+        assertTrue(vy > -0.15, "fall speed not limited: " + vy);
+        assertTrue(y > Y + 40 - 3.5, "fell too fast: y=" + y);
+        assertTrue(com.OsamaClient.newbridge.Hacks.Movement.Glide.limit(-1.0, 0.08) == -0.08, "limit()");
+    }
+
+    private void testFastLadder(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -2, Y - 1, -2, 2, Y - 1, 2, "stone");
+        fill(srv, -1, Y, 1, 1, Y + 14, 1, "stone");
+        for (int i = 0; i < 12; i++) srv.runCommand(String.format(java.util.Locale.ROOT, "setblock %d %d %d ladder[facing=north]", ox, Y + i, oz));
+        double[] climbed = new double[2];
+        for (int run = 0; run < 2; run++) {
+            final boolean fast = run == 1;
+            srv.runCommand(String.format(java.util.Locale.ROOT, "tp @a %.1f %d %.1f 180 0", ox + 0.5, Y, oz + 0.5));
+            ctx.waitTicks(10);
+            ctx.runOnClient(mc -> {
+                var f = com.OsamaClient.newbridge.Hacks.Movement.FastLadder.INSTANCE;
+                f.speed = 0.3; f.onlyWhenMoving = true;
+                if (f.enabled != fast) f.toggle();
+                mc.options.keyUp.setDown(true);
+            });
+            double y0 = ctx.computeOnClient(mc -> mc.player.getY());
+            ctx.waitTicks(20);
+            climbed[run] = ctx.computeOnClient(mc -> mc.player.getY()) - y0;
+            ctx.runOnClient(mc -> mc.options.keyUp.setDown(false));
+        }
+        ctx.runOnClient(mc -> { var f = com.OsamaClient.newbridge.Hacks.Movement.FastLadder.INSTANCE; if (f.enabled) f.toggle(); });
+        log("fastladder climbed vanilla=" + climbed[0] + " fast=" + climbed[1]);
+        assertTrue(climbed[1] > climbed[0] * 1.6 && climbed[1] > 3.0, "not faster: vanilla=" + climbed[0] + " fast=" + climbed[1]);
+    }
+
+    private void testAntiAfk(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -2, Y - 1, -2, 2, Y - 1, 2, "stone");
+        teleport(ctx, srv, 0, Y, 0);
+        ctx.runOnClient(mc -> mc.gui.setScreen(null));
+        float yaw0 = ctx.computeOnClient(mc -> mc.player.getYRot());
+        ctx.runOnClient(mc -> { var a = com.OsamaClient.newbridge.Hacks.Misc.AntiAfk.INSTANCE; a.intervalSeconds = 1.0; a.rotate = true; a.swing = true; a.jump = false; if (a.enabled) a.toggle(); a.toggle(); });
+        ctx.waitTicks(65);
+        int actions = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Misc.AntiAfk.INSTANCE.actions());
+        float yaw1 = ctx.computeOnClient(mc -> mc.player.getYRot());
+        ctx.runOnClient(mc -> { var a = com.OsamaClient.newbridge.Hacks.Misc.AntiAfk.INSTANCE; a.intervalSeconds = 20.0; if (a.enabled) a.toggle(); });
+        assertTrue(actions >= 2, "AntiAFK did not act, actions=" + actions);
+        assertTrue(Math.abs(yaw1 - yaw0) > 0.5f || actions >= 3, "head did not move: " + yaw0 + " -> " + yaw1);
+    }
 
     // ------------------------------------------------------------------ helpers
 

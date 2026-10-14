@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.input.UiInput;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.function.IntPredicate;
 
@@ -47,29 +47,29 @@ public final class TextField {
         if (!editing) return false;
         blink = 0;
         switch (key) {
-            case GLFW.GLFW_KEY_BACKSPACE -> {
+            case Keys.KEY_BACKSPACE -> {
                 if (cursor == 0) return false;
                 int from = UiInput.ctrl(mods) ? 0 : cursor - 1;
                 text = text.substring(0, from) + text.substring(cursor);
                 cursor = from;
                 return true;
             }
-            case GLFW.GLFW_KEY_DELETE -> {
+            case Keys.KEY_DELETE -> {
                 if (cursor >= text.length()) return false;
                 text = text.substring(0, cursor) + text.substring(cursor + 1);
                 return true;
             }
-            case GLFW.GLFW_KEY_LEFT -> cursor = Math.max(0, cursor - 1);
-            case GLFW.GLFW_KEY_RIGHT -> cursor = Math.min(text.length(), cursor + 1);
-            case GLFW.GLFW_KEY_HOME -> cursor = 0;
-            case GLFW.GLFW_KEY_END -> cursor = text.length();
-            case GLFW.GLFW_KEY_V -> {
+            case Keys.KEY_LEFT -> cursor = Math.max(0, cursor - 1);
+            case Keys.KEY_RIGHT -> cursor = Math.min(text.length(), cursor + 1);
+            case Keys.KEY_HOME -> cursor = 0;
+            case Keys.KEY_END -> cursor = text.length();
+            case Keys.KEY_V -> {
                 if (!UiInput.ctrl(mods)) return false;
                 boolean changed = false;
                 for (int cp : UiInput.clipboard().codePoints().toArray()) changed |= charTyped(cp);
                 return changed;
             }
-            case GLFW.GLFW_KEY_A -> {
+            case Keys.KEY_A -> {
                 if (!UiInput.ctrl(mods)) return false;
                 text = "";
                 cursor = 0;

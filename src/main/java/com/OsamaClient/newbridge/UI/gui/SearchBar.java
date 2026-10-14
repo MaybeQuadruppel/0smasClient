@@ -3,7 +3,7 @@ package com.OsamaClient.newbridge.UI.gui;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.setting.TextField;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.Locale;
 
@@ -71,7 +71,7 @@ final class SearchBar {
     /** @return true if the click hit the bar */
     boolean mouseClicked(int button) {
         if (!hovered) return false;
-        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) close();
+        if (button == Keys.MOUSE_BUTTON_RIGHT) close();
         else if (!field.editing) field.begin(field.text);
         return true;
     }
@@ -79,11 +79,11 @@ final class SearchBar {
     /** Keys while editing. @return true if consumed */
     boolean keyPressed(int key, int mods) {
         if (!editing()) return false;
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (key == Keys.KEY_ESCAPE) {
             close();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER) {
             field.end();
             if (field.text.isEmpty()) close();
             return true;

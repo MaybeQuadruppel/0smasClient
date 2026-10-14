@@ -3,7 +3,7 @@ package com.OsamaClient.newbridge.mixin;
 import com.OsamaClient.newbridge.EntryPoint;
 import com.OsamaClient.newbridge.Hacks.Visual.render.chams.ChamsRenderQueue;
 import com.OsamaClient.newbridge.event.Render3DEvent;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
@@ -22,30 +22,28 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class LevelRendererMixin {
 
     @Inject(
-            method = "render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lorg/joml/Matrix4fc;Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/joml/Vector4f;Z)V",
+            method = "render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;Lorg/joml/Vector4f;ZZ)V",
             at = @At("HEAD")
     )
-    private void newbridge$beginDelayedOverlays(GraphicsResourceAllocator allocator,
-                                                DeltaTracker tickCounter, boolean renderBlockOutline,
-                                                CameraRenderState cameraState, Matrix4fc positionMatrix,
-                                                GpuBufferSlice gpuBufferSlice, Vector4f vector4f,
-                                                boolean shouldRenderSky, CallbackInfo ci) {
+    private void newbridge$beginDelayedOverlays(GraphicsResourceAllocator allocator, boolean renderBlockOutline,
+                                                CameraRenderState cameraState, GpuBufferSlice terrainFog,
+                                                Vector4f fogColor, boolean shouldRenderSky,
+                                                boolean consistentDepthRequired, CallbackInfo ci) {
         // Chams-Queue zu Beginn des Frames leeren
         ChamsRenderQueue.clear();
     }
 
     @Inject(
-            method = "render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lorg/joml/Matrix4fc;Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/joml/Vector4f;Z)V",
+            method = "render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;Lorg/joml/Vector4f;ZZ)V",
             at = @At("RETURN")
     )
-    private void newbridge$fireRender3DEvent(GraphicsResourceAllocator allocator,
-                                             DeltaTracker tickCounter, boolean renderBlockOutline,
-                                             CameraRenderState cameraState, Matrix4fc positionMatrix,
-                                             GpuBufferSlice gpuBufferSlice, Vector4f vector4f,
-                                             boolean shouldRenderSky, CallbackInfo ci) {
-
+    private void newbridge$fireRender3DEvent(GraphicsResourceAllocator allocator, boolean renderBlockOutline,
+                                             CameraRenderState cameraState, GpuBufferSlice terrainFog,
+                                             Vector4f fogColor, boolean shouldRenderSky,
+                                             boolean consistentDepthRequired, CallbackInfo ci) {
+        DeltaTracker tickCounter = Minecraft.getInstance().getDeltaTracker();
         PoseStack matrixStack = new PoseStack();
-        matrixStack.mulPose(positionMatrix);
+        matrixStack.mulPose(cameraState.viewRotationMatrix);
 
         // Zugriff auf die Kamera-Position
         Camera camera = Minecraft.getInstance().gameRenderer.mainCamera();
@@ -62,4 +60,4 @@ public class LevelRendererMixin {
         Render3DEvent event = new Render3DEvent(matrixStack, (float) tickCounter.getGameTimeDeltaTicks(), camX, camY, camZ);
         EntryPoint.EVENT_BUS.post(event);
     }
-}
+}

@@ -1,6 +1,6 @@
 package com.OsamaClient.newbridge.UI.gui.render;
 
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 
 /** Etwas, das der UiRenderer als Textur binden kann (Schrift-Atlas, Bild). */
 public interface UiTexture {

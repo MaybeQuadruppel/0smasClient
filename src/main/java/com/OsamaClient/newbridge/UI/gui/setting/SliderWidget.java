@@ -6,7 +6,7 @@ import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.input.UiInput;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.Locale;
 
@@ -88,7 +88,7 @@ public class SliderWidget extends SettingWidget {
 
     @Override
     public boolean mouseClicked(Ui ui, int button, int mods) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
+        if (button != Keys.MOUSE_BUTTON_LEFT) return false;
         if (UiInput.shift(mods)) {
             field.begin(format(slider.getValue(), slider.getStep()));
             return true;
@@ -100,7 +100,7 @@ public class SliderWidget extends SettingWidget {
 
     @Override
     public void mouseReleased(Ui ui, int button) {
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) dragging = false;
+        if (button == Keys.MOUSE_BUTTON_LEFT) dragging = false;
     }
 
     @Override
@@ -121,7 +121,7 @@ public class SliderWidget extends SettingWidget {
 
     @Override
     public boolean keyPressed(int key, int mods) {
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER) {
             commit();
             return true;
         }
@@ -134,9 +134,9 @@ public class SliderWidget extends SettingWidget {
 
     @Override
     public boolean hoverKey(int key, int mods) {
-        if (key != GLFW.GLFW_KEY_LEFT && key != GLFW.GLFW_KEY_RIGHT) return false;
+        if (key != Keys.KEY_LEFT && key != Keys.KEY_RIGHT) return false;
         double step = slider.getStep() > 0 ? slider.getStep() : (slider.getMax() - slider.getMin()) / 100.0;
-        slider.setValue(slider.getValue() + (key == GLFW.GLFW_KEY_RIGHT ? step : -step));
+        slider.setValue(slider.getValue() + (key == Keys.KEY_RIGHT ? step : -step));
         return true;
     }
 }

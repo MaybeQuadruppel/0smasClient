@@ -4,7 +4,7 @@ import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.setting.TextField;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 /**
  * Basis für eigene Fenster im ClickGUI-Look. Immediate-Mode: Klicks werden gesammelt und beim
@@ -92,7 +92,7 @@ public abstract class UiWindow {
     /** @return true wenn verarbeitet (ESC schließt sonst das Fenster) */
     boolean keyPressed(int key, int mods) {
         if (focused != null) {
-            if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_TAB) {
+            if (key == Keys.KEY_ESCAPE || key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER || key == Keys.KEY_TAB) {
                 TextField f = focused;
                 focused.end();
                 focused = null;
@@ -124,7 +124,7 @@ public abstract class UiWindow {
 
     protected void consumeClick() { clickButton = -1; }
 
-    protected boolean shiftClick() { return (clickMods & GLFW.GLFW_MOD_SHIFT) != 0; }
+    protected boolean shiftClick() { return (clickMods & Keys.MOD_SHIFT) != 0; }
 
     /** Scrollmenge, wenn die Maus über dem Bereich ist (wird dabei verbraucht). */
     protected double scroll(float x, float y, float w, float h) {
@@ -147,7 +147,7 @@ public abstract class UiWindow {
         ui.outline(x, y, w, h, 1.5f, 1f, border);
         ui.textCentered(ui.ellipsize(label, w - 3f, Theme.FONT_SMALL), x + w / 2f, y, h, Theme.FONT_SMALL,
                 enabled ? Theme.TEXT : Theme.TEXT_DIM);
-        if (enabled && clicked(x, y, w, h, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+        if (enabled && clicked(x, y, w, h, Keys.MOUSE_BUTTON_LEFT)) {
             consumeClick();
             return true;
         }
@@ -156,7 +156,7 @@ public abstract class UiWindow {
 
     /** Textfeld; Klick fokussiert es. */
     protected void field(TextField f, float x, float y, float w, float h, String placeholder) {
-        if (clicked(x, y, w, h, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+        if (clicked(x, y, w, h, Keys.MOUSE_BUTTON_LEFT)) {
             consumeClick();
             if (focused != null && focused != f) focused.end();
             if (!f.editing) f.begin(f.text);
@@ -173,7 +173,7 @@ public abstract class UiWindow {
         ui.outline(x, y, s, s, 1.5f, 1f, hover ? Theme.accent() : 0x30FFFFFF);
         if (value) ui.check(x, y, s, 1f, 0xFFFFFFFF);
         ui.text(label, x + s + 3f, y, s, Theme.FONT_SMALL, Theme.TEXT);
-        if (clicked(x, y, s + 4f + ui.textWidth(label, Theme.FONT_SMALL), s, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+        if (clicked(x, y, s + 4f + ui.textWidth(label, Theme.FONT_SMALL), s, Keys.MOUSE_BUTTON_LEFT)) {
             consumeClick();
             return !value;
         }
@@ -189,7 +189,7 @@ public abstract class UiWindow {
             boolean sel = (c & 0xFFFFFF) == (current & 0xFFFFFF);
             ui.rect(px - 0.5f, y - 0.5f, size + 1f, size + 1f, sel ? 0xFFFFFFFF : 0x80000000);
             ui.rect(px, y, size, size, c);
-            if (clicked(px, y, size, size, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+            if (clicked(px, y, size, size, Keys.MOUSE_BUTTON_LEFT)) {
                 consumeClick();
                 out = c;
             }

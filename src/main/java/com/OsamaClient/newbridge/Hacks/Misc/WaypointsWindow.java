@@ -6,7 +6,7 @@ import com.OsamaClient.newbridge.UI.gui.window.UiWindow;
 import com.OsamaClient.newbridge.UI.gui.window.WindowManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -254,7 +254,7 @@ public final class WaypointsWindow extends UiWindow {
             }
         }
         // Klick auf die Zeile selbst = bearbeiten
-        if (clicked(x, y, w, h, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+        if (clicked(x, y, w, h, Keys.MOUSE_BUTTON_LEFT)) {
             consumeClick();
             edit(wp);
         }
@@ -324,7 +324,7 @@ public final class WaypointsWindow extends UiWindow {
             boolean sel = (c & 0xFFFFFF) == (fColor & 0xFFFFFF);
             ui.rect(px - 0.6f, y - 0.6f, size + 1.2f, size + 1.2f, sel ? 0xFFFFFFFF : 0x80000000);
             ui.rect(px, y, size, size, c);
-            if (clicked(px, y, size, size, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+            if (clicked(px, y, size, size, Keys.MOUSE_BUTTON_LEFT)) {
                 consumeClick();
                 picked = c;
             }
@@ -334,7 +334,7 @@ public final class WaypointsWindow extends UiWindow {
 
     @Override
     protected boolean onKey(int key, int mods) {
-        if (key == GLFW.GLFW_KEY_N && (mods & GLFW.GLFW_MOD_CONTROL) != 0) {
+        if (key == Keys.KEY_N && (mods & Keys.MOD_CONTROL) != 0) {
             startNew();
             return true;
         }
@@ -343,7 +343,7 @@ public final class WaypointsWindow extends UiWindow {
 
     @Override
     protected void onFieldCommitted(TextField field, int key) {
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER) {
             if (field == fName || field == fX || field == fY || field == fZ) {
                 String err = saveEditor();
                 status(err == null ? "Saved " + editing.name : err);

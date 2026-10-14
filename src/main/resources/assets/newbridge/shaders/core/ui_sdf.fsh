@@ -1,4 +1,5 @@
 #version 330
+#extension GL_ARB_separate_shader_objects : require
 
 // newbridge ClickGUI: signed-distance rounded rects in physical pixels.
 // Shape = (local.x, local.y, mode, param), Rect = (halfW, halfH, radius, unused).
@@ -7,16 +8,16 @@
 
 layout(std140) uniform DynamicTransforms {
     mat4 ModelViewMat;
+    mat4 TextureMat;
     vec4 ColorModulator;
     vec3 ModelOffset;
-    mat4 TextureMat;
 };
 
-in vec4 vColor;
-in vec4 vShape;
-in vec4 vRect;
+layout(location = 0) in vec4 vColor;
+layout(location = 1) in vec4 vShape;
+layout(location = 2) in vec4 vRect;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 float roundBox(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;

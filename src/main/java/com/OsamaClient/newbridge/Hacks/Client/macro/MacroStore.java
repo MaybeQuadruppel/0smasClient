@@ -21,13 +21,15 @@ public final class MacroStore {
 
     public static final class Macro {
         public String name = "Macro";
-        /** GLFW-Taste, -1 = keine. */
+        /** Taste (Scancode, siehe Keys), -1 = keine. */
         public int key = -1;
         /** Aktionen, getrennt mit ';' (Chat, /befehl, .client-befehl, wait N). */
         public String actions = "";
         public boolean enabled = true;
         /** Ticks zwischen zwei Aktionen. */
         public int delay = 2;
+        /** true = key is a scancode (26.3+). Missing in files of older versions: key is converted from GLFW. */
+        public boolean scancodes;
     }
 
     private final Path file;
@@ -45,7 +47,13 @@ public final class MacroStore {
                             new TypeToken<List<Macro>>() {}.getType());
                     if (read != null) {
                         read.removeIf(m -> m == null || m.name == null);
-                        read.forEach(m -> { if (m.actions == null) m.actions = ""; });
+                        read.forEach(m -> {
+                            if (m.actions == null) m.actions = "";
+                            if (!m.scancodes) {
+                                m.key = com.OsamaClient.newbridge.UI.gui.input.Keys.fromGlfw(m.key);
+                                m.scancodes = true;
+                            }
+                        });
                         macros = read;
                     }
                 } catch (Exception e) {
@@ -60,6 +68,7 @@ public final class MacroStore {
         if (file == null) return;
         try {
             Files.createDirectories(file.getParent());
+            for (Macro m : list()) m.scancodes = true;
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
             Files.writeString(tmp, GSON.toJson(list()), StandardCharsets.UTF_8);
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

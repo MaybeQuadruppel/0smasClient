@@ -153,7 +153,7 @@ public class Fullbox extends Module {
             }
             BlockHitResult bhr = new BlockHitResult(hit, p.face(), p.support(), false);
             mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, bhr);
-            if (swing) player.swing(InteractionHand.MAIN_HAND);
+            if (swing) com.OsamaClient.newbridge.Utils.SwingUtil.swing(player, InteractionHand.MAIN_HAND);
             placedCount++;
         }
         if (silent && !Float.isNaN(lastYaw)) {

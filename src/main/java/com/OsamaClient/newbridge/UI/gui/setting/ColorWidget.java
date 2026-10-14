@@ -7,7 +7,7 @@ import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.input.UiInput;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
@@ -211,13 +211,13 @@ public class ColorWidget extends SettingWidget {
     public boolean mouseClicked(Ui ui, int button, int mods) {
         float mx = ui.mouseX, my = ui.mouseY;
         if (!embedded && headerHovered) {
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+            if (button == Keys.MOUSE_BUTTON_LEFT || button == Keys.MOUSE_BUTTON_RIGHT) {
                 setOpen(!open);
                 return true;
             }
             return false;
         }
-        if (!open || openA.value() < 0.5f || button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return open;
+        if (!open || openA.value() < 0.5f || button != Keys.MOUSE_BUTTON_LEFT) return open;
         if (hex.editing && !in(mx, my, hexX, rowY, hexW, BTN_H)) commitHex();
         if (in(mx, my, svX, svY, svW, SV_H)) drag = DRAG_SV;
         else if (in(mx, my, hueX - 1f, svY, BAR_W + 2f, SV_H)) drag = DRAG_HUE;
@@ -237,7 +237,7 @@ public class ColorWidget extends SettingWidget {
 
     @Override
     public void mouseReleased(Ui ui, int button) {
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) drag = DRAG_NONE;
+        if (button == Keys.MOUSE_BUTTON_LEFT) drag = DRAG_NONE;
     }
 
     private void commitHex() {
@@ -259,7 +259,7 @@ public class ColorWidget extends SettingWidget {
 
     @Override
     public boolean keyPressed(int key, int mods) {
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER) {
             commitHex();
             return true;
         }

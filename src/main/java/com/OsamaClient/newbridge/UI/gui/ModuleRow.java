@@ -9,7 +9,7 @@ import com.OsamaClient.newbridge.UI.gui.setting.SettingWidget;
 import com.OsamaClient.newbridge.UI.gui.setting.SettingWidgets;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import com.OsamaClient.newbridge.UI.gui.util.KeyNames;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -136,9 +136,9 @@ public final class ModuleRow {
     boolean mouseClicked(Ui ui, int button, int mods) {
         if (hovered) {
             switch (button) {
-                case GLFW.GLFW_MOUSE_BUTTON_LEFT -> ClickGui.INSTANCE.safeToggle(module);
-                case GLFW.GLFW_MOUSE_BUTTON_RIGHT -> setExpanded(!expanded);
-                case GLFW.GLFW_MOUSE_BUTTON_MIDDLE -> ClickGui.INSTANCE.startBinding(this);
+                case Keys.MOUSE_BUTTON_LEFT -> ClickGui.INSTANCE.safeToggle(module);
+                case Keys.MOUSE_BUTTON_RIGHT -> setExpanded(!expanded);
+                case Keys.MOUSE_BUTTON_MIDDLE -> ClickGui.INSTANCE.startBinding(this);
                 default -> { return false; }
             }
             return true;
@@ -169,4 +169,4 @@ public final class ModuleRow {
         for (SettingWidget sw : widgets) if (sw.isHovered() && sw.hoverKey(key, mods)) return true;
         return false;
     }
-}
+}

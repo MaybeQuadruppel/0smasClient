@@ -126,7 +126,7 @@ public class Scaffold extends Module {
                 HitResult pick = player.pick(REACH + 0.5D, 1.0F, false);
                 if (pick instanceof BlockHitResult bh && bh.getType() == HitResult.Type.BLOCK && bh.getBlockPos().equals(support)) {
                     mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, bh);
-                    player.swing(InteractionHand.MAIN_HAND);
+                    com.OsamaClient.newbridge.Utils.SwingUtil.swing(player, InteractionHand.MAIN_HAND);
                     cooldown = delay;
                     state = 2;
                 }
@@ -240,7 +240,7 @@ public class Scaffold extends Module {
         }
 
         mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, bh);
-        player.swing(InteractionHand.MAIN_HAND);
+        com.OsamaClient.newbridge.Utils.SwingUtil.swing(player, InteractionHand.MAIN_HAND);
         cooldown = delay;
         return 2;
     }
@@ -390,4 +390,4 @@ public class Scaffold extends Module {
         double pitch = -(Math.atan2(dy, horizontal) * (180.0D / Math.PI));
         return new double[]{yaw, Mth.clamp(pitch, -90.0D, 90.0D)};
     }
-}
+}

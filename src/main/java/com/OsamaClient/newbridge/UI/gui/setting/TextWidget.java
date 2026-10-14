@@ -4,7 +4,7 @@ import com.OsamaClient.newbridge.UI.components.TextBox;
 import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 /** Text: label + inline field; click to edit, Enter / click elsewhere commits, Esc cancels. */
 public class TextWidget extends SettingWidget {
@@ -34,7 +34,7 @@ public class TextWidget extends SettingWidget {
 
     @Override
     public boolean mouseClicked(Ui ui, int button, int mods) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
+        if (button != Keys.MOUSE_BUTTON_LEFT) return false;
         if (!field.editing) field.begin(box.getText());
         return true;
     }
@@ -53,7 +53,7 @@ public class TextWidget extends SettingWidget {
 
     @Override
     public boolean keyPressed(int key, int mods) {
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER) {
             commit();
             return true;
         }

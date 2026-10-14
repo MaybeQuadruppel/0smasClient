@@ -58,7 +58,7 @@ public class AutoCrit extends Module {
 
             if (!client.player.onGround() && client.player.getDeltaMovement().y < -0.1) {
                 client.gameMode.attack(client.player, activeTarget);
-                client.player.swing(InteractionHand.MAIN_HAND);
+                com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
 
                 client.options.keyAttack.setDown(false);
                 reset();
@@ -111,4 +111,4 @@ public class AutoCrit extends Module {
     public void onDisable() {
         reset();
     }
-}
+}

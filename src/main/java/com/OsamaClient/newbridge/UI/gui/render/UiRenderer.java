@@ -1,16 +1,16 @@
 package com.OsamaClient.newbridge.UI.gui.render;
 
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuSampler;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.OsamaClient.newbridge.UI.gui.render.font.FontAtlas;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
@@ -265,14 +265,14 @@ public final class UiRenderer {
                 int type = cmdType[i];
                 if (type != boundType) {
                     RenderPipeline pipeline = type == TYPE_SDF ? UiPipelines.SDF : type == TYPE_IMAGE ? UiPipelines.IMAGE : UiPipelines.TEXT;
-                    pass.setPipeline(pipeline);
+                    pass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
                     pass.setVertexBuffer(0, (type == TYPE_SDF ? sdfGpu : textGpu).currentBuffer().slice());
                     boundType = type;
                     boundTex = null;
                 }
                 if (type != TYPE_SDF && cmdView[i] != boundTex) {
                     boolean smooth = type == TYPE_IMAGE && cmdTex[i] instanceof UiImage img && img.smooth;
-                    pass.bindTexture("Sampler0", cmdView[i], smooth ? samplerSmooth : sampler);
+                    pass.setUniform("Sampler0", cmdView[i], smooth ? samplerSmooth : sampler);
                     boundTex = cmdView[i];
                 }
                 int c = i * 4;

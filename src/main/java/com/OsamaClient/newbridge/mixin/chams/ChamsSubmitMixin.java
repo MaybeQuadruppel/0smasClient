@@ -6,9 +6,8 @@ import com.OsamaClient.newbridge.Hacks.Visual.render.chams.ChamsRenderQueue;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeCollection;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.UvMapping;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -19,8 +18,7 @@ public abstract class ChamsSubmitMixin {
 
     @Inject(method = "submitModel", at = @At("HEAD"), cancellable = true, require = 0)
     private void newbridge$chamsModel(Model model, Object object, PoseStack pose, RenderType type, int light, int overlay,
-                                      int tint, TextureAtlasSprite sprite, int outlineColor,
-                                      ModelFeatureRenderer.CrumblingOverlay crumbling, CallbackInfo ci) {
+                                      int tint, UvMapping sprite, int outlineColor, CallbackInfo ci) {
         if (!ChamsContext.active()) return;
 
         if (!ChamsContext.claimBody()) {
@@ -42,4 +40,4 @@ public abstract class ChamsSubmitMixin {
                 Chams.FULLBRIGHT, overlay, ChamsContext.visible(), ChamsContext.occluded(), sprite);
         ci.cancel();
     }
-}
+}

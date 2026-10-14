@@ -15,7 +15,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.fabricmc.fabric.api.client.rendering.v1.RenderStateDataKey;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -527,7 +527,7 @@ public final class EmoteEditor {
     public boolean mouseClicked(int button, double mouseX, double mouseY) {
         setMouseFromScreen(mouseX, mouseY);
 
-        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+        if (button == Keys.MOUSE_BUTTON_RIGHT) {
             int ch = sliderAtMouse();
             if (ch >= 0) {
                 pushUndo();
@@ -536,7 +536,7 @@ public final class EmoteEditor {
             }
             return false;
         }
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
+        if (button != Keys.MOUSE_BUTTON_LEFT) return false;
 
         float w = ui.width();
         float tx = 10f, ty = ui.height() - 80f, tw = ui.width() - 20f;
@@ -669,7 +669,7 @@ public final class EmoteEditor {
             float trackX = tx + 20f, trackW = tw - 40f;
             float pct = Math.max(0f, Math.min(1f, (ui.mouseX - trackX) / trackW));
             float raw = pct * duration;
-            boolean free = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_SHIFT) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_SHIFT);
+            boolean free = UiInput.keyDown(Keys.KEY_LEFT_SHIFT) || UiInput.keyDown(Keys.KEY_RIGHT_SHIFT);
             float newTime = quantizeTime(free ? raw : Math.round(raw / SNAP_STEP) * SNAP_STEP);
             newTime = Math.max(0f, Math.min(duration, newTime));
 
@@ -699,7 +699,7 @@ public final class EmoteEditor {
     }
 
     public void mouseReleased(int button) {
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+        if (button == Keys.MOUSE_BUTTON_LEFT) {
             draggingSlider = -1;
             draggingTimeline = false;
             draggingPreview = false;
@@ -710,11 +710,11 @@ public final class EmoteEditor {
     public void mouseScrolled(double mouseX, double mouseY, double delta) {
         setMouseFromScreen(mouseX, mouseY);
         float px = 10f, py = 52f, pw = 230f, ph = ui.height() - 142f;
-        boolean ctrl = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_CONTROL) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_CONTROL);
+        boolean ctrl = UiInput.keyDown(Keys.KEY_LEFT_CONTROL) || UiInput.keyDown(Keys.KEY_RIGHT_CONTROL);
         int ch = ctrl ? sliderAtMouse() : -1;
         if (ch >= 0) {
             float step = ch < 3 ? 1f : 0.1f;
-            boolean shift = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_SHIFT) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_SHIFT);
+            boolean shift = UiInput.keyDown(Keys.KEY_LEFT_SHIFT) || UiInput.keyDown(Keys.KEY_RIGHT_SHIFT);
             if (shift) step *= 10f;
             float min = ch < 3 ? -180f : -10f, max = ch < 3 ? 180f : 10f;
             float v = boneTransforms.get(selectedBone)[ch] + (float) Math.signum(delta) * step;
@@ -730,66 +730,66 @@ public final class EmoteEditor {
 
     public boolean keyPressed(int key, int mods) {
         if (nameField.editing) {
-            if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+            if (key == Keys.KEY_ESCAPE || key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER) {
                 nameField.end();
             } else {
                 nameField.keyPressed(key, mods);
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (key == Keys.KEY_ESCAPE) {
             close();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_S && (mods & GLFW.GLFW_MOD_CONTROL) != 0) {
+        if (key == Keys.KEY_S && (mods & Keys.MOD_CONTROL) != 0) {
             saveEmote();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_Z && UiInput.ctrl(mods)) {
+        if (key == Keys.KEY_Z && UiInput.ctrl(mods)) {
             if (UiInput.shift(mods)) redo(); else undo();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_Y && UiInput.ctrl(mods)) {
+        if (key == Keys.KEY_Y && UiInput.ctrl(mods)) {
             redo();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_C && UiInput.ctrl(mods)) {
+        if (key == Keys.KEY_C && UiInput.ctrl(mods)) {
             copyKeyframe();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_V && UiInput.ctrl(mods)) {
+        if (key == Keys.KEY_V && UiInput.ctrl(mods)) {
             if (!copiedPose.isEmpty()) { pushUndo(); pasteKeyframe(); }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_M) {
+        if (key == Keys.KEY_M) {
             mirrorPose();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT) {
-            jumpToKeyframe(key == GLFW.GLFW_KEY_RIGHT);
+        if (key == Keys.KEY_LEFT || key == Keys.KEY_RIGHT) {
+            jumpToKeyframe(key == Keys.KEY_RIGHT);
             return true;
         }
-        if (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN) {
+        if (key == Keys.KEY_UP || key == Keys.KEY_DOWN) {
             Bone[] bones = Bone.values();
-            int idx = selectedBone.ordinal() + (key == GLFW.GLFW_KEY_DOWN ? 1 : -1);
+            int idx = selectedBone.ordinal() + (key == Keys.KEY_DOWN ? 1 : -1);
             selectedBone = bones[(idx + bones.length) % bones.length];
             return true;
         }
-        if (key == GLFW.GLFW_KEY_SPACE) {
+        if (key == Keys.KEY_SPACE) {
             togglePlay();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_K) {
+        if (key == Keys.KEY_K) {
             pushUndo();
             setKeyframe();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_R) {
+        if (key == Keys.KEY_R) {
             previewYaw = 180f;
             previewPitch = 8f;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) {
+        if (key == Keys.KEY_DELETE || key == Keys.KEY_BACKSPACE) {
             if (selectedKeyframeTime != null) { pushUndo(); deleteKeyframe(); }
             return true;
         }
@@ -877,7 +877,7 @@ public final class EmoteEditor {
         float pct = Math.max(0f, Math.min(1f,
                 (ui.mouseX - (px + 10f)) / (pw - 20f)));
         float newValue = min + pct * (max - min);
-        boolean fine = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_SHIFT) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_SHIFT);
+        boolean fine = UiInput.keyDown(Keys.KEY_LEFT_SHIFT) || UiInput.keyDown(Keys.KEY_RIGHT_SHIFT);
         float step = draggingSlider < 3 ? (fine ? 0.5f : 1f) : (fine ? 0.01f : 0.05f);
         newValue = Math.round(newValue / step) * step;
 

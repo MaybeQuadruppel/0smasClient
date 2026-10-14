@@ -1,17 +1,17 @@
 package com.OsamaClient.newbridge.UI.gui.render;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuSampler;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 
@@ -91,8 +91,8 @@ public final class BlurRenderer {
             RenderPipeline pipeline = i == PASSES - 1 ? UiPipelines.BLUR_COMPOSITE : UiPipelines.BLUR;
             try (RenderPass pass = encoder.createRenderPass(() -> "newbridge blur", dst[i], Optional.empty(), null,
                     OptionalDouble.empty())) {
-                pass.setPipeline(pipeline);
-                pass.bindTexture("Sampler0", src[i], sampler);
+                pass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
+                pass.setUniform("Sampler0", src[i], sampler);
                 pass.setVertexBuffer(0, vertices.currentBuffer().slice());
                 pass.setIndexBuffer(indexBuffer, quadIndices.type());
                 pass.drawIndexed(6, 1, 0, i * 4, 0);

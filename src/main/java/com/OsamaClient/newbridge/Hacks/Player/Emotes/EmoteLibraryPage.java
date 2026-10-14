@@ -3,7 +3,7 @@ package com.OsamaClient.newbridge.Hacks.Player.Emotes;
 import com.OsamaClient.newbridge.Hacks.Player.Emotes.EmoteEditor.EmoteEditor;
 import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.List;
 
@@ -172,10 +172,10 @@ final class EmoteLibraryPage {
     }
 
     boolean keyPressed(int key) {
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (key == Keys.KEY_ESCAPE) {
             owner.close();
             return true;
         }
         return false;
     }
-}
+}

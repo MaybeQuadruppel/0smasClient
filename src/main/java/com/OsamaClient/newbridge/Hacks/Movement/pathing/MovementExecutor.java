@@ -292,7 +292,7 @@ public final class MovementExecutor {
         } else {
             mc.gameMode.continueDestroyBlock(target, face);
         }
-        if (SWING_ON_MINE) mc.player.swing(InteractionHand.MAIN_HAND);
+        if (SWING_ON_MINE) com.OsamaClient.newbridge.Utils.SwingUtil.swing(mc.player, InteractionHand.MAIN_HAND);
 
         idleTicks = 0;
         if (++mineTicks > MINE_LIMIT) fail(mc, "mining takes too long");
@@ -411,7 +411,7 @@ public final class MovementExecutor {
 
         if (placeCooldown == 0 && !mc.player.getBoundingBox().intersects(new AABB(from))) {
             mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, ray);
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            com.OsamaClient.newbridge.Utils.SwingUtil.swing(mc.player, InteractionHand.MAIN_HAND);
             placeCooldown = 4;
         }
     }

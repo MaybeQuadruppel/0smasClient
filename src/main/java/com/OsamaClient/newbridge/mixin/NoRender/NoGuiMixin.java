@@ -75,4 +75,25 @@ public class NoGuiMixin {
             ci.cancel();
         }
     }
+
+    // 7. SCOREBOARD, CROSSHAIR, TITLE, HELD-ITEM-NAME
+    @Inject(method = "extractScoreboardSidebar", at = @At("HEAD"), cancellable = true)
+    private void onExtractScoreboard(CallbackInfo ci) {
+        if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.scoreboard) ci.cancel();
+    }
+
+    @Inject(method = "extractCrosshair", at = @At("HEAD"), cancellable = true)
+    private void onExtractCrosshair(CallbackInfo ci) {
+        if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.crosshair) ci.cancel();
+    }
+
+    @Inject(method = "extractTitle", at = @At("HEAD"), cancellable = true)
+    private void onExtractTitle(CallbackInfo ci) {
+        if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.title) ci.cancel();
+    }
+
+    @Inject(method = "extractSelectedItemName", at = @At("HEAD"), cancellable = true)
+    private void onExtractSelectedItemName(CallbackInfo ci) {
+        if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.heldItemName) ci.cancel();
+    }
 }

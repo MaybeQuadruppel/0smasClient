@@ -55,7 +55,7 @@ public class StraightMine extends Module {
                     client.gameMode.continueDestroyBlock(targetPos, side);
                 }
 
-                client.player.swing(InteractionHand.MAIN_HAND);
+                com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
                 return; // Tick beenden – wir laufen erst weiter, wenn der Block weg ist
             }
         }
@@ -88,4 +88,4 @@ public class StraightMine extends Module {
             client.gameMode.stopDestroyBlock();
         }
     }
-}
+}

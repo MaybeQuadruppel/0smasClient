@@ -1,14 +1,15 @@
 #version 330
+#extension GL_ARB_separate_shader_objects : require
 
 // Dual-Kawase down / up sampling. Texture coordinates come from gl_FragCoord, so rendering into a texture
 // and sampling it back is consistent on every backend (no Y-flip conventions involved).
 
 uniform sampler2D Sampler0;
 
-in vec4 vParams;
-in vec4 vOut;
+layout(location = 0) in vec4 vParams;
+layout(location = 1) in vec4 vOut;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 void main() {
     vec2 uv = gl_FragCoord.xy * vOut.xy;

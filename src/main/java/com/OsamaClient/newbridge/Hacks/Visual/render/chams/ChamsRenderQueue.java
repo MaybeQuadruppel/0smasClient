@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.UvMapping;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,13 +32,13 @@ public final class ChamsRenderQueue {
     public static void submitBody(Model<?> model, Object state, PoseStack.Pose pose,
                                   RenderType visibleType, RenderType occludedType,
                                   int light, int overlay, int visibleColor, int occludedColor,
-                                  TextureAtlasSprite sprite) {
+                                  UvMapping sprite) {
         BODIES.add(new BodySubmit(model, state, pose, visibleType, occludedType,
                 light, overlay, visibleColor, occludedColor, sprite));
     }
 
     public static void submitLayer(Model<?> model, Object state, PoseStack.Pose pose, RenderType type,
-                                   int light, int overlay, int color, TextureAtlasSprite sprite) {
+                                   int light, int overlay, int color, UvMapping sprite) {
         LAYERS.add(new ModelSubmit(model, state, pose, type, light, overlay, color, sprite));
     }
 
@@ -74,7 +74,7 @@ public final class ChamsRenderQueue {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void draw(ChamsBufferSource buffers, PoseStack framePose, Model<?> model, Object state,
                              PoseStack.Pose modelPose, RenderType type, int light, int overlay, int color,
-                             TextureAtlasSprite sprite) {
+                             UvMapping sprite) {
         framePose.pushPose();
         try {
             framePose.mulPose(modelPose.pose());
@@ -92,10 +92,10 @@ public final class ChamsRenderQueue {
     private record BodySubmit(Model<?> model, Object state, PoseStack.Pose pose,
                               RenderType visibleType, RenderType occludedType,
                               int light, int overlay, int visibleColor, int occludedColor,
-                              TextureAtlasSprite sprite) {
+                              UvMapping sprite) {
     }
 
     private record ModelSubmit(Model<?> model, Object state, PoseStack.Pose pose, RenderType type,
-                               int light, int overlay, int color, TextureAtlasSprite sprite) {
+                               int light, int overlay, int color, UvMapping sprite) {
     }
-}
+}

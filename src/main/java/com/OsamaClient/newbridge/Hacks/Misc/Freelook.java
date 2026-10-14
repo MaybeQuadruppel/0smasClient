@@ -4,7 +4,7 @@ import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 public class Freelook extends Module {
 
@@ -38,8 +38,7 @@ public class Freelook extends Module {
     }
 
     public static boolean isAltHeld() {
-        long window = Minecraft.getInstance().getWindow().handle();
-        return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_ALT) == GLFW.GLFW_PRESS;
+        return com.mojang.blaze3d.platform.InputConstants.isKeyDown(Keys.KEY_LEFT_ALT);
     }
 
     public interface CameraOverriddenEntity {
@@ -48,4 +47,4 @@ public class Freelook extends Module {
         void freelook$setCameraPitch(float pitch);
         void freelook$setCameraYaw(float yaw);
     }
-}
+}

@@ -157,13 +157,13 @@ public final class FemaleBodyRenderer {
                     MeshModel crowdMesh = jacketAlpha == JacketAlpha.EMPTY ? meshes.body : meshes.bodyWithJacket;
                     output.order(0).submitModel(
                             crowdMesh, state, poseStack, net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucent(texture), lightCoords,
-                            overlay, -1, null, state.outlineColor, null
+                            overlay, -1, null, state.outlineColor
                     );
                     return;
                 }
                 output.order(0).submitModel(
                         meshes.body, state, poseStack, net.minecraft.client.renderer.rendertype.RenderTypes.entitySolid(texture), lightCoords,
-                        overlay, -1, null, state.outlineColor, null
+                        overlay, -1, null, state.outlineColor
                 );
                 if (jacketAlpha != JacketAlpha.EMPTY) {
                     RenderType jacketRenderType = switch (jacketAlpha) {
@@ -174,7 +174,7 @@ public final class FemaleBodyRenderer {
                     };
                     output.order(0).submitModel(
                             meshes.jacket, state, poseStack, jacketRenderType, lightCoords,
-                            overlay, -1, null, state.outlineColor, null
+                            overlay, -1, null, state.outlineColor
                     );
                 }
                 return;
@@ -185,12 +185,12 @@ public final class FemaleBodyRenderer {
                 output.order(0).submitModel(
                         visibleMesh, state, poseStack,
                         RenderTypes.femaleBodyTranslucentCull(texture), lightCoords,
-                        overlay, 0x26FFFFFF, null, state.outlineColor, null
+                        overlay, 0x26FFFFFF, null, state.outlineColor
                 );
             } else if (state.appearsGlowing()) {
                 output.order(0).submitModel(
                         visibleMesh, state, poseStack, net.minecraft.client.renderer.rendertype.RenderTypes.outline(texture), lightCoords,
-                        overlay, -1, null, state.outlineColor, null
+                        overlay, -1, null, state.outlineColor
                 );
             }
         }
@@ -698,4 +698,4 @@ public final class FemaleBodyRenderer {
             }
         }
     }
-}
+}

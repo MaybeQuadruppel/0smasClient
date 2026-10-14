@@ -84,11 +84,11 @@ public final class EspChunkCache {
         } else if (packet instanceof ClientboundSectionBlocksUpdatePacket sectionUpdate) {
             sectionUpdate.runUpdates((pos, state) -> markDirty(pos.getX() >> 4, pos.getZ() >> 4));
         } else if (packet instanceof ClientboundLevelChunkWithLightPacket chunkPacket) {
-            markDirty(chunkPacket.getX(), chunkPacket.getZ());
+            markDirty(chunkPacket.x(), chunkPacket.z());
         } else if (packet instanceof ClientboundForgetLevelChunkPacket forget) {
             markDirty(forget.pos().x(), forget.pos().z());
         } else if (packet instanceof ClientboundRespawnPacket || packet instanceof ClientboundLoginPacket) {
             clearAll();
         }
     }
-}
+}

@@ -14,7 +14,7 @@ import com.OsamaClient.newbridge.UI.gui.render.font.UiFont;
 import com.OsamaClient.newbridge.UI.gui.setting.SettingWidget;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -316,7 +316,7 @@ public final class ClickGui {
             bindingRow.binding = false;
             bindingRow = null;
         }
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && dockClicked()) return;
+        if (button == Keys.MOUSE_BUTTON_LEFT && dockClicked()) return;
         if (searchBar.mouseClicked(button)) {
             if (focused != null) focused.blur();
             focused = null;
@@ -351,7 +351,7 @@ public final class ClickGui {
     public void keyPressed(int key, int mods) {
         if (!openP.forward()) return;
         if (bindingRow != null) {
-            boolean unbind = key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE;
+            boolean unbind = key == Keys.KEY_ESCAPE || key == Keys.KEY_DELETE || key == Keys.KEY_BACKSPACE;
             bindingRow.module.key = unbind ? -1 : key;
             bindingRow.binding = false;
             bindingRow = null;
@@ -359,12 +359,12 @@ public final class ClickGui {
             return;
         }
         if (searchBar.keyPressed(key, mods)) return;
-        if (focused == null && key == GLFW.GLFW_KEY_F && UiInput.ctrl(mods)) {
+        if (focused == null && key == Keys.KEY_F && UiInput.ctrl(mods)) {
             searchBar.open();
             return;
         }
         if (focused != null) {
-            if (key == GLFW.GLFW_KEY_ESCAPE) {
+            if (key == Keys.KEY_ESCAPE) {
                 focused.blur();
                 focused = null;
                 return;
@@ -374,7 +374,7 @@ public final class ClickGui {
                 return;
             }
         }
-        if (key == GLFW.GLFW_KEY_ESCAPE || (ClickGuiModule.INSTANCE != null && key == ClickGuiModule.INSTANCE.key)) {
+        if (key == Keys.KEY_ESCAPE || (ClickGuiModule.INSTANCE != null && key == ClickGuiModule.INSTANCE.key)) {
             close();
             return;
         }

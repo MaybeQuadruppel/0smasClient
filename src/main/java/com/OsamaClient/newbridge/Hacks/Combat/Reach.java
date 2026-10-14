@@ -67,7 +67,7 @@ public class Reach extends Module {
             if (extendedTarget instanceof LivingEntity livingTarget) {
                 if (isTargetValid(livingTarget, client)) {
                     client.gameMode.attack(client.player, livingTarget);
-                    client.player.swing(InteractionHand.MAIN_HAND);
+                    com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
                     client.options.keyAttack.setDown(false);
                 }
             }
@@ -131,4 +131,4 @@ public class Reach extends Module {
     public double getMaxRange() {
         return this.enabled ? maxRange : 3.0;
     }
-}
+}

@@ -10,7 +10,7 @@ public abstract class Module {
     public String name;
     public boolean enabled = false;
     public boolean keyAlreadyPressed = false;
-    /** GLFW key code that toggles this module, -1 = unbound. */
+    /** Key scancode (SDL3, see Keys) that toggles this module, -1 = unbound. */
     public int key = -1;
     /** true = the key does not toggle the module but keeps it enabled only while it is held down. */
     public boolean holdToActivate = false;

@@ -36,8 +36,14 @@ public final class ChamsBufferSource {
         try {
             stagedBuffer.upload();
 
-            for (int i = 0; i < draws.size(); i++) {
-                draw(drawTypes.get(i), draws.get(i));
+            // 26.3: draws need a render pass from the caller -> one pass on the main target for all of ours
+            var target = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainRenderTarget();
+            try (com.mojang.renderpearl.api.commands.RenderPass pass = RenderSystem.getDevice().createCommandEncoder()
+                    .createRenderPass(() -> "newbridge chams", target.getColorTextureView(), java.util.Optional.empty(),
+                            target.hasDepth() ? target.getDepthTextureView() : null, java.util.OptionalDouble.empty())) {
+                for (int i = 0; i < draws.size(); i++) {
+                    draw(drawTypes.get(i), draws.get(i), pass);
+                }
             }
         } finally {
             stagedBuffer.endFrame();
@@ -52,10 +58,10 @@ public final class ChamsBufferSource {
         stagedBuffer.close();
     }
 
-    private void draw(RenderType type, StagedVertexBuffer.Draw draw) {
+    private void draw(RenderType type, StagedVertexBuffer.Draw draw, com.mojang.renderpearl.api.commands.RenderPass pass) {
         StagedVertexBuffer.ExecuteInfo info = stagedBuffer.getExecuteInfo(draw);
         if (info != null) {
-            type.prepare().drawFromBuffer(info);
+            type.prepare().drawFromBuffer(info, pass);
         }
     }
-}
+}

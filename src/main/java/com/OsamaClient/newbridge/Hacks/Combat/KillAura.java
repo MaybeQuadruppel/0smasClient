@@ -70,7 +70,7 @@ public class KillAura extends Module {
 
     private void attackTarget(Minecraft client, LivingEntity target) {
         client.gameMode.attack(client.player, target);
-        client.player.swing(InteractionHand.MAIN_HAND);
+        com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
 
         double baseDelay = 1000.0 / cps;
         double randomDelay = (random.nextDouble() - 0.5) * 30.0;
@@ -144,4 +144,4 @@ public class KillAura extends Module {
         super.onDisable();
         currentTarget = null;
     }
-}
+}

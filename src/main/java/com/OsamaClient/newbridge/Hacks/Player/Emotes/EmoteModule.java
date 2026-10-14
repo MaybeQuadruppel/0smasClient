@@ -2,7 +2,7 @@ package com.OsamaClient.newbridge.Hacks.Player.Emotes;
 
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 public class EmoteModule extends Module {
     public static EmoteModule INSTANCE;
@@ -13,7 +13,7 @@ public class EmoteModule extends Module {
     public EmoteModule() {
         super("Emotes", "Opens the emote wheel", Category.PLAYER);
         INSTANCE = this;
-        key = GLFW.GLFW_KEY_B;
+        key = Keys.KEY_B;
         settings.add(wheelScale);
         EmotePlayer.register(); // <-- neu
     }
@@ -23,4 +23,4 @@ public class EmoteModule extends Module {
         enabled = false; // never stays on, it only opens the wheel
         EmoteWheel.INSTANCE.open();
     }
-}
+}

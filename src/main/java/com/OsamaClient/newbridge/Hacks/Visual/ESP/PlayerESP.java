@@ -245,7 +245,7 @@ public class PlayerESP extends Module {
                     calcStack.translate(entityPos.x - camX, entityPos.y - camY, entityPos.z - camZ);
 
                     float yaw = Mth.rotLerp(tickDelta, living.yBodyRotO, living.yBodyRot);
-                    calcStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180.0F - yaw));
+                    calcStack.rotate(com.mojang.math.Axis.YP.rotationDegrees(180.0F - yaw));
 
                     calcStack.scale(-1.0F, -1.0F, 1.0F);
                     calcStack.translate(0.0F, -1.501F, 0.0F);

@@ -12,7 +12,6 @@
     "LevelRendererOutlineMixin",
     "LiquidBlockMixin",
     "ServerboundMovePlayerPacketAccessor",
-    "ShaderManagerMixin",
     "Connection.ClientConnectionMixin",
     "Connection.ClientPacketListenerMixin",
     "NoRender.NoGuiMixin",

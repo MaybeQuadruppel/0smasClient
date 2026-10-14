@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -119,7 +119,7 @@ public class EntityFilterWidget extends SettingWidget {
                 en.color.setOpen(!en.color.isOpen());
                 return true;
             }
-            if (en.hovered && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            if (en.hovered && button == Keys.MOUSE_BUTTON_LEFT) {
                 picker.filters.put(en.key, !picker.isFilterEnabled(en.key));
                 return true;
             }
@@ -178,4 +178,4 @@ public class EntityFilterWidget extends SettingWidget {
         ColorWidget c = editing();
         return c != null && c.charTyped(codepoint);
     }
-}
+}

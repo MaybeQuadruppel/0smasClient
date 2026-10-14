@@ -9,7 +9,7 @@ import com.OsamaClient.newbridge.UI.components.ModuleManager;
 import com.OsamaClient.newbridge.UI.gui.render.UiPipelines;
 import com.OsamaClient.newbridge.Utils.ChatHandler;
 import com.OsamaClient.newbridge.event.EventBus;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;

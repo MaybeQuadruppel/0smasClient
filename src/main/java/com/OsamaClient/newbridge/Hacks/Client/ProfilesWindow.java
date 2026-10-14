@@ -7,7 +7,7 @@ import com.OsamaClient.newbridge.UI.gui.setting.TextField;
 import com.OsamaClient.newbridge.UI.gui.window.UiWindow;
 import com.OsamaClient.newbridge.config.Config;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -169,7 +169,7 @@ public final class ProfilesWindow extends UiWindow {
                 confirmTime = 2.5f;
             }
         }
-        if (clicked(x, y, w, h, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+        if (clicked(x, y, w, h, Keys.MOUSE_BUTTON_LEFT)) {
             consumeClick();
             select(n);
         }
@@ -234,7 +234,7 @@ public final class ProfilesWindow extends UiWindow {
 
     @Override
     protected void onFieldCommitted(TextField field, int key) {
-        if (key != GLFW.GLFW_KEY_ENTER && key != GLFW.GLFW_KEY_KP_ENTER) return;
+        if (key != Keys.KEY_ENTER && key != Keys.KEY_KP_ENTER) return;
         if (field == newName && !newName.text.isBlank()) {
             p().save(newName.text);
             select(Config.sanitizeProfileName(newName.text));

@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.List;
 
@@ -75,11 +75,11 @@ public class ModeWidget extends SettingWidget {
             setOpen(false);
             return true;
         }
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+        if (button == Keys.MOUSE_BUTTON_LEFT) {
             setOpen(!open);
             return true;
         }
-        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+        if (button == Keys.MOUSE_BUTTON_RIGHT) {
             mode.setIndex((mode.getIndex() + 1) % mode.getModes().size());
             return true;
         }

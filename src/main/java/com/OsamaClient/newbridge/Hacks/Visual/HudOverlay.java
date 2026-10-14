@@ -16,7 +16,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -149,7 +149,7 @@ public class HudOverlay extends Module {
 
     void mouseClicked(int button) {
         buttonsDown |= 1 << button;
-        if (button == 0) pendingClick = true;
+        if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_LEFT) pendingClick = true;
     }
 
     void mouseReleased(int button) {
@@ -158,7 +158,7 @@ public class HudOverlay extends Module {
     }
 
     void keyPressed(int key, int mods) {
-        if (key == GLFW.GLFW_KEY_ESCAPE) closeEditor();
+        if (key == Keys.KEY_ESCAPE) closeEditor();
     }
 
     // ── HUD draw - einmal pro Frame, siehe GameRendererUiMixin ─────────────────
@@ -467,4 +467,4 @@ public class HudOverlay extends Module {
         if (path.contains("turtle")) return 0xFF3FA560;
         return Theme.accent();
     }
-}
+}

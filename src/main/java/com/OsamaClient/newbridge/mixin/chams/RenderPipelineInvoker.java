@@ -1,12 +1,12 @@
 package com.OsamaClient.newbridge.mixin.chams;
 
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.DepthStencilState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.PolygonMode;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.DepthStencilState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.PolygonMode;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,11 +17,11 @@ import java.util.List;
 @Mixin(RenderPipeline.class)
 public interface RenderPipelineInvoker {
     @Invoker("<init>")
-    static RenderPipeline newbridge$create(Identifier location, Identifier vertexShader, Identifier fragmentShader,
-                                        ShaderDefines shaderDefines, List<BindGroupLayout> bindGroupLayouts,
+    static RenderPipeline newbridge$create(Identifier location, java.util.Map<com.mojang.renderpearl.api.pipeline.ShaderType, Identifier> shaders,
+                                        ShaderDefines shaderDefines, java.util.Collection<BindGroupLayout> bindGroupLayouts,
                                         ColorTargetState[] colorTargetStates, DepthStencilState depthStencilState,
                                         PolygonMode polygonMode, boolean cull, VertexFormat[] vertexFormatPerBuffer,
-                                        PrimitiveTopology primitiveTopology, int sortKey) {
+                                        PrimitiveTopology primitiveTopology, int pushConstantSize, int sortKey) {
         throw new AssertionError();
     }
-}
+}

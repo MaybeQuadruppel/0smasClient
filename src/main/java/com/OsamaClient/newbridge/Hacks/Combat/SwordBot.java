@@ -158,7 +158,7 @@ public class SwordBot extends Module {
     private void attack(Minecraft client) {
         if (client.gameMode != null && target != null) {
             client.gameMode.attack(client.player, target);
-            client.player.swing(InteractionHand.MAIN_HAND);
+            com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
             lastAttackTime = System.currentTimeMillis();
         }
     }
@@ -189,4 +189,4 @@ public class SwordBot extends Module {
         resetKeys(Minecraft.getInstance());
         target = null;
     }
-}
+}

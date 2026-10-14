@@ -4,7 +4,7 @@ import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.setting.TextField;
 import com.OsamaClient.newbridge.UI.gui.util.KeyNames;
 import com.OsamaClient.newbridge.UI.gui.window.UiWindow;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -140,7 +140,7 @@ public final class MacrosWindow extends UiWindow {
                 confirm = null;
             } else { confirm = mac; confirmTime = 2.5f; }
         }
-        if (clicked(x, y, w, h, GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+        if (clicked(x, y, w, h, Keys.MOUSE_BUTTON_LEFT)) {
             consumeClick();
             if (selected != null && selected != mac) apply();
             select(mac);
@@ -150,7 +150,7 @@ public final class MacrosWindow extends UiWindow {
     @Override
     protected boolean onKey(int key, int mods) {
         if (binding && selected != null) {
-            selected.key = (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) ? -1 : key;
+            selected.key = (key == Keys.KEY_ESCAPE || key == Keys.KEY_DELETE || key == Keys.KEY_BACKSPACE) ? -1 : key;
             binding = false;
             m().store.save();
             status(selected.key < 0 ? "Key removed" : "Bound to " + KeyNames.name(selected.key));

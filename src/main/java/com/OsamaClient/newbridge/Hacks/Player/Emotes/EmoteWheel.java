@@ -9,7 +9,7 @@ import com.OsamaClient.newbridge.UI.gui.render.UiRenderer;
 import com.OsamaClient.newbridge.UI.gui.render.font.UiFont;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -216,7 +216,7 @@ public final class EmoteWheel {
     // ------------------------------------------------------------------ input
 
     public void mouseClicked(int button) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return;
+        if (button != Keys.MOUSE_BUTTON_LEFT) return;
         if (mode == Mode.LIBRARY) {
             library.mouseClicked();
             return;
@@ -246,11 +246,11 @@ public final class EmoteWheel {
             }
             return false;
         }
-        if (key == GLFW.GLFW_KEY_ESCAPE || (m != null && key == m.key)) {
+        if (key == Keys.KEY_ESCAPE || (m != null && key == m.key)) {
             close();
             return true;
         }
-        int idx = key - GLFW.GLFW_KEY_1;
+        int idx = key - Keys.KEY_1;
         if (idx >= 0 && idx < emotes.size()) {
             select(idx);
             return true;
@@ -262,4 +262,4 @@ public final class EmoteWheel {
         EmotePlayer.play(emotes.get(index));
         close();
     }
-}
+}

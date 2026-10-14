@@ -129,7 +129,7 @@ public class AutoTrade extends Module {
                 );
 
                 mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hitResult);
-                mc.player.swing(InteractionHand.MAIN_HAND);
+                com.OsamaClient.newbridge.Utils.SwingUtil.swing(mc.player, InteractionHand.MAIN_HAND);
 
                 mc.player.getInventory().setSelectedSlot(oldSlot);
 
@@ -206,4 +206,4 @@ public class AutoTrade extends Module {
         }
         return -1;
     }
-}
+}

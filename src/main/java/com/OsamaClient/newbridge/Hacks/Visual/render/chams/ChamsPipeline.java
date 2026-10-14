@@ -1,9 +1,9 @@
 package com.OsamaClient.newbridge.Hacks.Visual.render.chams;
 
 import com.OsamaClient.newbridge.mixin.chams.RenderPipelineInvoker;
-import com.mojang.blaze3d.pipeline.DepthStencilState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.CompareOp;
+import com.mojang.renderpearl.api.pipeline.DepthStencilState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.CompareOp;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
@@ -44,18 +44,22 @@ public final class ChamsPipeline {
     private static final Identifier CHAMS_FRAGMENT = Identifier.fromNamespaceAndPath("newbridgeclient", "core/chams");
 
     private static RenderPipeline clone(RenderPipeline base, String name, DepthStencilState depth) {
+        java.util.Map<com.mojang.renderpearl.api.pipeline.ShaderType, Identifier> shaders =
+                new java.util.EnumMap<>(com.mojang.renderpearl.api.pipeline.ShaderType.class);
+        shaders.putAll(base.getShaders());
+        shaders.put(com.mojang.renderpearl.api.pipeline.ShaderType.FRAGMENT, CHAMS_FRAGMENT);
         return RenderPipelineInvoker.newbridge$create(
                 Identifier.fromNamespaceAndPath("newbridgeclient", "pipeline/" + name),
-                base.getVertexShader(),
-                CHAMS_FRAGMENT,
+                shaders,
                 base.getShaderDefines(),
                 base.getBindGroupLayouts(),
-                base.getColorTargetStates(),
+                base.getColorTargetStates().toArray(new com.mojang.renderpearl.api.pipeline.ColorTargetState[0]),
                 depth,
                 base.getPolygonMode(),
                 true,
-                base.getVertexFormatBindings(),
+                base.getVertexFormatBindings().toArray(new com.mojang.renderpearl.api.vertex.VertexFormat[0]),
                 base.getPrimitiveTopology(),
+                base.pushConstantSize(),
                 base.getSortKey()
         );
     }
@@ -69,4 +73,4 @@ public final class ChamsPipeline {
             default -> CompareOp.LESS_THAN;
         };
     }
-}
+}

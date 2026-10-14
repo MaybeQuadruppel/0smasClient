@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.components.ModeButton;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.List;
 
@@ -46,7 +46,7 @@ public class ClickGuiModule extends Module {
     public ClickGuiModule() {
         super("ClickGui", "Opens this GUI", Category.CLIENT);
         INSTANCE = this;
-        key = GLFW.GLFW_KEY_RIGHT_SHIFT;
+        key = Keys.KEY_RIGHT_SHIFT;
         settings.add(accent);
         settings.add(rainbowAccent);
         settings.add(rainbowSpeed);
@@ -69,4 +69,4 @@ public class ClickGuiModule extends Module {
         enabled = false;
         ClickGui.INSTANCE.toggleOpen();
     }
-}
+}

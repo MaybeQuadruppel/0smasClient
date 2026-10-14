@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 /** Boolean: label + animated pill switch. */
 public class BoolWidget extends SettingWidget {
@@ -43,7 +43,7 @@ public class BoolWidget extends SettingWidget {
 
     @Override
     public boolean mouseClicked(Ui ui, int button, int mods) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
+        if (button != Keys.MOUSE_BUTTON_LEFT) return false;
         toggle.setValue(!toggle.enabled);
         return true;
     }

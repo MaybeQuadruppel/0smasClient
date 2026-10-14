@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -149,18 +149,18 @@ public class ListPickerWidget extends SettingWidget {
             return true;
         }
         if (!open) return false;
-        if (searchHovered && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+        if (searchHovered && button == Keys.MOUSE_BUTTON_LEFT) {
             if (!search.editing) search.begin(search.text);
             return true;
         }
         search.end();
         if (hoveredIndex >= 0 && hoveredIndex < filtered.size()) {
             Entry en = filtered.get(hoveredIndex);
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            if (button == Keys.MOUSE_BUTTON_LEFT) {
                 source.toggle(en.key());
                 if (editorEntry != null && editorEntry.key().equals(en.key()) && !source.selected(en.key())) closeEditor();
                 // keep the list stable while clicking; re-sort on the next search change / reopen
-            } else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && source.selected(en.key())) {
+            } else if (button == Keys.MOUSE_BUTTON_RIGHT && source.selected(en.key())) {
                 if (editorEntry != null && editorEntry.key().equals(en.key())) closeEditor();
                 else {
                     editor = source.editor(en);
@@ -202,7 +202,7 @@ public class ListPickerWidget extends SettingWidget {
     @Override
     public boolean keyPressed(int key, int mods) {
         if (editor != null && editor.wantsKeyboard()) return editor.keyPressed(key, mods);
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (key == Keys.KEY_ENTER || key == Keys.KEY_KP_ENTER) {
             search.end();
             return true;
         }

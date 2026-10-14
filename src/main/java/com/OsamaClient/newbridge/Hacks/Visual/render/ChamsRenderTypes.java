@@ -1,7 +1,7 @@
 package com.OsamaClient.newbridge.Hacks.Visual.render;
 
 import com.OsamaClient.newbridge.mixin.chams.RenderSetupAccessor;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.resources.Identifier;
@@ -55,4 +55,4 @@ public final class ChamsRenderTypes {
                         .createRenderSetup()
         ));
     }
-}
+}

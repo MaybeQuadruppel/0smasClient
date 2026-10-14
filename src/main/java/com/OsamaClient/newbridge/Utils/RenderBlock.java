@@ -1,11 +1,11 @@
 package com.OsamaClient.newbridge.Utils;
 
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
@@ -123,7 +123,7 @@ public class RenderBlock {
                 .writeTransform(new Matrix4f(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
 
         try (RenderPass renderPass = commandEncoder.createRenderPass(() -> MOD_ID + "_traj_pass", client.gameRenderer.mainRenderTarget().getColorTextureView(), Optional.empty(), client.gameRenderer.mainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
-            renderPass.setPipeline(PIPELINE);
+            renderPass.setPipeline(RenderSystem.getCompiledPipeline(PIPELINE));
             RenderSystem.bindDefaultUniforms(renderPass);
             renderPass.setUniform("DynamicTransforms", dynamicTransforms);
 
@@ -141,4 +141,4 @@ public class RenderBlock {
         if (buffer == null) begin();
         return buffer;
     }
-}
+}

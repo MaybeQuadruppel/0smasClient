@@ -1,11 +1,11 @@
 package com.OsamaClient.newbridge.UI.gui.render;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.BlendFunction;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
@@ -57,7 +57,8 @@ public final class UiPipelines {
     public static void register() {
         if (SDF != null) return;
         SDF = RenderPipelines.register(RenderPipeline.builder(RenderPipelines.GLOBALS_SNIPPET)
-                .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
                 .withLocation(id("pipeline/ui_sdf"))
                 .withVertexShader(id("core/ui_sdf"))
                 .withFragmentShader(id("core/ui_sdf"))
@@ -69,7 +70,8 @@ public final class UiPipelines {
                 .build());
 
         TEXT = RenderPipelines.register(RenderPipeline.builder(RenderPipelines.GLOBALS_SNIPPET)
-                .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
                 .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
                 .withLocation(id("pipeline/ui_text"))
                 .withVertexShader(id("core/ui_text"))
@@ -82,7 +84,8 @@ public final class UiPipelines {
                 .build());
 
         IMAGE = RenderPipelines.register(RenderPipeline.builder(RenderPipelines.GLOBALS_SNIPPET)
-                .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
                 .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
                 .withLocation(id("pipeline/ui_image"))
                 .withVertexShader(id("core/ui_text"))

@@ -4,7 +4,7 @@ import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.gui.anim.Anim;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -152,13 +152,13 @@ public final class Panel {
     /** @return true if consumed */
     boolean mouseClicked(Ui ui, int button, int mods) {
         if (headerHovered) {
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            if (button == Keys.MOUSE_BUTTON_LEFT) {
                 dragging = true;
                 x = dx;
                 y = dy;
                 dragDX = ui.mouseX - x;
                 dragDY = ui.mouseY - y;
-            } else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+            } else if (button == Keys.MOUSE_BUTTON_RIGHT) {
                 setCollapsed(!collapsed);
             }
             return true;
@@ -177,7 +177,7 @@ public final class Panel {
     }
 
     void mouseReleased(Ui ui, int button) {
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) dragging = false;
+        if (button == Keys.MOUSE_BUTTON_LEFT) dragging = false;
         for (ModuleRow r : rows) r.mouseReleased(ui, button);
     }
 
@@ -192,4 +192,4 @@ public final class Panel {
         for (ModuleRow r : rows) if (r.hoverKey(key, mods)) return true;
         return false;
     }
-}
+}

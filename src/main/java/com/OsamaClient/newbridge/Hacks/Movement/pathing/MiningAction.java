@@ -53,7 +53,7 @@ public final class MiningAction {
                 mc.gameMode.continueDestroyBlock(pos, face);
             }
             // WICHTIG: Hand schwengen, damit Anti-Cheats auf Servern den Abbau nicht verwerfen
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            com.OsamaClient.newbridge.Utils.SwingUtil.swing(mc.player, InteractionHand.MAIN_HAND);
             return true;
         }
 

@@ -8,7 +8,7 @@ import com.OsamaClient.newbridge.UI.gui.render.UiRenderer;
 import com.OsamaClient.newbridge.UI.gui.render.font.UiFont;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,7 +139,7 @@ public final class WindowManager {
     void keyPressed(int key, int mods) {
         if (window == null) return;
         if (window.keyPressed(key, mods)) return;
-        if (key == GLFW.GLFW_KEY_ESCAPE) close();
+        if (key == Keys.KEY_ESCAPE) close();
     }
 
     void charTyped(int cp) {

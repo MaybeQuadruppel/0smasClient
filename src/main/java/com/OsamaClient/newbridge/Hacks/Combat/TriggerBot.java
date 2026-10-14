@@ -54,7 +54,7 @@ public class TriggerBot extends Module {
 
             if (entity instanceof LivingEntity target && isTargetValid(target, client)) {
                 client.gameMode.attack(client.player, target);
-                client.player.swing(InteractionHand.MAIN_HAND);
+                com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
 
                 double baseDelay = 1000.0 / cps;
                 double randomDelay = (random.nextDouble() - 0.5) * (randomize * 50.0);
@@ -80,4 +80,4 @@ public class TriggerBot extends Module {
 
         return false;
     }
-}
+}

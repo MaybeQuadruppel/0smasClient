@@ -5,7 +5,7 @@ import com.OsamaClient.newbridge.UI.gui.Theme;
 import com.OsamaClient.newbridge.UI.gui.render.Ui;
 import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import com.OsamaClient.newbridge.UI.gui.util.KeyNames;
-import org.lwjgl.glfw.GLFW;
+import com.OsamaClient.newbridge.UI.gui.input.Keys;
 
 import java.util.function.BooleanSupplier;
 
@@ -47,7 +47,7 @@ public class BindWidget extends SettingWidget {
 
     @Override
     public boolean mouseClicked(Ui ui, int button, int mods) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
+        if (button != Keys.MOUSE_BUTTON_LEFT) return false;
         startBinding.run();
         return true;
     }

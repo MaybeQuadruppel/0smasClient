@@ -37,9 +37,9 @@ public class InvMove extends Module {
             int keyCode = InputConstants.getKey(key.saveString()).getValue();
 
             if (keyCode != InputConstants.UNKNOWN.getValue()) {
-                boolean isPressed = InputConstants.isKeyDown(mc.getWindow(), keyCode);
+                boolean isPressed = InputConstants.isKeyDown(keyCode);
                 key.setDown(isPressed);
             }
         }
     }
-}
+}

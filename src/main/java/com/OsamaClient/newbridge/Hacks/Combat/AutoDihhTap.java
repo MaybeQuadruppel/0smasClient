@@ -160,7 +160,7 @@ public class AutoDihhTap extends Module {
                     // Cursor = Mitte der geklickten Fläche
                     BlockHitResult place = new BlockHitResult(faceCenter(hitPos, bh.getDirection()), bh.getDirection(), hitPos, false);
                     client.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, place);
-                    player.swing(InteractionHand.MAIN_HAND);
+                    com.OsamaClient.newbridge.Utils.SwingUtil.swing(player, InteractionHand.MAIN_HAND);
                     obsidianPos = placePos;
                     // Slot-Wechsel auf den Crystal passiert ERST im Schritt PLACE_CRYSTAL (anderer Tick)
                 }
@@ -314,13 +314,13 @@ public class AutoDihhTap extends Module {
         if (client.player == null || client.gameMode == null) return;
         BlockHitResult hit = new BlockHitResult(faceCenter(pos, face), face, pos, false);
         client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, hit);
-        client.player.swing(InteractionHand.MAIN_HAND);
+        com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
     }
 
     private void attack(Minecraft client, net.minecraft.world.entity.Entity entity) {
         if (client.player == null || client.gameMode == null) return;
         client.gameMode.attack(client.player, entity);
-        client.player.swing(InteractionHand.MAIN_HAND);
+        com.OsamaClient.newbridge.Utils.SwingUtil.swing(client.player, InteractionHand.MAIN_HAND);
     }
 
     private boolean switchToSword(LocalPlayer player) {
@@ -456,4 +456,4 @@ public class AutoDihhTap extends Module {
             if (cb != null) cb.run();
         }
     }
-}
+}
