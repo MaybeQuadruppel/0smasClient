@@ -88,6 +88,10 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("antiafk: acts after the interval", () -> testAntiAfk(ctx, srv));
             run("block picker: block icons render next to the names (screenshot)", () -> testBlockPickerIcons(ctx));
             run("clickburst: one click fires N clicks", () -> testClickBurst(ctx, srv));
+            run("spawnerfinder: finds a spawner in loaded chunks", () -> testSpawnerFinder(ctx, srv));
+            run("playeralert: radius logic + module runs", () -> testPlayerAlert(ctx));
+            run("autoweapon: picks the sword when attacking, switches back", () -> testAutoWeapon(ctx, srv));
+            run("autowalk: walks forward and stops when disabled", () -> testAutoWalk(ctx, srv));
             run("pathing: jump onto 1-block step (no pillar)", () -> testStepUp(ctx, srv));
             run("pathing: avoid lava pocket and gravel in wall", () -> testHazards(ctx, srv));
             run("pathing: 3-block drop without fall damage", () -> testDrop(ctx, srv));
@@ -785,6 +789,81 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         assertTrue(total == 20, "burst should send exactly 20 clicks, sent " + total);
         assertTrue(early >= 4 && early < 20, "rate off (40 cps): " + early + " clicks after 2 ticks");
         assertTrue(total2 - total >= 1 && total2 - total < 10, "stop on release failed: " + (total2 - total));
+    }
+
+    private void testSpawnerFinder(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -2, Y - 1, -2, 8, Y - 1, 2, "stone");
+        srv.runCommand(String.format(java.util.Locale.ROOT, "setblock %d %d %d spawner", ox + 6, Y, oz));
+        teleport(ctx, srv, 0, Y, 0);
+        ctx.runOnClient(mc -> {
+            var f = com.OsamaClient.newbridge.Hacks.Donut.SpawnerFinder.INSTANCE;
+            f.chat = true; f.waypoint = true; f.radiusChunks = 6;
+            if (f.enabled) f.toggle();
+            f.toggle();
+        });
+        ctx.waitTicks(60);
+        var found = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.SpawnerFinder.INSTANCE.found());
+        ctx.runOnClient(mc -> { var f = com.OsamaClient.newbridge.Hacks.Donut.SpawnerFinder.INSTANCE; f.waypoint = false; if (f.enabled) f.toggle(); });
+        srv.runCommand(String.format(java.util.Locale.ROOT, "setblock %d %d %d air", ox + 6, Y, oz));
+        assertTrue(found.size() == 1 && found.get(0).equals(new BlockPos(ox + 6, Y, oz)), "spawners found: " + found);
+    }
+
+    private void testPlayerAlert(ClientGameTestContext ctx) {
+        var P = com.OsamaClient.newbridge.Hacks.Donut.PlayerAlert.class;
+        assertTrue(com.OsamaClient.newbridge.Hacks.Donut.PlayerAlert.within(63.9 * 63.9, 64), "inside");
+        assertTrue(!com.OsamaClient.newbridge.Hacks.Donut.PlayerAlert.within(64.1 * 64.1, 64), "outside");
+        ctx.runOnClient(mc -> { var a = com.OsamaClient.newbridge.Hacks.Donut.PlayerAlert.INSTANCE; if (a.enabled) a.toggle(); a.toggle(); });
+        ctx.waitTicks(20);
+        int alerts = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.PlayerAlert.INSTANCE.alerts());
+        ctx.runOnClient(mc -> { var a = com.OsamaClient.newbridge.Hacks.Donut.PlayerAlert.INSTANCE; if (a.enabled) a.toggle(); });
+        assertTrue(alerts == 0, "alert although alone: " + alerts);
+    }
+
+    private void testAutoWeapon(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -3, Y - 1, -3, 6, Y - 1, 3, "stone");
+        prepareInventory(srv);
+        srv.runCommand("item replace entity @a hotbar.3 with minecraft:diamond_sword");
+        srv.runCommand("item replace entity @a hotbar.5 with minecraft:wooden_sword");
+        teleport(ctx, srv, 0, Y, 0);
+        srv.runCommand(String.format(java.util.Locale.ROOT, "summon minecraft:armor_stand %.1f %d %.1f {NoGravity:1b}", ox + 2.5, Y, oz + 0.5));
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> {
+            var a = com.OsamaClient.newbridge.Hacks.Combat.AutoWeapon.INSTANCE;
+            a.preferAxe = false; a.switchBack = true;
+            if (a.enabled) a.toggle();
+            a.toggle();
+            mc.player.getInventory().setSelectedSlot(0);
+            mc.player.setXRot(10f);
+            mc.options.keyAttack.setDown(true);
+        });
+        ctx.waitTicks(5);
+        int during = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+        ctx.runOnClient(mc -> mc.options.keyAttack.setDown(false));
+        ctx.waitTicks(5);
+        int after = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+        ctx.runOnClient(mc -> { var a = com.OsamaClient.newbridge.Hacks.Combat.AutoWeapon.INSTANCE; if (a.enabled) a.toggle(); });
+        srv.runCommand("kill @e[type=armor_stand]");
+        assertTrue(during == 3, "should select the diamond sword (slot 3), was " + during);
+        assertTrue(after == 0, "should switch back to slot 0, was " + after);
+    }
+
+    private void testAutoWalk(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -3, Y - 1, -3, 12, Y - 1, 3, "stone");
+        teleport(ctx, srv, 0, Y, 0);
+        double x0 = ctx.computeOnClient(mc -> mc.player.getX());
+        ctx.runOnClient(mc -> { var w = com.OsamaClient.newbridge.Hacks.Movement.AutoWalk.INSTANCE; w.sprint = true; if (w.enabled) w.toggle(); w.toggle(); });
+        ctx.waitTicks(30);
+        double x1 = ctx.computeOnClient(mc -> mc.player.getX());
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Movement.AutoWalk.INSTANCE.toggle());
+        ctx.waitTicks(15);
+        double x2 = ctx.computeOnClient(mc -> mc.player.getX());
+        ctx.waitTicks(10);
+        double x3 = ctx.computeOnClient(mc -> mc.player.getX());
+        assertTrue(x1 - x0 > 3.0, "did not walk: " + (x1 - x0));
+        assertTrue(Math.abs(x3 - x2) < 0.05, "kept walking after disable: " + (x3 - x2));
     }
 
     // ------------------------------------------------------------------ helpers

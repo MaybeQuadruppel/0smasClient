@@ -70,6 +70,10 @@ public class ModuleManager {
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.FastLadder());
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.Glide());
         modules.add(new com.OsamaClient.newbridge.Hacks.Combat.ClickBurst());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Combat.AutoWeapon());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Movement.AutoWalk());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Donut.SpawnerFinder());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Donut.PlayerAlert());
 //        modules.add(new TestEnderChestESP());
         modules.add(new ClickTP());
         modules.add(new AutoTrade());
