@@ -11,6 +11,9 @@
   "entrypoints": {
     "client": [
       "com.OsamaClient.newbridge.EntryPoint"
+    ],
+    "fabric-client-gametest": [
+      "com.OsamaClient.newbridge.gametest.NewBridgeClientGameTest"
     ]
   },
   "mixins": [

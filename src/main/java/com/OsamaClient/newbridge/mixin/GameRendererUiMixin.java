@@ -33,9 +33,12 @@ public abstract class GameRendererUiMixin {
         ClickGui.INSTANCE.frame();
         EmoteWheel.INSTANCE.frame();
         EmoteEditor.INSTANCE.frame();
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.frame();
+        com.OsamaClient.newbridge.Hacks.Visual.minimap.Minimap.draw();
         ModuleList.draw();
         HudOverlay.draw();
         TeammateList.draw();
         Nametags.draw();
+        com.OsamaClient.newbridge.Hacks.Misc.Waypoints.draw();
     }
 }

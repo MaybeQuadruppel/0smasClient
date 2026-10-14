@@ -40,6 +40,7 @@ public final class RtpLiveServer {
     private static final Pattern NUMBER = Pattern.compile("-?\\d+(?:\\.\\d+)?");
 
     private static HttpServer server;
+    private static boolean shutdownHookRegistered;
     private static int port;
     private static String token = "";
 
@@ -76,6 +77,13 @@ public final class RtpLiveServer {
 
             server.setExecutor(null); // default executor is fine, this is barely any load
             server.start();
+            // Der Dispatcher-Thread des HttpServers ist kein Daemon: ohne stop() hält er die JVM nach dem
+            // Schließen von Minecraft am Leben -> "Client shutdown watchdog"-Crash. Deshalb beim Beenden stoppen.
+            if (!shutdownHookRegistered) {
+                shutdownHookRegistered = true;
+                net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING
+                        .register(client -> stop());
+            }
         } catch (IOException e) {
             server = null; // port probably taken - module just won't have a live view this session
         }

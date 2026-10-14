@@ -30,8 +30,18 @@ public class AutoDihhTap extends Module {
 
     private static final double REACH_SQ = 20.25D;      // 4.5 Blöcke
     private static final int TIMEOUT_TICKS = 60;        // Watchdog pro Sequenz-Schritt
-    private static final int CRYSTAL_WAIT_TICKS = 4;    // ~200ms wie früher
+    private static final int CRYSTAL_WAIT_TICKS = 2;    // Mindestwartezeit zwischen den beiden Crystals
     private static final int RETRIGGER_COOLDOWN = 10;
+
+    // --- Minecraft-Cooldowns ---
+    /** Ab welcher Attack-Strength (0..1) der Schwerthit als "voll aufgeladen" gilt. */
+    private static final float ATTACK_READY = 0.9F;
+    /**
+     * Der zweite Crystal wird platziert, sobald die Hurt-Zeit (i-Frames) des Ziels nur noch
+     * so viele Ticks übrig hat. Platzieren + Zielen + Schlagen dauern ca. 3 Ticks, damit die
+     * Explosion genau dann trifft, wenn die i-Frames vorbei sind.
+     */
+    private static final int HURT_LEAD_TICKS = 3;
 
     private final Aim aim = new Aim();
     private float vYaw, vPitch;   // virtuelle (gespoofte) Rotation
@@ -70,7 +80,8 @@ public class AutoDihhTap extends Module {
                     && client.hitResult instanceof EntityHitResult eh
                     && eh.getEntity() instanceof LivingEntity living
                     && living.isAlive()
-                    && !(living instanceof ArmorStand)) {
+                    && !(living instanceof ArmorStand)
+                    && canAttackNow(client.player, living)) {
                 currentTarget = living;
                 setStep(Step.LOOK_AT_TARGET);
             }
@@ -102,6 +113,15 @@ public class AutoDihhTap extends Module {
 
     // ------------------------------------------------------------- SEQUENZ
 
+    /*
+     * GrimAC-Regeln, an die sich die Sequenz hält:
+     *  - Slot-Wechsel nur VOR einer Aktion im selben Tick, nie direkt NACH use/attack
+     *    (PacketOrderE) -> nach jeder Aktion kommt ein Tick-Wechsel, bevor der Slot geändert wird.
+     *  - Vor jeder Platzierung/jedem Schlag wird erst gedreht (eigener Tick), die Aktion folgt
+     *    im nächsten Tick (RotationPlace / Reach).
+     *  - Cursor liegt immer in der Mitte der Fläche (FabricatedPlace).
+     *  - Yaw bleibt numerisch durchgehend (AimModulo360).
+     */
     private void runStep(Minecraft client) {
         LocalPlayer player = client.player;
         Vec3 eye = player.getEyePosition();
@@ -109,7 +129,10 @@ public class AutoDihhTap extends Module {
         switch (currentStep) {
             case LOOK_AT_TARGET -> {
                 if (currentTarget == null || !currentTarget.isAlive()) { reset(); return; }
-                switchToSword(player);
+                // Warten, bis Attack-Cooldown und Hurt-Cooldown des Ziels bereit sind
+                if (!canAttackNow(player, currentTarget)) return;
+
+                switchToSword(player); // Wechsel VOR dem Schlag = ok
                 if (client.hitResult instanceof EntityHitResult eh && eh.getEntity() == currentTarget) {
                     attack(client, currentTarget);
                 }
@@ -118,36 +141,50 @@ public class AutoDihhTap extends Module {
             }
 
             case PREPARE_BASE -> {
+                if (findSlot(player, Items.END_CRYSTAL) == -1) { reset(); return; }
+
                 HitResult pickResult = player.pick(4.5D, 1.0F, false); // eigener Ray mit gespoofter Rotation
-                if (!(pickResult instanceof BlockHitResult bh)) { reset(); return; }
+                if (!(pickResult instanceof BlockHitResult bh) || bh.getType() != HitResult.Type.BLOCK) { reset(); return; }
                 BlockPos hitPos = bh.getBlockPos();
 
                 if (client.level.getBlockState(hitPos).is(Blocks.OBSIDIAN)) {
                     obsidianPos = hitPos;
                 } else {
-                    // Obsidian direkt an die angeschaute Fläche setzen (funktioniert in jede Richtung, auch über dem Spieler)
                     BlockPos placePos = hitPos.relative(bh.getDirection());
                     if (!client.level.getBlockState(placePos).canBeReplaced()
                             || eye.distanceToSqr(Vec3.atCenterOf(placePos)) > REACH_SQ
-                            || !switchToItem(player, Items.OBSIDIAN)) {
+                            || !switchToItem(player, Items.OBSIDIAN)) { // Wechsel VOR dem Use = ok
                         reset();
                         return;
                     }
-                    client.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, bh);
+                    // Cursor = Mitte der geklickten Fläche
+                    BlockHitResult place = new BlockHitResult(faceCenter(hitPos, bh.getDirection()), bh.getDirection(), hitPos, false);
+                    client.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, place);
                     player.swing(InteractionHand.MAIN_HAND);
                     obsidianPos = placePos;
+                    // Slot-Wechsel auf den Crystal passiert ERST im Schritt PLACE_CRYSTAL (anderer Tick)
                 }
 
                 if (eye.distanceToSqr(Vec3.atCenterOf(obsidianPos)) > REACH_SQ
-                        || !switchToItem(player, Items.END_CRYSTAL)) {
+                        || !client.level.getBlockState(obsidianPos.above()).isAir()) {
                     reset();
                     return;
                 }
-                setStep(Step.PLACE_CRYSTAL);
+                setStep(Step.AIM_BASE);
+            }
+
+            case AIM_BASE -> {
+                // Erst auf die Fläche des Obsidians drehen, DANACH (nächster Tick) den Crystal setzen
+                placeFace = bestFace(client, eye, obsidianPos);
+                aimAt(faceCenter(obsidianPos, placeFace), Step.PLACE_CRYSTAL);
             }
 
             case PLACE_CRYSTAL -> {
-                placeFace = bestFace(client, eye, obsidianPos);
+                if (eye.distanceToSqr(Vec3.atCenterOf(obsidianPos)) > REACH_SQ
+                        || !switchToItem(player, Items.END_CRYSTAL)) { // Wechsel VOR dem Use = ok
+                    reset();
+                    return;
+                }
                 clickFace(client, obsidianPos, placeFace);
                 setStep(Step.AIM_CRYSTAL);
             }
@@ -172,23 +209,33 @@ public class AutoDihhTap extends Module {
                     secondRound = true;
                     setStep(Step.WAIT);
                 } else {
-                    finish(player);
+                    // NICHT im selben Tick den Slot wechseln (PacketOrderE: attacking) -> nächster Tick
+                    setStep(Step.SWITCH_BACK);
                 }
             }
 
             case WAIT -> {
-                if (stepTicks >= CRYSTAL_WAIT_TICKS) setStep(Step.AIM_BASE);
+                if (currentTarget == null || !currentTarget.isAlive()) {
+                    setStep(Step.SWITCH_BACK);
+                    return;
+                }
+                // Hurt-Cooldown (i-Frames) des Ziels abwarten, damit der zweite Crystal voll zählt
+                if (stepTicks >= CRYSTAL_WAIT_TICKS && currentTarget.hurtTime <= HURT_LEAD_TICKS) {
+                    setStep(Step.AIM_BASE);
+                }
             }
 
-            case AIM_BASE -> {
-                placeFace = bestFace(client, eye, obsidianPos);
-                aimAt(faceCenter(obsidianPos, placeFace), Step.PLACE_NEW_CRYSTAL);
+            case SWITCH_BACK -> {
+                // Eigener Tick nach dem letzten Schlag: jetzt darf der Slot gewechselt werden
+                switchToSword(player);
+                // Sanft zurück zur echten Blickrichtung drehen, statt am Ende einen Rotations-Snap zu senden
+                Vec3 back = directionFromRotation(Tracker.getRealPitch(), Tracker.getRealYaw());
+                aimAt(eye.add(back.scale(20.0D)), Step.DONE);
             }
 
-            case PLACE_NEW_CRYSTAL -> {
-                switchToItem(player, Items.END_CRYSTAL);
-                clickFace(client, obsidianPos, placeFace);
-                setStep(Step.AIM_CRYSTAL);
+            case DONE -> {
+                reset();
+                cooldown = RETRIGGER_COOLDOWN;
             }
 
             default -> reset();
@@ -197,19 +244,20 @@ public class AutoDihhTap extends Module {
 
     // --------------------------------------------------------------- HELPER
 
+    /** Attack-Cooldown des Spielers voll aufgeladen UND das Ziel hat keine aktiven i-Frames (hurtTime). */
+    private static boolean canAttackNow(LocalPlayer player, LivingEntity target) {
+        return player.getAttackStrengthScale(0.5F) >= ATTACK_READY && target.hurtTime == 0;
+    }
+
     private void setStep(Step step) {
         this.currentStep = step;
         this.stepTicks = 0;
+        // Solange die Sequenz läuft, keine Vanilla-Rechtsklicks des Spielers (SupressMixin)
+        Tracker.isAiming = step != Step.NONE;
     }
 
     private void aimAt(Vec3 point, Step next) {
         aim.start(point, () -> setStep(next));
-    }
-
-    private void finish(LocalPlayer player) {
-        switchToSword(player);
-        reset();
-        cooldown = RETRIGGER_COOLDOWN;
     }
 
     private void reset() {
@@ -220,6 +268,7 @@ public class AutoDihhTap extends Module {
         secondRound = false;
         currentTarget = null;
         obsidianPos = null;
+        Tracker.isAiming = false;
     }
 
     private EndCrystal findCrystal(Minecraft client) {
@@ -254,6 +303,13 @@ public class AutoDihhTap extends Module {
         return Vec3.atCenterOf(pos).add(face.getStepX() * 0.5D, face.getStepY() * 0.5D, face.getStepZ() * 0.5D);
     }
 
+    private static Vec3 directionFromRotation(float pitch, float yaw) {
+        float yawRad = yaw * ((float) Math.PI / 180.0F);
+        float pitchRad = pitch * ((float) Math.PI / 180.0F);
+        double cosPitch = Math.cos(pitchRad);
+        return new Vec3(-Math.sin(yawRad) * cosPitch, -Math.sin(pitchRad), Math.cos(yawRad) * cosPitch);
+    }
+
     private void clickFace(Minecraft client, BlockPos pos, Direction face) {
         if (client.player == null || client.gameMode == null) return;
         BlockHitResult hit = new BlockHitResult(faceCenter(pos, face), face, pos, false);
@@ -271,14 +327,18 @@ public class AutoDihhTap extends Module {
         return switchToItem(player, Items.NETHERITE_SWORD) || switchToItem(player, Items.DIAMOND_SWORD);
     }
 
-    private boolean switchToItem(LocalPlayer player, Item item) {
+    private int findSlot(LocalPlayer player, Item item) {
         for (int i = 0; i < 9; ++i) {
-            if (player.getInventory().getItem(i).is(item)) {
-                player.getInventory().setSelectedSlot(i);
-                return true;
-            }
+            if (player.getInventory().getItem(i).is(item)) return i;
         }
-        return false;
+        return -1;
+    }
+
+    private boolean switchToItem(LocalPlayer player, Item item) {
+        int slot = findSlot(player, item);
+        if (slot == -1) return false;
+        player.getInventory().setSelectedSlot(slot);
+        return true;
     }
 
     // ----------------------------------------------------------- LIFECYCLE
@@ -320,8 +380,8 @@ public class AutoDihhTap extends Module {
     }
 
     private enum Step {
-        NONE, LOOK_AT_TARGET, PREPARE_BASE, PLACE_CRYSTAL, AIM_CRYSTAL,
-        HIT_CRYSTAL, WAIT, AIM_BASE, PLACE_NEW_CRYSTAL
+        NONE, LOOK_AT_TARGET, PREPARE_BASE, AIM_BASE, PLACE_CRYSTAL, AIM_CRYSTAL,
+        HIT_CRYSTAL, WAIT, SWITCH_BACK, DONE
     }
 
     // ------------------------------------------------ AIM (aus SafeAnchor)
@@ -337,7 +397,6 @@ public class AutoDihhTap extends Module {
             this.onDone = onDone;
             this.currentSpeed = 0.0F;
             this.active = true;
-            Tracker.isAiming = true;
         }
 
         void cancel() {
@@ -345,7 +404,6 @@ public class AutoDihhTap extends Module {
             this.target = null;
             this.onDone = null;
             this.currentSpeed = 0.0F;
-            Tracker.isAiming = false;
         }
 
         void tick(LocalPlayer player, float maxSpeed) {
@@ -359,12 +417,14 @@ public class AutoDihhTap extends Module {
             float targetYaw = (float) (Mth.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F;
             float targetPitch = Mth.clamp((float) -(Mth.atan2(dy, horizontal) * (180.0D / Math.PI)), -90.0F, 90.0F);
 
+            // Kürzester Winkelunterschied; vYaw wird immer nur ADDITIV verändert,
+            // damit der Zahlenwert durchgehend bleibt (AimModulo360).
             float yawDelta = Mth.wrapDegrees(targetYaw - vYaw);
             float pitchDelta = targetPitch - vPitch;
             float distance = (float) Math.sqrt(yawDelta * yawDelta + pitchDelta * pitchDelta);
 
             if (distance <= 0.5F) {
-                vYaw = targetYaw;
+                vYaw += yawDelta;       // NICHT vYaw = targetYaw (würde auf -180..180 springen)
                 vPitch = targetPitch;
                 finish();
                 return;
@@ -393,7 +453,6 @@ public class AutoDihhTap extends Module {
             this.active = false;
             this.target = null;
             this.onDone = null;
-            Tracker.isAiming = false;
             if (cb != null) cb.run();
         }
     }

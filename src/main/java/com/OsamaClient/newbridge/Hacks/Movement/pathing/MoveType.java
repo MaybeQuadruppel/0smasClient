@@ -3,195 +3,149 @@ package com.OsamaClient.newbridge.Hacks.Movement.pathing;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.tags.FluidTags;
-import net.minecraft.world.level.block.state.BlockState;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * All movement types the pathfinder can consider.
- * Modeled after Baritone's Moves enum.
+ * All movement types the pathfinder can consider (modeled after Baritone's Moves).
  *
- * Each move type knows:
- * - what blocks need to be cleared (positionsToBreak)
- * - what the cost is
- * - whether it's valid (solid floor, not impassable)
+ * Coordinates are always the FEET position of the player.
+ *
+ * Moves:
+ *  - TRAVERSE   : 1 block flat, may mine feet/head cell
+ *  - DIAGONAL   : 1 block flat diagonal, only through already free space (no mining)
+ *  - ASCEND     : jump onto a 1-block step (normal jump, NO block placing)
+ *  - DESCEND    : walk off an edge, drop 1..3 blocks (no fall damage)
+ *  - DOWNWARD   : dig straight down 1 block
+ *  - PILLAR_UP  : jump + place block under yourself. Expensive, only used when no step exists.
+ *
+ * Safety rules applied to every move (at plan time):
+ *  - never mine falling blocks or blocks with a falling block above them
+ *  - never mine a block that touches any fluid (water/lava would flow into the tunnel)
+ *  - never walk through fluids, never walk with feet/head next to lava
+ *  - never stand on dangerous blocks (magma, campfire, cactus, ...)
  */
 public enum MoveType {
 
-    // ─── Flat movement (4 cardinal directions) ───────────────────────────────
+    // ─── Flat movement ────────────────────────────────────────────────────────
 
     TRAVERSE_NORTH(0, 0, -1) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return traverse(mc, x, y, z, x, y, z - 1);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return traverse(mc, x, y, z, 0, -1); }
     },
     TRAVERSE_SOUTH(0, 0, +1) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return traverse(mc, x, y, z, x, y, z + 1);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return traverse(mc, x, y, z, 0, 1); }
     },
     TRAVERSE_EAST(+1, 0, 0) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return traverse(mc, x, y, z, x + 1, y, z);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return traverse(mc, x, y, z, 1, 0); }
     },
     TRAVERSE_WEST(-1, 0, 0) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return traverse(mc, x, y, z, x - 1, y, z);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return traverse(mc, x, y, z, -1, 0); }
     },
 
-    // ─── Ascend (+1y, 4 cardinal directions) – sehr teuer, Pathfinder bevorzugt PILLAR_UP ──
+    DIAGONAL_NE(+1, 0, -1) {
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return diagonal(mc, x, y, z, 1, -1); }
+    },
+    DIAGONAL_NW(-1, 0, -1) {
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return diagonal(mc, x, y, z, -1, -1); }
+    },
+    DIAGONAL_SE(+1, 0, +1) {
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return diagonal(mc, x, y, z, 1, 1); }
+    },
+    DIAGONAL_SW(-1, 0, +1) {
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return diagonal(mc, x, y, z, -1, 1); }
+    },
+
+    // ─── Ascend: echter Sprung auf eine 1-Block-Stufe ─────────────────────────
 
     ASCEND_NORTH(0, +1, -1) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            MoveResult base = ascend(mc, x, y, z, x, y - 1, z - 1);
-            if (base == MoveResult.IMPOSSIBLE) return MoveResult.IMPOSSIBLE;
-            return new MoveResult(base.dest, base.cost * 10.0, base.positionsToBreak);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return ascend(mc, x, y, z, 0, -1); }
     },
     ASCEND_SOUTH(0, +1, +1) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            MoveResult base = ascend(mc, x, y, z, x, y - 1, z + 1);
-            if (base == MoveResult.IMPOSSIBLE) return MoveResult.IMPOSSIBLE;
-            return new MoveResult(base.dest, base.cost * 10.0, base.positionsToBreak);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return ascend(mc, x, y, z, 0, 1); }
     },
     ASCEND_EAST(+1, +1, 0) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            MoveResult base = ascend(mc, x, y, z, x + 1, y - 1, z);
-            if (base == MoveResult.IMPOSSIBLE) return MoveResult.IMPOSSIBLE;
-            return new MoveResult(base.dest, base.cost * 10.0, base.positionsToBreak);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return ascend(mc, x, y, z, 1, 0); }
     },
     ASCEND_WEST(-1, +1, 0) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            MoveResult base = ascend(mc, x, y, z, x - 1, y - 1, z);
-            if (base == MoveResult.IMPOSSIBLE) return MoveResult.IMPOSSIBLE;
-            return new MoveResult(base.dest, base.cost * 10.0, base.positionsToBreak);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return ascend(mc, x, y, z, -1, 0); }
     },
 
-    // ─── Descend (-1y, 4 cardinal directions) ────────────────────────────────
+    // ─── Descend: Kante runter, 1..3 Bloecke ──────────────────────────────────
 
     DESCEND_NORTH(0, -1, -1) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return descend(mc, x, y, z, x, z - 1);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return descend(mc, x, y, z, 0, -1); }
     },
     DESCEND_SOUTH(0, -1, +1) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return descend(mc, x, y, z, x, z + 1);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return descend(mc, x, y, z, 0, 1); }
     },
     DESCEND_EAST(+1, -1, 0) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return descend(mc, x, y, z, x + 1, z);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return descend(mc, x, y, z, 1, 0); }
     },
     DESCEND_WEST(-1, -1, 0) {
-        @Override
-        public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            return descend(mc, x, y, z, x - 1, z);
-        }
+        @Override public MoveResult apply(Minecraft mc, int x, int y, int z) { return descend(mc, x, y, z, -1, 0); }
     },
 
-    // ─── Downward (drop/dig straight down) ───────────────────────────────────
-    // DIG_DOWN integriert: baut Kopfblock (y+1) zuerst ab, dann Block unter
-    // den Füßen (y-1). Falling-Block-Säulen über dem Ziel werden mitgerechnet.
+    // ─── Downward (dig straight down) ─────────────────────────────────────────
 
     DOWNWARD(0, -1, 0) {
         @Override
         public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            if (mc.level == null) return MoveResult.IMPOSSIBLE;
+            if (!PathWorld.has(mc)) return MoveResult.IMPOSSIBLE;
 
-            BlockPos headBlock = new BlockPos(x, y + 1, z); // Kopfhöhe – muss zuerst weg!
-            BlockPos dest      = new BlockPos(x, y - 1, z); // direkt unter den Füßen
-            BlockPos floor     = new BlockPos(x, y - 2, z); // neuer Boden
+            BlockPos dest  = new BlockPos(x, y - 1, z); // direkt unter den Füßen
+            BlockPos floor = new BlockPos(x, y - 2, z); // neuer Boden
 
-            if (!BlockHelper.isLoaded(mc, headBlock) || !BlockHelper.isLoaded(mc, dest)
-                    || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
+            if (!BlockHelper.isLoaded(mc, dest) || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
 
-            // Kopfblock muss abbaubar sein
-            double costHead = BlockHelper.miningCost(mc, headBlock);
-            if (costHead == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-
-            // Block unter den Füßen muss abbaubar sein
             double mCost = BlockHelper.miningCost(mc, dest);
-            if (mCost == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+            if (mCost >= ActionCosts.COST_INF || mCost == 0) return MoveResult.IMPOSSIBLE; // 0 = schon Luft -> DESCEND/Fall
+            if (!BlockHelper.canStandOn(mc, floor)) return MoveResult.IMPOSSIBLE;
+            if (BlockHelper.nearLava(mc, dest)) return MoveResult.IMPOSSIBLE;
 
-            // Neuer Boden muss solid oder begehbare Flüssigkeit sein
-            BlockState floorState = mc.level.getBlockState(floor);
-            if (!floorState.isSolid() && !isWalkableFluid(floorState)) return MoveResult.IMPOSSIBLE;
-
-            // Falling block check: würde Gravel/Sand über dem Kopfblock fallen?
-            double fallingCostHead = BlockHelper.fallingBlockColumnCost(mc, headBlock);
-            if (fallingCostHead == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-
-            double mineCost = 0;
-            java.util.List<BlockPos> toBreak = new java.util.ArrayList<>();
-            // Reihenfolge: erst Kopf, dann Füße
-            if (costHead > 0) { toBreak.add(headBlock); mineCost += costHead; }
-            if (mCost    > 0) { toBreak.add(dest);      mineCost += mCost;    }
-            if (mineCost > 0)   mineCost += ActionCosts.MINING_OVERHEAD;
-            mineCost += fallingCostHead;
-
-            double cost = ActionCosts.FALL_1_25_BLOCKS_COST + mineCost;
-            return new MoveResult(dest, cost, toBreak.toArray(new BlockPos[0]));
+            double cost = ActionCosts.FALL_1_25_BLOCKS_COST + mCost + ActionCosts.MINING_OVERHEAD;
+            return new MoveResult(dest, cost, new BlockPos[]{dest});
         }
     },
 
-    // ─── Pillar up (senkrecht hoch, Block unter sich platzieren) ─────────────
+    // ─── Pillar up (Block unter sich platzieren) – nur wenn keine Stufe da ist ──
 
     PILLAR_UP(0, +1, 0) {
         @Override
         public MoveResult apply(Minecraft mc, int x, int y, int z) {
-            if (mc.player == null || mc.level == null) return MoveResult.IMPOSSIBLE;
+            if (!PathWorld.hasPlayer(mc) || !PathWorld.has(mc)) return MoveResult.IMPOSSIBLE;
 
+            BlockPos placeAt  = new BlockPos(x, y, z);     // hier kommt der Block hin
             BlockPos destFeet = new BlockPos(x, y + 1, z);
-            // Kopffreiheit auf dem neuen Level
             BlockPos destHead = new BlockPos(x, y + 2, z);
             BlockPos floor    = new BlockPos(x, y - 1, z);
             if (!BlockHelper.isLoaded(mc, destFeet) || !BlockHelper.isLoaded(mc, destHead)
                     || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
+
             // Boden darf Luft sein: in einer Pillar-Kette platzieren die vorherigen Schritte genau
-            // diesen Block, der A* sieht ihn aber noch nicht in der Welt. Ohne das konnte der Pfad
-            // immer nur EINEN Pillar-Schritt lang sein -> ständiges Neuberechnen.
-            // Der Executor prüft zur Laufzeit, ob wirklich etwas zum Platzieren da ist.
-            BlockState floorState = mc.level.getBlockState(floor);
-            if (!floorState.isSolid() && !floorState.isAir()) return MoveResult.IMPOSSIBLE;
+            // diesen Block. Der Executor prüft zur Laufzeit, ob wirklich etwas zum Platzieren da ist.
+            if (!BlockHelper.canStandOn(mc, floor) && !PathWorld.level(mc).getBlockState(floor).isAir()) return MoveResult.IMPOSSIBLE;
+            // Nie in Flüssigkeiten bauen
+            if (!PathWorld.level(mc).getFluidState(placeAt).isEmpty()) return MoveResult.IMPOSSIBLE;
 
             double costFeet = BlockHelper.miningCost(mc, destFeet);
             double costHead = BlockHelper.miningCost(mc, destHead);
-            if (costFeet == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-            if (costHead == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+            if (costFeet >= ActionCosts.COST_INF || costHead >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
 
-            // Falling block check über destHead
             double fallingCost = BlockHelper.fallingBlockColumnCost(mc, destHead);
-            if (fallingCost == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+            if (fallingCost >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+            if (BlockHelper.nearLava(mc, destFeet) || BlockHelper.nearLava(mc, destHead)) return MoveResult.IMPOSSIBLE;
 
-            // Spieler braucht einen platzierbaren Block im Inventar
-            if (!hasPlaceableBlock(mc)) return MoveResult.IMPOSSIBLE;
+            if (!BlockHelper.hasPlaceableBlock(mc)) return MoveResult.IMPOSSIBLE;
 
+            List<BlockPos> toBreak = new ArrayList<>(2);
             double mineCost = 0;
-            java.util.List<BlockPos> toBreak = new java.util.ArrayList<>();
-            if (costFeet > 0) { toBreak.add(destFeet); mineCost += costFeet; }
             if (costHead > 0) { toBreak.add(destHead); mineCost += costHead; }
+            if (costFeet > 0) { toBreak.add(destFeet); mineCost += costFeet; }
             if (mineCost > 0) mineCost += ActionCosts.MINING_OVERHEAD;
-            mineCost += fallingCost;
 
-            // + Platzieren/Warten (Sprung + Block setzen dauert real ~10 Ticks)
-            double cost = ActionCosts.JUMP_ONE_BLOCK_COST + ActionCosts.WALK_ONE_BLOCK_COST + 8.0 + mineCost;
+            double cost = ActionCosts.JUMP_ONE_BLOCK_COST + ActionCosts.WALK_ONE_BLOCK_COST
+                    + ActionCosts.PLACE_BLOCK_COST + mineCost;
             return new MoveResult(destFeet, cost, toBreak.toArray(new BlockPos[0]));
         }
     };
@@ -210,149 +164,166 @@ public enum MoveType {
 
     // ─── Shared helpers ───────────────────────────────────────────────────────
 
-    protected static boolean hasPlaceableBlock(Minecraft mc) {
-        return BlockHelper.hasPlaceableBlock(mc);
+    /** Kosten, um eine Zelle (Fuß- oder Kopfhöhe) begehbar zu machen; prüft auch Lava-Nähe und Fallblöcke darüber. */
+    private static double clearCost(Minecraft mc, BlockPos cell) {
+        double c = BlockHelper.miningCost(mc, cell);
+        if (c >= ActionCosts.COST_INF) return ActionCosts.COST_INF;
+        if (BlockHelper.nearLava(mc, cell)) return ActionCosts.COST_INF;
+        if (c > 0 && BlockHelper.fallingBlockColumnCost(mc, cell) >= ActionCosts.COST_INF) return ActionCosts.COST_INF;
+        return c;
     }
 
-    protected static MoveResult traverse(Minecraft mc, int sx, int sy, int sz, int dx, int dy, int dz) {
-        BlockPos dest     = new BlockPos(dx, dy, dz);
-        BlockPos destHead = new BlockPos(dx, dy + 1, dz);
-        BlockPos floor    = new BlockPos(dx, dy - 1, dz);
+    protected static MoveResult traverse(Minecraft mc, int sx, int sy, int sz, int ox, int oz) {
+        int tx = sx + ox, tz = sz + oz;
+        BlockPos dest     = new BlockPos(tx, sy, tz);
+        BlockPos destHead = new BlockPos(tx, sy + 1, tz);
+        BlockPos floor    = new BlockPos(tx, sy - 1, tz);
 
         if (!BlockHelper.isLoaded(mc, dest) || !BlockHelper.isLoaded(mc, destHead)
                 || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
+        if (!BlockHelper.canStandOn(mc, floor)) return MoveResult.IMPOSSIBLE;
 
-        double costFeet = BlockHelper.miningCost(mc, dest);
-        double costHead = BlockHelper.miningCost(mc, destHead);
-        if (costFeet == ActionCosts.COST_INF || costHead == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+        // Kopfblock zuerst prüfen: über dem Kopfblock darf kein Kies liegen
+        double costHead = clearCost(mc, destHead);
+        if (costHead >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+        double costFeet = clearCost(mc, dest);
+        if (costFeet >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
 
-        BlockState floorState = mc.level.getBlockState(floor);
-        if (!floorState.isSolid() && !isWalkableFluid(floorState)) return MoveResult.IMPOSSIBLE;
-
-        // Existing tunnels are often less useful for exploration, but they are
-        // still valid routes. A penalty lets A* use one when it is the only path.
-        Direction travelDir = (dx != sx) ? (dx > sx ? Direction.EAST : Direction.WEST)
-                : (dz > sz ? Direction.SOUTH : Direction.NORTH);
-        boolean carvedTunnel = BlockHelper.isCarvedTunnel(mc, dest, travelDir);
-
-        // Falling block check: würde Gravel/Sand über dest oder destHead in den Weg fallen?
-        double fallingCostFeet = BlockHelper.fallingBlockColumnCost(mc, dest);
-        double fallingCostHead = BlockHelper.fallingBlockColumnCost(mc, destHead);
-        if (fallingCostFeet == ActionCosts.COST_INF || fallingCostHead == ActionCosts.COST_INF)
-            return MoveResult.IMPOSSIBLE;
-
-        // Wasser als Ziel ist bereits über miningCost() (FORBIDDEN) ausgeschlossen,
-        // Flüssigkeiten werden also nie mehr als Weg benutzt.
+        Direction travelDir = ox != 0 ? (ox > 0 ? Direction.EAST : Direction.WEST)
+                : (oz > 0 ? Direction.SOUTH : Direction.NORTH);
         double moveCost = ActionCosts.WALK_ONE_BLOCK_COST;
-        if (carvedTunnel) moveCost += ActionCosts.CARVED_TUNNEL_PENALTY;
+        // Nur bereits FREIE Gänge zählen als fremder Tunnel – massiver Stein, den wir selbst
+        // aufgraben, darf nicht bestraft werden (sonst springt der Bot auf Wände statt durchzugraben).
+        if (costFeet == 0 && costHead == 0 && BlockHelper.isCarvedTunnel(mc, dest, travelDir))
+            moveCost += ActionCosts.CARVED_TUNNEL_PENALTY;
 
+        List<BlockPos> toBreak = new ArrayList<>(2);
         double mineCost = 0;
-        java.util.List<BlockPos> toBreakList = new java.util.ArrayList<>();
-        if (costFeet > 0) { toBreakList.add(dest);     mineCost += costFeet; }
-        if (costHead > 0) { toBreakList.add(destHead); mineCost += costHead; }
+        // Reihenfolge: erst Kopf, dann Füße (sonst fällt man evtl. nicht durch / sieht das Face nicht)
+        if (costHead > 0) { toBreak.add(destHead); mineCost += costHead; }
+        if (costFeet > 0) { toBreak.add(dest);     mineCost += costFeet; }
         if (mineCost > 0) mineCost += ActionCosts.MINING_OVERHEAD;
-        mineCost += fallingCostFeet + fallingCostHead;
 
-        return new MoveResult(dest, moveCost + mineCost, toBreakList.toArray(new BlockPos[0]));
+        return new MoveResult(dest, moveCost + mineCost, toBreak.toArray(new BlockPos[0]));
+    }
+
+    /** Diagonal nur durch bereits freien Raum – beide "Ecken" müssen frei sein, damit man nicht hängen bleibt. */
+    protected static MoveResult diagonal(Minecraft mc, int sx, int sy, int sz, int ox, int oz) {
+        int tx = sx + ox, tz = sz + oz;
+        BlockPos dest  = new BlockPos(tx, sy, tz);
+        BlockPos floor = new BlockPos(tx, sy - 1, tz);
+        if (!BlockHelper.isLoaded(mc, dest) || !BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
+        if (!BlockHelper.canStandOn(mc, floor)) return MoveResult.IMPOSSIBLE;
+
+        BlockPos[] cells = {
+                dest, dest.above(),
+                new BlockPos(tx, sy, sz), new BlockPos(tx, sy + 1, sz),
+                new BlockPos(sx, sy, tz), new BlockPos(sx, sy + 1, tz)
+        };
+        for (BlockPos c : cells) {
+            if (!BlockHelper.isFreeCell(mc, c) || BlockHelper.nearLava(mc, c)) return MoveResult.IMPOSSIBLE;
+        }
+        return new MoveResult(dest, ActionCosts.WALK_DIAGONAL_COST, new BlockPos[0]);
     }
 
     /**
-     * Ascend: dest ist bei Y+1.
-     * Spieler springt von src zu dest.
+     * Ascend: Ziel ist eine Stufe höher. Der Spieler SPRINGT auf den Block vor ihm
+     * (kein Block-Platzieren).
      * Braucht:
-     * - src head+1 (y+2) frei (Sprungfreiheit über aktuelle Position)
-     * - dest feet (y+1) abbaubar
-     * - dest head (y+2) abbaubar
-     * - soliden Boden unter dest (y+0 ist der Stufenblock = muss solid sein)
+     *  - Stufe (tx, sy, tz) zum Draufstellen
+     *  - Sprungfreiheit über dem Kopf (sx, sy+2, sz)
+     *  - Ziel Füße (tx, sy+1) und Kopf (tx, sy+2) frei oder abbaubar
      */
-    protected static MoveResult ascend(Minecraft mc, int sx, int sy, int sz, int tx, int ty, int tz) {
-        int destY = sy + 1;
+    protected static MoveResult ascend(Minecraft mc, int sx, int sy, int sz, int ox, int oz) {
+        int tx = sx + ox, tz = sz + oz;
+        BlockPos step      = new BlockPos(tx, sy, tz);
         BlockPos jumpClear = new BlockPos(sx, sy + 2, sz);
-        BlockPos destFeet  = new BlockPos(tx, destY, tz);
-        BlockPos destHead  = new BlockPos(tx, destY + 1, tz);
-        BlockPos srcFloor  = new BlockPos(tx, sy, tz);
+        BlockPos destFeet  = new BlockPos(tx, sy + 1, tz);
+        BlockPos destHead  = new BlockPos(tx, sy + 2, tz);
 
         if (!BlockHelper.isLoaded(mc, jumpClear) || !BlockHelper.isLoaded(mc, destFeet)
-                || !BlockHelper.isLoaded(mc, destHead) || !BlockHelper.isLoaded(mc, srcFloor)) {
+                || !BlockHelper.isLoaded(mc, destHead) || !BlockHelper.isLoaded(mc, step)) {
             return MoveResult.IMPOSSIBLE;
         }
+        if (!BlockHelper.canStandOn(mc, step)) return MoveResult.IMPOSSIBLE;
 
-        BlockState srcFloorState = mc.level.getBlockState(srcFloor);
-        if (!srcFloorState.isSolid()) return MoveResult.IMPOSSIBLE;
-
-        double costJumpClear = BlockHelper.miningCost(mc, jumpClear);
-        double costFeet      = BlockHelper.miningCost(mc, destFeet);
-        double costHead      = BlockHelper.miningCost(mc, destHead);
-
-        if (costJumpClear == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-        if (costFeet      == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-        if (costHead      == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-
-        // Falling block check über destFeet
-        double fallingCost = BlockHelper.fallingBlockColumnCost(mc, destFeet);
-        if (fallingCost == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+        double costJumpClear = clearCost(mc, jumpClear);
+        if (costJumpClear >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+        double costHead = clearCost(mc, destHead);
+        if (costHead >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+        double costFeet = clearCost(mc, destFeet);
+        if (costFeet >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
 
         double moveCost = ActionCosts.WALK_ONE_BLOCK_COST + ActionCosts.JUMP_ONE_BLOCK_COST;
 
+        List<BlockPos> toBreak = new ArrayList<>(3);
         double mineCost = 0;
-        java.util.List<BlockPos> toBreakList = new java.util.ArrayList<>();
-        // Reihenfolge: erst Sprungfreiheit, dann Ziel
-        if (costJumpClear > 0) { toBreakList.add(jumpClear); mineCost += costJumpClear; }
-        if (costFeet      > 0) { toBreakList.add(destFeet);  mineCost += costFeet;      }
-        if (costHead      > 0) { toBreakList.add(destHead);  mineCost += costHead;      }
-        if (mineCost      > 0)   mineCost += ActionCosts.MINING_OVERHEAD;
-        mineCost += fallingCost;
+        // Reihenfolge: erst Sprungfreiheit, dann Ziel von oben nach unten
+        if (costJumpClear > 0) { toBreak.add(jumpClear); mineCost += costJumpClear; }
+        if (costHead      > 0) { toBreak.add(destHead);  mineCost += costHead;      }
+        if (costFeet      > 0) { toBreak.add(destFeet);  mineCost += costFeet;      }
+        if (mineCost > 0) mineCost += ActionCosts.MINING_OVERHEAD;
 
-        return new MoveResult(new BlockPos(tx, destY, tz), moveCost + mineCost, toBreakList.toArray(new BlockPos[0]));
+        return new MoveResult(destFeet, moveCost + mineCost, toBreak.toArray(new BlockPos[0]));
     }
 
-    protected static MoveResult descend(Minecraft mc, int sx, int sy, int sz, int tx, int tz) {
-        int destY = sy - 1;
+    /**
+     * Descend: über die Kante laufen und 1..MAX_FALL_HEIGHT Blöcke fallen.
+     * Bei genau 1 Block darf der Weg freigegraben werden (Treppe nach unten),
+     * bei tieferen Fällen nur durch bereits freien Raum.
+     */
+    protected static MoveResult descend(Minecraft mc, int sx, int sy, int sz, int ox, int oz) {
+        int tx = sx + ox, tz = sz + oz;
 
+        BlockPos overHead = new BlockPos(tx, sy + 1, tz); // Kopfhöhe beim Rüberlaufen
+        BlockPos overFeet = new BlockPos(tx, sy, tz);     // Fußhöhe beim Rüberlaufen
+        BlockPos land1    = new BlockPos(tx, sy - 1, tz); // Füße nach 1 Block Fall
 
-        BlockPos srcHead  = new BlockPos(tx, sy + 1, tz); // Fallblock
-        BlockPos destFeet = new BlockPos(tx, destY, tz);  // Fuesse am Ziel (sy-1)
-        BlockPos destHead = new BlockPos(tx, sy, tz);     // Kopfhoehe am Ziel (sy)
-        BlockPos floor    = new BlockPos(tx, destY - 1, tz);
+        if (!BlockHelper.isLoaded(mc, overHead) || !BlockHelper.isLoaded(mc, overFeet)
+                || !BlockHelper.isLoaded(mc, land1)) return MoveResult.IMPOSSIBLE;
 
-        if (!BlockHelper.isLoaded(mc, srcHead) || !BlockHelper.isLoaded(mc, destFeet)
-                || !BlockHelper.isLoaded(mc, destHead) || !BlockHelper.isLoaded(mc, floor)) {
-            return MoveResult.IMPOSSIBLE;
+        BlockPos floor1 = land1.below();
+        if (!BlockHelper.isLoaded(mc, floor1)) return MoveResult.IMPOSSIBLE;
+
+        // ── 1 Block runter (darf graben) ──
+        if (BlockHelper.canStandOn(mc, floor1)) {
+            double costOverHead = clearCost(mc, overHead);
+            if (costOverHead >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+            double costOverFeet = clearCost(mc, overFeet);
+            if (costOverFeet >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+            double costLand = clearCost(mc, land1);
+            if (costLand >= ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+
+            List<BlockPos> toBreak = new ArrayList<>(3);
+            double mineCost = 0;
+            if (costOverHead > 0) { toBreak.add(overHead); mineCost += costOverHead; }
+            if (costOverFeet > 0) { toBreak.add(overFeet); mineCost += costOverFeet; }
+            if (costLand     > 0) { toBreak.add(land1);    mineCost += costLand;     }
+            if (mineCost > 0) mineCost += ActionCosts.MINING_OVERHEAD;
+
+            double cost = ActionCosts.WALK_ONE_BLOCK_COST + ActionCosts.FALL_1_25_BLOCKS_COST + mineCost;
+            return new MoveResult(land1, cost, toBreak.toArray(new BlockPos[0]));
         }
 
-        double costSrcHead = BlockHelper.miningCost(mc, srcHead);
-        double costFeet    = BlockHelper.miningCost(mc, destFeet);
-        double costHead    = BlockHelper.miningCost(mc, destHead);
-        if (costSrcHead == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-        if (costFeet    == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-        if (costHead    == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
+        // ── 2..3 Blöcke runter: nur durch freien Raum, Landung muss sicher sein ──
+        if (!BlockHelper.isFreeCell(mc, overHead) || !BlockHelper.isFreeCell(mc, overFeet)
+                || !BlockHelper.isFreeCell(mc, land1)) return MoveResult.IMPOSSIBLE;
+        if (BlockHelper.nearLava(mc, overHead) || BlockHelper.nearLava(mc, overFeet)) return MoveResult.IMPOSSIBLE;
 
-        BlockState floorState = mc.level.getBlockState(floor);
-        if (!floorState.isSolid() && !isWalkableFluid(floorState)) return MoveResult.IMPOSSIBLE;
-        double fallingCost = BlockHelper.fallingBlockColumnCost(mc, destHead);
-        if (fallingCost == ActionCosts.COST_INF) return MoveResult.IMPOSSIBLE;
-
-        double moveCost = ActionCosts.WALK_ONE_BLOCK_COST + ActionCosts.FALL_1_25_BLOCKS_COST;
-
-        double mineCost = 0;
-        java.util.List<BlockPos> toBreakList = new java.util.ArrayList<>();
-        // Reihenfolge: erst Kopfblock an Quelle, dann Zielbereich
-        if (costSrcHead > 0) { toBreakList.add(srcHead);  mineCost += costSrcHead; }
-        if (costHead    > 0) { toBreakList.add(destHead); mineCost += costHead;    }
-        if (costFeet    > 0) { toBreakList.add(destFeet); mineCost += costFeet;    }
-        if (mineCost    > 0)   mineCost += ActionCosts.MINING_OVERHEAD;
-        mineCost += fallingCost;
-
-        return new MoveResult(new BlockPos(tx, destY, tz), moveCost + mineCost, toBreakList.toArray(new BlockPos[0]));
-    }
-
-    protected static boolean isWater(BlockState state) {
-        return state.getFluidState().is(FluidTags.WATER);
-    }
-
-    protected static boolean isWalkableFluid(BlockState state) {
-        // Flüssigkeiten werden jetzt komplett gemieden (auch als "begehbarer" Boden,
-        // z.B. flaches Wasser) -> der Pathfinder läuft drumherum statt hindurch.
-        return false;
+        for (int fall = 2; fall <= ActionCosts.MAX_FALL_HEIGHT; fall++) {
+            BlockPos landFeet = new BlockPos(tx, sy - fall, tz);
+            BlockPos floor    = landFeet.below();
+            if (!BlockHelper.isLoaded(mc, floor)) return MoveResult.IMPOSSIBLE;
+            if (!BlockHelper.isFreeCell(mc, landFeet)) return MoveResult.IMPOSSIBLE; // Wasser/Lava/Block im Weg
+            if (BlockHelper.canStandOn(mc, floor)) {
+                if (BlockHelper.nearLava(mc, landFeet) || BlockHelper.nearLava(mc, landFeet.above()))
+                    return MoveResult.IMPOSSIBLE;
+                double cost = ActionCosts.WALK_ONE_BLOCK_COST + ActionCosts.distanceToTicks(fall + 0.25);
+                return new MoveResult(landFeet, cost, new BlockPos[0]);
+            }
+            // Boden ist keine sichere Standfläche (Lava, Magma, Wasser...) und nicht frei -> abbrechen
+            if (!BlockHelper.isFreeCell(mc, floor)) return MoveResult.IMPOSSIBLE;
+        }
+        return MoveResult.IMPOSSIBLE; // würde tiefer fallen -> Fallschaden
     }
 }

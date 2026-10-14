@@ -120,7 +120,7 @@ public class ModuleList extends Module {
 
         // ── Build sorted active-module list ───────────────────────────────────
         List<Module> active = ModuleManager.modules.stream()
-                .filter(m -> m.enabled && m != instance)
+                .filter(m -> m.enabled && m != instance && !(m instanceof com.OsamaClient.newbridge.Hacks.Client.Profiles) && !(m instanceof com.OsamaClient.newbridge.Hacks.Client.macro.Macros))
                 .sorted(instance.buildComparator())
                 .collect(Collectors.toList());
 
@@ -252,4 +252,4 @@ public class ModuleList extends Module {
         if (t < 0.5f) return ColorUtil.lerp(Theme.TEXT, 0xFF999999, t * 2f);
         return ColorUtil.lerp(0xFF999999, 0xFF000000, (t - 0.5f) * 2f);
     }
-}
+}

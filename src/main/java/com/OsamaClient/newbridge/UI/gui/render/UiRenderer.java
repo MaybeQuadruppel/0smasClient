@@ -30,7 +30,7 @@ import java.util.OptionalDouble;
  */
 public final class UiRenderer {
 
-    private static final int TYPE_SDF = 0, TYPE_TEXT = 1;
+    private static final int TYPE_SDF = 0, TYPE_TEXT = 1, TYPE_IMAGE = 2;
 
     private final QuadBuffer sdf = new QuadBuffer(UiPipelines.SDF_STRIDE, 4096);
     private final QuadBuffer text = new QuadBuffer(UiPipelines.TEXT_STRIDE, 4096);
@@ -39,7 +39,7 @@ public final class UiRenderer {
     private int cmds;
     private int[] cmdType = new int[64], cmdFirst = new int[64], cmdCount = new int[64];
     private int[] cmdClip = new int[64 * 4];
-    private FontAtlas[] cmdTex = new FontAtlas[64];
+    private UiTexture[] cmdTex = new UiTexture[64];
     private GpuTextureView[] cmdView = new GpuTextureView[64];
 
     // clip stack in framebuffer px, top-left origin; clip[0] < 0 means "no clip"
@@ -181,8 +181,24 @@ public final class UiRenderer {
         QuadBuffer.putColor(b, argb);
     }
 
+    /** Bild-Quad (volle Farbe aus der Textur, multipliziert mit argb) in Framebuffer-Pixeln. */
+    public void image(UiImage img, float x0, float y0, float x1, float y1, int argb) {
+        if ((argb >>> 24) == 0) return;
+        if (clipped(x0, y0, x1 - x0, y1 - y0)) return;
+        command(TYPE_IMAGE, img, text.vertexCount());
+        ByteBuffer b = text.reserve(4);
+        b.putFloat(x0).putFloat(y0).putFloat(0f).putFloat(0f).putFloat(0f);
+        QuadBuffer.putColor(b, argb);
+        b.putFloat(x0).putFloat(y1).putFloat(0f).putFloat(0f).putFloat(1f);
+        QuadBuffer.putColor(b, argb);
+        b.putFloat(x1).putFloat(y1).putFloat(0f).putFloat(1f).putFloat(1f);
+        QuadBuffer.putColor(b, argb);
+        b.putFloat(x1).putFloat(y0).putFloat(0f).putFloat(1f).putFloat(0f);
+        QuadBuffer.putColor(b, argb);
+    }
+
     /** Appends 4 vertices to the last command if its state matches, otherwise starts a new command. */
-    private void command(int type, FontAtlas tex, int firstVertex) {
+    private void command(int type, UiTexture tex, int firstVertex) {
         if (cmds > 0) {
             int i = cmds - 1;
             int c = i * 4;
@@ -233,6 +249,7 @@ public final class UiRenderer {
         GpuBufferSlice projSlice = projectionBuffer.getBuffer(projection);
         GpuBufferSlice transforms = RenderSystem.getDynamicUniforms().writeTransform(modelView);
         GpuSampler sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
+        GpuSampler samplerSmooth = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR);
 
         try (RenderPass pass = encoder.createRenderPass(() -> "newbridge ui", target.getColorTextureView(),
                 Optional.empty(), null, OptionalDouble.empty())) {
@@ -247,14 +264,15 @@ public final class UiRenderer {
             for (int i = 0; i < cmds; i++) {
                 int type = cmdType[i];
                 if (type != boundType) {
-                    RenderPipeline pipeline = type == TYPE_SDF ? UiPipelines.SDF : UiPipelines.TEXT;
+                    RenderPipeline pipeline = type == TYPE_SDF ? UiPipelines.SDF : type == TYPE_IMAGE ? UiPipelines.IMAGE : UiPipelines.TEXT;
                     pass.setPipeline(pipeline);
                     pass.setVertexBuffer(0, (type == TYPE_SDF ? sdfGpu : textGpu).currentBuffer().slice());
                     boundType = type;
                     boundTex = null;
                 }
-                if (type == TYPE_TEXT && cmdView[i] != boundTex) {
-                    pass.bindTexture("Sampler0", cmdView[i], sampler);
+                if (type != TYPE_SDF && cmdView[i] != boundTex) {
+                    boolean smooth = type == TYPE_IMAGE && cmdTex[i] instanceof UiImage img && img.smooth;
+                    pass.bindTexture("Sampler0", cmdView[i], smooth ? samplerSmooth : sampler);
                     boundTex = cmdView[i];
                 }
                 int c = i * 4;

@@ -192,37 +192,27 @@ public class Nametags extends Module {
         return null;
     }
 
-    private static Vector3f projectToFramebuffer(double worldX, double worldY, double worldZ, Vec3 camPos, Camera camera, Minecraft mc) {
+    /**
+     * Welt -> Framebuffer-Pixel. Nutzt exakt die View-Projection-Matrix der Kamera (inkl. Sprint-/Effekt-FOV,
+     * Wasser, Aspect), statt das FOV selbst nachzurechnen - so kleben Tags/Waypoints beim Sprinten fest.
+     * z = Tiefe vor der Kamera; null wenn hinter der Kamera.
+     */
+    public static Vector3f projectToFramebuffer(double worldX, double worldY, double worldZ, Vec3 camPos, Camera camera, Minecraft mc) {
         float dx = (float) (worldX - camPos.x);
         float dy = (float) (worldY - camPos.y);
         float dz = (float) (worldZ - camPos.z);
 
-        Quaternionf inverseRotation = new Quaternionf(camera.rotation()).conjugate();
-        Vector4f viewSpace = new Vector4f(dx, dy, dz, 1.0f).rotate(inverseRotation);
+        Vector4f clip = new Vector4f(dx, dy, dz, 1.0f);
+        camera.getViewRotationProjectionMatrix(new org.joml.Matrix4f()).transform(clip);
+        if (clip.w <= 0.05f) return null;
 
-        float z = -viewSpace.z;
-        if (z <= 0.05f) return null;
-
-        double baseFov = mc.options.fov().get();
-        float effectScale = mc.options.fovEffectScale().get().floatValue();
-        boolean isFirstPerson = mc.options.getCameraType().isFirstPerson();
-        float fovModifier = mc.player.getFieldOfViewModifier(isFirstPerson, effectScale);
-        double fov = baseFov * fovModifier;
-
-        double halfFovRad = Math.toRadians(fov / 2.0);
-        float scaleY = (float) (1.0 / Math.tan(halfFovRad));
+        float ndcX = clip.x / clip.w;
+        float ndcY = clip.y / clip.w;
 
         int fbWidth = mc.getWindow().getWidth();
         int fbHeight = mc.getWindow().getHeight();
-        double aspect = (double) fbWidth / fbHeight;
-        float scaleX = (float) (scaleY / aspect);
-
-        float ndcX = (viewSpace.x * scaleX) / z;
-        float ndcY = (viewSpace.y * scaleY) / z;
-
-        float pixelX = (float) ((1.0 + ndcX) * 0.5 * fbWidth);
-        float pixelY = (float) ((1.0 - ndcY) * 0.5 * fbHeight);
-
-        return new Vector3f(pixelX, pixelY, z);
+        float pixelX = (1.0f + ndcX) * 0.5f * fbWidth;
+        float pixelY = (1.0f - ndcY) * 0.5f * fbHeight;
+        return new Vector3f(pixelX, pixelY, clip.w);
     }
-}
+}

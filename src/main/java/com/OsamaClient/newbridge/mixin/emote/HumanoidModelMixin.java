@@ -40,7 +40,7 @@ public abstract class HumanoidModelMixin<T extends HumanoidRenderState> {
     @Inject(method = "setupAnim", at = @At("TAIL"))
     private void newbridge$applyPose(T state, CallbackInfo ci) {
         HumanoidModel<?> self = (HumanoidModel<?>) (Object) this;
-        BendLimbs.syncOverlays(self);
+        BendLimbs.clear(self); // new frame: bend only if an emote / the editor sets it below
 
         if (Boolean.TRUE.equals(((FabricRenderState) state).getData(EmoteEditor.PREVIEW_KEY))) {
             applyEditorPose(self);
@@ -91,4 +91,4 @@ public abstract class HumanoidModelMixin<T extends HumanoidRenderState> {
             part.z += t[5];
         }
     }
-}
+}

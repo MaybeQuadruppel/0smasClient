@@ -29,10 +29,17 @@ public class AutoMiner extends Module {
     private Block currentTargetBlock = null;
     private boolean isMining = false;
     private int miningNoProgressTicks = 0;
+    /** Ziele, die nicht erreichbar/abbaubar waren: Position -> Tick (Weltzeit-Zähler), bis zu dem sie ignoriert werden. */
+    private final java.util.Map<BlockPos, Integer> skipped = new java.util.HashMap<>();
+    private int tickCounter = 0;
+    private Object lastLevel, lastPlayer;
     private int pathColor = 0xFF4ADE80;
     private int targetColor = 0xFFFFD43B;
     private final com.OsamaClient.newbridge.Hacks.Movement.pathing.PathRenderer pathRenderer =
             new com.OsamaClient.newbridge.Hacks.Movement.pathing.PathRenderer();
+
+    /** Für Tests: die Zielblock-Auswahl. */
+    public BlockPicker blockPicker() { return blockPicker; }
 
     public AutoMiner() {
         super("AutoMiner", "Farms for you", Category.MISC);
@@ -44,19 +51,38 @@ public class AutoMiner extends Module {
     }
 
     @Override
+    public void onEnable() {
+        resetState(Minecraft.getInstance());
+    }
+
+    @Override
     public void onDisable() {
-        Minecraft mc = Minecraft.getInstance();
+        resetState(Minecraft.getInstance());
+    }
+
+    /** Verwirft Ziel, Navigation und Wartezeiten (beim Ein-/Ausschalten und beim Welt-/Server-Wechsel). */
+    private void resetState(Minecraft mc) {
         Navigator.INSTANCE.cancel(mc, Navigator.OWNER_AUTO_MINER);
         MiningAction.resetMiningState();
         currentTargetPos = null;
         currentTargetBlock = null;
         isMining = false;
         miningNoProgressTicks = 0;
+        tickDelay = 0;
+        skipped.clear();
+        lastLevel = mc.level;
+        lastPlayer = mc.player;
+    }
+
+    private void skip(BlockPos pos) {
+        if (pos != null) skipped.put(pos, tickCounter + 600);
     }
 
     @Override
     public void onTick(Minecraft client) {
         if (!enabled || client.player == null || client.level == null) return;
+        tickCounter++;
+        if (client.level != lastLevel || client.player != lastPlayer) resetState(client);
 
         // The request may be queued behind another module, but it remains ours.
         if (Navigator.INSTANCE.isNavigating(Navigator.OWNER_AUTO_MINER)) return;
@@ -65,9 +91,10 @@ public class AutoMiner extends Module {
         if (currentTargetPos != null && currentTargetBlock != null && !isMining) {
             if (client.player.getEyePosition().distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(currentTargetPos))
                     > BlockInteraction.REACH * BlockInteraction.REACH) {
+                skip(currentTargetPos);
                 currentTargetPos = null;
                 currentTargetBlock = null;
-                tickDelay = 40;
+                tickDelay = 10;
                 return;
             }
             client.player.sendSystemMessage(
@@ -84,13 +111,15 @@ public class AutoMiner extends Module {
                 miningNoProgressTicks = 0;
                 return;
             }
-            if (++miningNoProgressTicks < 40) return;
+            if (++miningNoProgressTicks < 8) return;
+            // nichts mehr abbaubar: war der Ziel-Block selbst noch da, nicht wieder sofort anlaufen
+            if (client.level.getBlockState(currentTargetPos).is(currentTargetBlock)) skip(currentTargetPos);
             MiningAction.resetMiningState();
             currentTargetPos = null;
             currentTargetBlock = null;
             isMining = false;
             miningNoProgressTicks = 0;
-            tickDelay = 20;
+            tickDelay = 0; // sofort das nächste Ziel suchen
             return;
         }
 
@@ -109,7 +138,8 @@ public class AutoMiner extends Module {
             BlockState state = client.level.getBlockState(target);
             BlockPos miningStand = findMiningStand(client, target);
             if (miningStand == null) {
-                tickDelay = 40;
+                skip(target);
+                tickDelay = 2;
                 return;
             }
             currentTargetPos = target;
@@ -121,10 +151,13 @@ public class AutoMiner extends Module {
 
             Navigator.INSTANCE.goTo(client, Navigator.OWNER_AUTO_MINER,
                     Navigator.PRIORITY_AUTO_MINER, new GoalBlock(miningStand));
-            if (!Navigator.INSTANCE.isNavigating(Navigator.OWNER_AUTO_MINER)) {
+            if (!Navigator.INSTANCE.isNavigating(Navigator.OWNER_AUTO_MINER)
+                    && client.player.getEyePosition().distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(target))
+                    > BlockInteraction.REACH * BlockInteraction.REACH) {
+                skip(target);
                 currentTargetPos = null;
                 currentTargetBlock = null;
-                tickDelay = 100;
+                tickDelay = 5;
             }
         } else {
             tickDelay = 60;
@@ -149,6 +182,11 @@ public class AutoMiner extends Module {
                     Block block = state.getBlock();
 
                     if (blockPicker.selectedBlocks.containsKey(block)) {
+                        Integer until = skipped.get(currentPos);
+                        if (until != null) {
+                            if (until > tickCounter) continue;
+                            skipped.remove(currentPos);
+                        }
                         if (BlockHelper.isEncasedInBedrock(client.level, currentPos)) continue;
                         if (BlockHelper.isBedrockAbove(client.level, currentPos)) continue;
 
@@ -179,10 +217,10 @@ public class AutoMiner extends Module {
             BlockPos head = stand.above();
             BlockPos floor = stand.below();
             if (!client.level.isLoaded(stand) || !client.level.isLoaded(head) || !client.level.isLoaded(floor)) continue;
-            if (!client.level.getFluidState(stand).isEmpty() || !client.level.getFluidState(head).isEmpty()) continue;
-            if (!client.level.getBlockState(stand).getCollisionShape(client.level, stand).isEmpty()) continue;
-            if (!client.level.getBlockState(head).getCollisionShape(client.level, head).isEmpty()) continue;
-            if (client.level.getBlockState(floor).getCollisionShape(client.level, floor).isEmpty()) continue;
+            // gleiche Regeln wie der Pathfinder: freie Zellen, sicherer Boden, keine Lava daneben
+            if (!BlockHelper.isFreeCell(client, stand) || !BlockHelper.isFreeCell(client, head)) continue;
+            if (!BlockHelper.canStandOn(client, floor)) continue;
+            if (BlockHelper.nearLava(client, stand) || BlockHelper.nearLava(client, head)) continue;
 
             double distance = stand.distSqr(client.player.blockPosition());
             if (distance < bestDistance) {

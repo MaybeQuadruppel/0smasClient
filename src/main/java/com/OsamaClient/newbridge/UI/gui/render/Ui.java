@@ -100,6 +100,12 @@ public final class Ui {
         if (p2 > 0) line(bx, by, bx + (cx - bx) * p2, by + (cy - by) * p2, t, color);
     }
 
+    /** Zeichnet ein UiImage in das Rechteck (Units). */
+    public void image(UiImage img, float x, float y, float w, float h) {
+        float x0 = snap(x), y0 = snap(y), x1 = snap(x + w), y1 = snap(y + h);
+        r.image(img, x0, y0, x1, y1, a(0xFFFFFFFF));
+    }
+
     // ------------------------------------------------------------------ text
 
     public FontAtlas font(float sizeUnits) {

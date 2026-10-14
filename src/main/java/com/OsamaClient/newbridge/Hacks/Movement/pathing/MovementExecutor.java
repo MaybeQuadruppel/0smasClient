@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.Hacks.Movement.pathing;
 
+import com.OsamaClient.newbridge.Hacks.Combat.AimAssist;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.BlockInteraction.AimTarget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -233,8 +234,12 @@ public final class MovementExecutor {
             fail(mc, "cannot mine " + state.getBlock().getName().getString());
             return;
         }
-        if (BlockHelper.touchesLava(mc, target)) {
-            fail(mc, "lava next to " + target.toShortString());
+        if (BlockHelper.touchesFluid(mc, target)) {
+            fail(mc, "fluid next to " + target.toShortString());
+            return;
+        }
+        if (BlockHelper.fallingBlockColumnCost(mc, target) >= ActionCosts.COST_INF) {
+            fail(mc, "falling block above " + target.toShortString());
             return;
         }
 
@@ -310,8 +315,7 @@ public final class MovementExecutor {
             return;
         }
 
-        BlockInteraction.smoothLookAt(mc, new Vec3(dest.x, mc.player.getEyeY(), dest.z));
-        float yawDiff = yawDiffTo(mc, dest);
+        float yawDiff = faceWalkTarget(mc, wp, dest, dist);
 
         boolean facing = Math.abs(yawDiff) < 30f;
         mc.options.keyUp.setDown(facing);
@@ -327,8 +331,7 @@ public final class MovementExecutor {
         Vec3 dest = new Vec3(to.getX() + 0.5, to.getY(), to.getZ() + 0.5);
         double dist = horizontalDist(mc, to);
 
-        BlockInteraction.smoothLookAt(mc, new Vec3(dest.x, mc.player.getEyeY(), dest.z));
-        float yawDiff = yawDiffTo(mc, dest);
+        float yawDiff = faceWalkTarget(mc, to, dest, dist);
         boolean facing = Math.abs(yawDiff) < 20f;
 
         boolean onGround = mc.player.onGround();
@@ -337,8 +340,10 @@ public final class MovementExecutor {
         mc.options.keyUp.setDown(facing || !onGround);
         mc.options.keySprint.setDown(false);
 
+        // Normaler Sprung auf die Stufe: sobald wir nah genug sind ODER schon gegen
+        // die Stufe laufen. Kein Block-Platzieren.
         boolean jump = false;
-        if (onGround && facing && jumpCooldown == 0
+        if (onGround && (facing || mc.player.horizontalCollision) && jumpCooldown == 0
                 && (dist <= 1.35 || (mc.player.horizontalCollision && dist < 2.0))) {
             if (++jumpAttempts > MAX_JUMPS) {
                 fail(mc, "cannot climb onto " + to.toShortString());
@@ -432,6 +437,29 @@ public final class MovementExecutor {
         double dx = mc.player.getX() - (wp.getX() + 0.5);
         double dz = mc.player.getZ() - (wp.getZ() + 0.5);
         return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /** Max. Gierwinkel-Änderung pro Tick beim Laufen (verhindert hektische Kopfdrehungen). */
+    private static final float WALK_TURN_FOV = 36f;
+
+    /**
+     * Dreht den Kopf zum Laufziel und liefert den verbleibenden Gierwinkel zurück.
+     * Nahe am Wegpunkt (wo die Richtung zur Mitte wild hin- und herspringt) wird nicht mehr zur
+     * Mitte gedreht, sondern zum nächsten Wegpunkt bzw. die Blickrichtung beibehalten.
+     */
+    private float faceWalkTarget(Minecraft mc, BlockPos wp, Vec3 dest, double dist) {
+        Vec3 look = dest;
+        if (dist < 0.6) {
+            BlockPos next = null;
+            if (path != null && stepIndex + 2 < path.waypoints.size() && wp.equals(path.waypoints.get(stepIndex + 1))) {
+                BlockPos n = path.waypoints.get(stepIndex + 2);
+                if (n.getX() != wp.getX() || n.getZ() != wp.getZ()) next = n;
+            }
+            if (next != null) look = new Vec3(next.getX() + 0.5, wp.getY(), next.getZ() + 0.5);
+            else return 0f; // geradeaus weiterlaufen, nicht mehr zur Mitte zappeln
+        }
+        AimAssist.smoothLookAt(mc, new Vec3(look.x, mc.player.getEyeY(), look.z), WALK_TURN_FOV, 2.0f);
+        return yawDiffTo(mc, look);
     }
 
     private float yawDiffTo(Minecraft mc, Vec3 dest) {

@@ -15,9 +15,9 @@ public class MinecraftMixin {
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
         EntryPoint.EVENT_BUS.post(new TickEvent());
+        Tracker.applyMovementCorrection(Minecraft.getInstance());
     }
 
-    // Nach dem kompletten Tick (Player-Tick + Paket-Versand) echte Rotation wiederherstellen
     @Inject(method = "tick", at = @At("RETURN"))
     private void onTickReturn(CallbackInfo ci) {
         Tracker.restoreSpoof();

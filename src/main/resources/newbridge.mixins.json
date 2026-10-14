@@ -28,6 +28,8 @@
     "emote.HumanoidModelMixin",
     "emote.InventoryScreenMixin",
     "emote.PlayerModelEmoteMixin",
+    "emote.ModelPartBendMixin",
+    "emote.ModelPartCubeBendMixin",
     "emote.AvatarRenderStateEmoteMixin",
     "emote.AvatarRendererEmoteMixin",
     "ONETAPMIXIN",
@@ -47,7 +49,9 @@
     "chams.RenderTypeStateAccessor",
     "xray.AbstractBlockStateMixin",
     "xray.BlockEntityRenderDispatcherMixin",
-    "camera.CameraNoClipMixin"
+    "camera.CameraNoClipMixin",
+    "combat.LocalPlayerRotationAccessor",
+    "combat.MinecraftHandleKeybindsMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -55,4 +59,4 @@
   "overwrites": {
     "requireAnnotations": true
   }
-}
+}

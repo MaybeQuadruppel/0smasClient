@@ -12,6 +12,47 @@ public class ChatHandler {
 
     public static void register() {
         ClientSendMessageEvents.ALLOW_CHAT.register((message) -> {
+            String lower = message.toLowerCase();
+            if (lower.equals(".profile") || lower.startsWith(".profile ") || lower.equals(".profiles") || lower.startsWith(".profiles ")) {
+                if (com.OsamaClient.newbridge.Hacks.Client.Profiles.INSTANCE != null) {
+                    com.OsamaClient.newbridge.Hacks.Client.Profiles.INSTANCE.handleCommand(message.trim().split("\\s+"));
+                }
+                return false;
+            }
+            if (lower.equals(".wp") || lower.startsWith(".wp ") || lower.startsWith(".waypoint")) {
+                if (com.OsamaClient.newbridge.Hacks.Misc.Waypoints.INSTANCE != null) {
+                    com.OsamaClient.newbridge.Hacks.Misc.Waypoints.INSTANCE.handleCommand(message.trim().split("\\s+"));
+                }
+                return false;
+            }
+            if (lower.equals(".trail") || lower.startsWith(".trail ")) {
+                if (com.OsamaClient.newbridge.Hacks.Misc.Breadcrumbs.INSTANCE != null) {
+                    com.OsamaClient.newbridge.Hacks.Misc.Breadcrumbs.INSTANCE.handleCommand(message.trim().split("\\s+"));
+                }
+                return false;
+            }
+            if (lower.equals(".stash") || lower.startsWith(".stash ") || lower.equals(".stashes")) {
+                if (com.OsamaClient.newbridge.Hacks.Misc.stash.StashLogger.INSTANCE != null) {
+                    com.OsamaClient.newbridge.Hacks.Misc.stash.StashLogger.INSTANCE.handleCommand(message.trim().split("\\s+"));
+                }
+                return false;
+            }
+            if (lower.equals(".macro") || lower.startsWith(".macro ") || lower.equals(".macros")) {
+                if (com.OsamaClient.newbridge.Hacks.Client.macro.Macros.INSTANCE != null) {
+                    com.OsamaClient.newbridge.Hacks.Client.macro.Macros.INSTANCE.handleCommand(message.trim().split("\\s+"));
+                }
+                return false;
+            }
+            if (lower.equals(".help")) {
+                Minecraft mc = Minecraft.getInstance();
+                if (mc.player != null) {
+                    mc.player.sendSystemMessage(Component.literal("§6Commands: §f.goto <x> [y] <z> | .goto stop | .tp <x> [y] <z>"));
+                    mc.player.sendSystemMessage(Component.literal("§f.profile save|load|delete <name> | .profile list | .profile bind"));
+                    mc.player.sendSystemMessage(Component.literal("§f.wp add <name> [x y z] | .wp del <name> | .wp list | .wp goto <name> | .wp clear"));
+                    mc.player.sendSystemMessage(Component.literal("§f.trail back [blocks] | .trail clear | .stash [clear] | .macro"));
+                }
+                return false;
+            }
             if (message.startsWith(".goto")) {
                 String[] args = message.split(" ");
                 Minecraft mc = Minecraft.getInstance();

@@ -20,6 +20,15 @@ loom {
         client {
             programArgs("--username","Doomed")
         }
+        // Automatische Ingame-Tests: ./gradlew runClientGameTest
+        // (eigener run-Ordner, damit Config/Waypoints aus "run" unberührt bleiben)
+        clientGameTest {
+            inherit client
+            name "Client Game Test"
+            vmArg "-Dfabric.client.gametest"
+            vmArg "-Dfabric.client.gametest.modid=newbridge"
+            runDir "run-gametest"
+        }
     }
 }
 

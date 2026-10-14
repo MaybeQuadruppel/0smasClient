@@ -52,6 +52,14 @@ public class EntryPoint implements ClientModInitializer {
 
         ModuleManager.init();
         ChatHandler.register();
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Waypoints",
+                "Waypoint manager: all waypoints, edit, colors, go to", com.OsamaClient.newbridge.Hacks.Misc.WaypointsWindow::new);
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Profiles",
+                "Profile manager: save, load, compare and bind setups", com.OsamaClient.newbridge.Hacks.Client.ProfilesWindow::new);
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Stashes",
+                "Found stashes: value, contents, distance; add waypoint / go", com.OsamaClient.newbridge.Hacks.Misc.stash.StashesWindow::new);
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Macros",
+                "Macros: keys that send messages, commands and client commands", com.OsamaClient.newbridge.Hacks.Client.macro.MacrosWindow::new);
         com.OsamaClient.newbridge.UI.gui.Keybinds.register();
         // Alles speichern/laden (Module, Keybinds, Einstellungen, Panels, GUI-Theme)
         com.OsamaClient.newbridge.config.Config.init();
@@ -88,6 +96,8 @@ public class EntryPoint implements ClientModInitializer {
                     }
                 }
             }
+
+            com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.tick();
 
             // Only one place writes movement keys and mining input each tick.
             Navigator.INSTANCE.onTick(client);

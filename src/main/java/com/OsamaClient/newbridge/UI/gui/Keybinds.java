@@ -32,6 +32,11 @@ public final class Keybinds {
             boolean down = UiInput.keyDown(m.key);
             boolean was = WAS_DOWN.getOrDefault(m, true); // treat "unknown" as held: no toggle on the first tick
             WAS_DOWN.put(m, down);
+            if (m.holdToActivate) {
+                if (active && down != m.enabled) ClickGui.INSTANCE.safeToggle(m);
+                else if (!active && !down && m.enabled) ClickGui.INSTANCE.safeToggle(m);
+                continue;
+            }
             if (active && down && !was) ClickGui.INSTANCE.safeToggle(m);
         }
     }

@@ -39,17 +39,15 @@ public class GoalBlock implements Goal, ActionCosts {
         int xAbs = Math.abs(xDiff);
         int zAbs = Math.abs(zDiff);
 
-        double flatCost;
-        if (xAbs < zAbs) {
-            flatCost = (zAbs - xAbs) * WALK_ONE_BLOCK_COST + xAbs * WALK_ONE_BLOCK_COST;
-        } else {
-            flatCost = (xAbs - zAbs) * WALK_ONE_BLOCK_COST + zAbs * WALK_ONE_BLOCK_COST;
-        }
+        // Octile distance (4 straight + 4 diagonal moves)
+        int straight = Math.abs(xAbs - zAbs);
+        int diagonal = Math.min(xAbs, zAbs);
+        double flatCost = straight * WALK_ONE_BLOCK_COST + diagonal * WALK_DIAGONAL_COST;
 
         // Vertical cost
-        double vertCost = yDiff > 0
-                ? yDiff * JUMP_ONE_BLOCK_COST
-                : Math.abs(yDiff) * FALL_1_25_BLOCKS_COST;
+        double vertCost = yDiff < 0
+                ? -yDiff * JUMP_ONE_BLOCK_COST                // Ziel liegt höher -> springen
+                : yDiff * FALL_0_25_BLOCKS_COST;              // Ziel liegt tiefer -> fallen (günstig)
 
         return flatCost + vertCost;
     }

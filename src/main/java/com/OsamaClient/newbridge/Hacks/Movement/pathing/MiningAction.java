@@ -36,6 +36,8 @@ public final class MiningAction {
         if (BlockHelper.isEncasedInBedrock(mc.level, pos)) return false;
         if (BlockHelper.isForbidden(state)) return false;
         if (BlockHelper.touchesLava(mc, pos)) return false;
+        // Kein Abbauen, wenn Kies/Sand direkt darüber nachrutschen würde
+        if (BlockHelper.isFallingBlock(mc.level.getBlockState(pos.above()))) return false;
 
         int toolSlot = ToolSelector.selectBestTool(mc, state);
         if (toolSlot < 0) return false;

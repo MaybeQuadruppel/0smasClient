@@ -27,7 +27,7 @@ import static org.lwjgl.util.freetype.FreeType.*;
  * Glyphs are drawn 1:1 (nearest filtering), so text is as crisp as the pixel grid allows.
  * Not Minecraft's font system.
  */
-public final class FontAtlas implements AutoCloseable {
+public final class FontAtlas implements AutoCloseable, com.OsamaClient.newbridge.UI.gui.render.UiTexture {
 
     private static final String FONT_PATH = "/assets/newbridge/fonts/inter.ttf";
     private static final int LOAD_FLAGS = FT_LOAD_RENDER | (FT_RENDER_MODE_LIGHT << 16); // light (vertical) hinting

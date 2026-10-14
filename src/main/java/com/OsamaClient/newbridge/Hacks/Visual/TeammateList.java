@@ -47,7 +47,7 @@ public class TeammateList extends Module {
 
     public TeammateList() {
         super("TeammateList", "HUD list of active teammates in the top left corner", Category.VISUAL);
-        this.enabled = true;
+        this.enabled = false;
         instance = this;
         settings.add(showDistance);
         settings.add(textScale);

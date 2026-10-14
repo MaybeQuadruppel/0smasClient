@@ -9,6 +9,8 @@ import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -25,47 +27,146 @@ public final class BlockHelper {
             Blocks.WATER // don't try to mine water source blocks
     );
 
+    /** Blocks the bot must never walk into (feet/head cell), even though some have no collision. */
+    private static final Set<net.minecraft.world.level.block.Block> DANGEROUS_CELL = Set.of(
+            Blocks.FIRE, Blocks.SOUL_FIRE, Blocks.COBWEB, Blocks.SWEET_BERRY_BUSH,
+            Blocks.POWDER_SNOW, Blocks.WITHER_ROSE, Blocks.CACTUS, Blocks.MAGMA_BLOCK,
+            Blocks.CAMPFIRE, Blocks.SOUL_CAMPFIRE, Blocks.POINTED_DRIPSTONE, Blocks.END_PORTAL,
+            Blocks.NETHER_PORTAL, Blocks.SCAFFOLDING
+    );
+
+    /** Blocks the bot must never stand on. */
+    private static final Set<net.minecraft.world.level.block.Block> DANGEROUS_FLOOR = Set.of(
+            Blocks.MAGMA_BLOCK, Blocks.CAMPFIRE, Blocks.SOUL_CAMPFIRE, Blocks.CACTUS,
+            Blocks.POINTED_DRIPSTONE, Blocks.POWDER_SNOW, Blocks.SCAFFOLDING
+    );
+
+    /** Per-search cache: break time in ticks per BlockState (depends on hotbar tools). */
+    private static final Map<BlockState, Double> BREAK_TICKS_CACHE = new IdentityHashMap<>();
+
     private BlockHelper() {}
 
+    /** Must be called whenever a new path search starts (inventory/tools may have changed). */
+    public static void beginSearch() {
+        BREAK_TICKS_CACHE.clear();
+    }
+
     /**
-     * Returns the cost to mine this block in ticks.
-     * Returns COST_INF if the block is impassable/forbidden.
-     * Returns 0 if the block is already air/passable.
+     * Returns the cost to clear this block so the player can stand in it, in ticks.
+     * Returns COST_INF if the block must not be touched/entered.
+     * Returns 0 if the block is already passable (air, grass, flowers, ...).
      *
-     * Falling blocks (Gravel, Sand, etc.) get extra cost because:
-     * - After mining the block below them they fall down
-     * - This can block the path or hurt the player
+     * Never-touch rules (all checked at PLAN time, not just while executing):
+     * - fluids (water, lava, waterlogged blocks) and anything directly next to a fluid,
+     *   because breaking it would let the fluid flow into the tunnel
+     * - falling blocks (gravel, sand, concrete powder, ...)
+     * - block entities (chests, shulkers, spawners, furnaces ...): never destroy containers
+     * - dangerous blocks (fire, cobweb, berry bush, powder snow, magma, ...)
      */
     public static double miningCost(Minecraft mc, BlockPos pos) {
-        if (mc.level == null) return ActionCosts.COST_INF;
+        if (!PathWorld.has(mc)) return ActionCosts.COST_INF;
         // Never invent air in an unloaded chunk. That was the source of paths
         // which looked valid locally but immediately disagreed with the server.
-        if (!mc.level.isLoaded(pos)) return ActionCosts.COST_INF;
+        if (!PathWorld.loaded(mc, pos)) return ActionCosts.COST_INF;
 
-        BlockState state = mc.level.getBlockState(pos);
+        BlockState state = PathWorld.level(mc).getBlockState(pos);
 
         if (state.isAir()) return 0;
         if (FORBIDDEN.contains(state.getBlock())) return ActionCosts.COST_INF;
+        if (!state.getFluidState().isEmpty()) return ActionCosts.COST_INF; // water, lava, waterlogged
+        if (DANGEROUS_CELL.contains(state.getBlock())) return ActionCosts.COST_INF;
 
-        // Lava check via fluid state
-        if (state.getFluidState().is(FluidTags.LAVA)) return ActionCosts.COST_INF;
+        // Already passable (tall grass, flowers, torches, rails ...): nothing to mine
+        if (state.getCollisionShape(PathWorld.level(mc), pos).isEmpty()) return 0;
 
         // Unbreakable
-        float hardness = state.getDestroySpeed(mc.level, pos);
+        float hardness = state.getDestroySpeed(PathWorld.level(mc), pos);
         if (hardness < 0) return ActionCosts.COST_INF;
 
-        // Wasser: komplett meiden statt nur durchqueren (schon vorher via FORBIDDEN
-        // abgedeckt, hier nur zur Klarheit/Robustheit falls jemand FORBIDDEN ändert)
-        if (state.getFluidState().is(FluidTags.WATER)) return ActionCosts.COST_INF;
+        // Gravel/Sand/etc: nie abbauen -> drumherum laufen
+        if (isFallingBlock(state)) return ActionCosts.COST_INF;
 
-        // Gravel/Sand/etc: NICHT mehr abbauen -> der Pathfinder soll drumherum laufen,
-        // statt hindurchzugraben (kein Fallschaden/keine Blockade durch nachrutschenden Kies).
-        if (isFallingBlock(state)) {
-            return ActionCosts.COST_INF;
+        // Container / Spawner / sonstige Block-Entities nie zerstoeren
+        if (state.getBlock() instanceof net.minecraft.world.level.block.EntityBlock) return ActionCosts.COST_INF;
+
+        // Abbauen wuerde Wasser/Lava in den Gang laufen lassen
+        if (touchesFluid(mc, pos)) return ActionCosts.COST_INF;
+
+        return breakTicks(mc, state, hardness);
+    }
+
+    /** Ticks needed to break {@code state} with the best tool in the hotbar (cached per search). */
+    private static double breakTicks(Minecraft mc, BlockState state, float hardness) {
+        Double cached = BREAK_TICKS_CACHE.get(state);
+        if (cached != null) return cached;
+
+        double ticks;
+        if (hardness == 0f) {
+            ticks = 1.0;
+        } else {
+            double bestProgress = 0;
+            boolean needsTool = state.requiresCorrectToolForDrops();
+            if (PathWorld.hasPlayer(mc)) {
+                for (int slot = 0; slot < 9; slot++) {
+                    net.minecraft.world.item.ItemStack stack = PathWorld.hotbar(mc, slot);
+                    float speed = stack.isEmpty() ? 1f : stack.getDestroySpeed(state);
+                    boolean canHarvest = !needsTool || (!stack.isEmpty() && stack.isCorrectToolForDrops(state));
+                    double progress = speed / hardness / (canHarvest ? 30.0 : 100.0);
+                    if (progress > bestProgress) bestProgress = progress;
+                }
+            }
+            if (bestProgress <= 0) bestProgress = 1.0 / hardness / 100.0;
+            ticks = Math.ceil(1.0 / bestProgress) + 2.0; // +2: aim/start latency
         }
+        BREAK_TICKS_CACHE.put(state, ticks);
+        return ticks;
+    }
 
-        // Hardness-based cost (calibrated: stone with iron pickaxe ≈ 7.5 ticks)
-        return hardness * 30.0 + ActionCosts.MINING_OVERHEAD;
+    /**
+     * True if the player can stand ON this block: has collision, top surface roughly at
+     * full height (no fences/walls 1.5, no bottom slabs 0.5, no carpets) and is not
+     * dangerous (magma, campfire, cactus, powder snow ...).
+     */
+    public static boolean canStandOn(Minecraft mc, BlockPos pos) {
+        if (!PathWorld.loaded(mc, pos)) return false;
+        BlockState state = PathWorld.level(mc).getBlockState(pos);
+        if (state.isAir()) return false;
+        if (!state.getFluidState().isEmpty()) return false;
+        if (DANGEROUS_FLOOR.contains(state.getBlock())) return false;
+        net.minecraft.world.phys.shapes.VoxelShape shape = state.getCollisionShape(PathWorld.level(mc), pos);
+        if (shape.isEmpty()) return false;
+        double top = shape.max(Direction.Axis.Y);
+        return top >= 0.8 && top <= 1.0;
+    }
+
+    /**
+     * True if the player can occupy this cell WITHOUT mining (air / no-collision blocks),
+     * and it is neither a fluid nor dangerous.
+     */
+    public static boolean isFreeCell(Minecraft mc, BlockPos pos) {
+        if (!PathWorld.loaded(mc, pos)) return false;
+        BlockState state = PathWorld.level(mc).getBlockState(pos);
+        if (state.isAir()) return true;
+        if (!state.getFluidState().isEmpty()) return false;
+        if (DANGEROUS_CELL.contains(state.getBlock())) return false;
+        return state.getCollisionShape(PathWorld.level(mc), pos).isEmpty();
+    }
+
+    /**
+     * True if lava is directly next to (4 horizontal sides) or above this cell. The bot
+     * never walks with its feet/head through such a cell.
+     */
+    public static boolean nearLava(Minecraft mc, BlockPos pos) {
+        if (!PathWorld.has(mc)) return false;
+        if (isLava(mc, pos.above())) return true;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            if (isLava(mc, pos.relative(d))) return true;
+        }
+        return false;
+    }
+
+    private static boolean isLava(Minecraft mc, BlockPos pos) {
+        return PathWorld.loaded(mc, pos) && PathWorld.level(mc).getFluidState(pos).is(FluidTags.LAVA);
     }
 
     /**
@@ -79,7 +180,7 @@ public final class BlockHelper {
      * something above it (e.g. in traverse/ascend for destFeet and destHead).
      */
     public static double fallingBlockColumnCost(Minecraft mc, BlockPos pos) {
-        if (mc.level == null) return 0;
+        if (!PathWorld.has(mc)) return 0;
 
         BlockPos check = pos.above();
 
@@ -88,9 +189,9 @@ public final class BlockHelper {
         // als unmöglich markiert (COST_INF), statt ihn "mitzurechnen" und
         // trotzdem abzubauen -> der Bot meidet Kies/Sand jetzt vollständig.
         for (int i = 0; i < 32; i++) {
-            if (!mc.level.isLoaded(check)) return ActionCosts.COST_INF;
+            if (!PathWorld.loaded(mc, check)) return ActionCosts.COST_INF;
 
-            BlockState above = mc.level.getBlockState(check);
+            BlockState above = PathWorld.level(mc).getBlockState(check);
 
             if (above.isAir()) break; // Säule endet, nichts fällt nach
 
@@ -115,7 +216,7 @@ public final class BlockHelper {
     }
 
     public static boolean isLoaded(Minecraft mc, BlockPos pos) {
-        return mc.level != null && mc.level.isLoaded(pos);
+        return PathWorld.loaded(mc, pos);
     }
 
     public static boolean isEncasedInBedrock(net.minecraft.world.level.Level level, BlockPos pos) {
@@ -203,9 +304,9 @@ public final class BlockHelper {
 
     /** Hotbar-Slot mit einem platzierbaren Block, sonst -1. */
     public static int findPlaceableSlot(Minecraft mc) {
-        if (mc.player == null) return -1;
+        if (!PathWorld.hasPlayer(mc)) return -1;
         for (int slot = 0; slot < 9; slot++) {
-            if (isPlacementItem(mc.player.getInventory().getItem(slot))) return slot;
+            if (isPlacementItem(PathWorld.hotbar(mc, slot))) return slot;
         }
         return -1;
     }
@@ -219,11 +320,25 @@ public final class BlockHelper {
      * in den Gang laufen lassen.
      */
     public static boolean touchesLava(Minecraft mc, BlockPos pos) {
-        if (mc.level == null) return false;
+        if (!PathWorld.has(mc)) return false;
         for (Direction d : Direction.values()) {
             BlockPos n = pos.relative(d);
-            if (!mc.level.isLoaded(n)) continue;
-            if (mc.level.getFluidState(n).is(FluidTags.LAVA)) return true;
+            if (!PathWorld.loaded(mc, n)) continue;
+            if (PathWorld.level(mc).getFluidState(n).is(FluidTags.LAVA)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * true wenn direkt neben {@code pos} (alle 6 Seiten) irgendeine Flüssigkeit ist:
+     * Abbauen von pos würde Wasser/Lava in den Gang laufen lassen.
+     */
+    public static boolean touchesFluid(Minecraft mc, BlockPos pos) {
+        if (!PathWorld.has(mc)) return false;
+        for (Direction d : Direction.values()) {
+            BlockPos n = pos.relative(d);
+            if (!PathWorld.loaded(mc, n)) continue;
+            if (!PathWorld.level(mc).getFluidState(n).isEmpty()) return true;
         }
         return false;
     }
@@ -237,7 +352,7 @@ public final class BlockHelper {
      * already explored/trapped) tunnels other players made.
      */
     public static boolean isCarvedTunnel(Minecraft mc, BlockPos feet, Direction travelDir) {
-        if (mc.level == null || travelDir.getAxis() == Direction.Axis.Y) return false;
+        if (!PathWorld.has(mc) || travelDir.getAxis() == Direction.Axis.Y) return false;
         Direction perp = travelDir.getClockWise();
 
         if (is1x2Tunnel(mc, feet, perp)) return true;
@@ -246,8 +361,8 @@ public final class BlockHelper {
     }
 
     private static boolean isWallLike(Minecraft mc, BlockPos pos) {
-        BlockState state = mc.level.getBlockState(pos);
-        return state.isSolid() && !isFallingBlock(state);
+        BlockState state = PathWorld.level(mc).getBlockState(pos);
+        return !state.getCollisionShape(PathWorld.level(mc), pos).isEmpty() && !isFallingBlock(state);
     }
 
     private static boolean is1x2Tunnel(Minecraft mc, BlockPos feet, Direction perp) {
@@ -272,7 +387,7 @@ public final class BlockHelper {
         for (int side = -1; side <= 1; side++) {
             for (int up = 0; up <= 2; up++) {
                 BlockPos p = feet.relative(perp, side).above(up);
-                if (!mc.level.getBlockState(p).getCollisionShape(mc.level, p).isEmpty()) return false;
+                if (!PathWorld.level(mc).getBlockState(p).getCollisionShape(PathWorld.level(mc), p).isEmpty()) return false;
             }
         }
         // Boden, Decke und beide äußeren Wände müssen solide sein

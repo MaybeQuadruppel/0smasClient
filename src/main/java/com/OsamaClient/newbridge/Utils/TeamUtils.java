@@ -13,28 +13,30 @@ import net.minecraft.world.scores.Scoreboard;
 
 public class TeamUtils {
 
+    private static final int WHITE = 0xFFFFFF, GRAY = 0xAAAAAA, DARK_GRAY = 0x555555;
+
     public static boolean isTeammate(Entity entity) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || entity == null || entity == mc.player || !(entity instanceof LivingEntity living)) {
             return false;
         }
 
-        // 1. Scoreboard-Team
+        // 1. Scoreboard-Teams (Hypixel Bedwars/Skywars/... nutzen pro Team ein eigenes Scoreboard-Team)
         Scoreboard scoreboard = mc.level.getScoreboard();
         PlayerTeam myTeam = scoreboard.getPlayersTeam(mc.player.getScoreboardName());
-        if (myTeam != null) {
-            PlayerTeam theirTeam = scoreboard.getPlayersTeam(entity.getScoreboardName());
-            return theirTeam != null && theirTeam == myTeam;
-        }
+        PlayerTeam theirTeam = scoreboard.getPlayersTeam(entity.getScoreboardName());
+        Boolean byTeam = compareTeams(myTeam, theirTeam);
+        if (byTeam != null) return byTeam;
 
-        // 2. Fallback: Erster expliziter Farbcode im sichtbaren Namensschild
-        Integer myColor = getFirstExplicitColor(mc.player.getDisplayName());
-        Integer theirColor = getFirstExplicitColor(entity.getDisplayName());
-        if (myColor != null && theirColor != null) {
+        // 2. Farbe im sichtbaren Namen - nur wenn beide eine Farbe haben, die keine Standardfarbe ist
+        //    (Ränge in Lobbys sind keine Teams; Weiß/Grau zählt deshalb nicht).
+        Integer myColor = teamColorOf(mc.player.getDisplayName());
+        Integer theirColor = teamColorOf(entity.getDisplayName());
+        if (myColor != null && theirColor != null && myTeam == null && theirTeam == null) {
             return myColor.equals(theirColor);
         }
 
-        // 3. Fallback: Gefärbte Lederrüstung
+        // 3. Gefärbte Lederrüstung (Bedwars: Helm + Brustplatte bleiben in Teamfarbe, Hose/Schuhe werden getauscht)
         Integer myArmor = getLeatherArmorColor(mc.player);
         Integer theirArmor = getLeatherArmorColor(living);
         if (myArmor != null && theirArmor != null) {
@@ -44,11 +46,42 @@ public class TeamUtils {
         return false;
     }
 
+    /**
+     * Vergleicht zwei Scoreboard-Teams. true = gleiches Team, false = sicher verschieden,
+     * null = keine Aussage möglich (kein Team / keine unterscheidbaren Merkmale).
+     */
+    public static Boolean compareTeams(PlayerTeam mine, PlayerTeam theirs) {
+        if (mine == null || theirs == null) return null;
+        if (mine == theirs || mine.getName().equals(theirs.getName())) return true;
+        // gesetzte Teamfarbe: gleiche Farbe = gleiches Team (kein Team-Objekt-Vergleich von Optionals!)
+        var c1 = mine.getColor();
+        var c2 = theirs.getColor();
+        if (c1.isPresent() && c2.isPresent()) return c1.get() == c2.get();
+        // Hypixel: Farbe steckt im Team-Prefix/-Suffix ("§cR ", "§9B ")
+        Integer p1 = teamColorOf(mine.getPlayerPrefix()), p2 = teamColorOf(theirs.getPlayerPrefix());
+        if (p1 == null) p1 = teamColorOf(mine.getPlayerSuffix());
+        if (p2 == null) p2 = teamColorOf(theirs.getPlayerSuffix());
+        if (p1 != null && p2 != null) return p1.equals(p2);
+        // Teams mit unterschiedlichem Namen und ohne Farbhinweis: verschiedene Teams (Hypixel-Scoreboard-Teams sind eindeutig)
+        return false;
+    }
+
+    /** Erste "echte" Farbe einer Komponente (Weiß/Grau/Dunkelgrau werden ignoriert), sonst null. */
+    public static Integer teamColorOf(Component component) {
+        Integer c = getFirstExplicitColor(component);
+        if (c == null) return null;
+        int rgb = c & 0xFFFFFF;
+        if (rgb == WHITE || rgb == GRAY || rgb == DARK_GRAY) return null;
+        return rgb;
+    }
+
     private static Integer getFirstExplicitColor(Component component) {
         if (component == null) return null;
 
         if (component.getStyle().getColor() != null) {
-            return component.getStyle().getColor().getValue();
+            int v = component.getStyle().getColor().getValue() & 0xFFFFFF;
+            // ein weißer/grauer Abschnitt (z. B. Leerzeichen) darf eine spätere Teamfarbe nicht verdecken
+            if (v != WHITE && v != GRAY && v != DARK_GRAY) return v;
         }
         for (Component sibling : component.getSiblings()) {
             Integer c = getFirstExplicitColor(sibling);
@@ -58,9 +91,12 @@ public class TeamUtils {
     }
 
     private static Integer getLeatherArmorColor(LivingEntity entity) {
-        ItemStack chest = entity.getItemBySlot(EquipmentSlot.CHEST);
-        if (chest.isEmpty()) return null;
-        DyedItemColor dyed = chest.get(DataComponents.DYED_COLOR);
-        return dyed != null ? dyed.rgb() : null;
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.CHEST, EquipmentSlot.HEAD}) {
+            ItemStack piece = entity.getItemBySlot(slot);
+            if (piece.isEmpty()) continue;
+            DyedItemColor dyed = piece.get(DataComponents.DYED_COLOR);
+            if (dyed != null) return dyed.rgb();
+        }
+        return null;
     }
 }

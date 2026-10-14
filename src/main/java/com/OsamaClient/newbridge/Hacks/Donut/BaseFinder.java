@@ -1,7 +1,7 @@
 package com.OsamaClient.newbridge.Hacks.Donut;
 
 import com.OsamaClient.newbridge.EntryPoint;
-import com.OsamaClient.newbridge.Hacks.Movement.pathing.GoalBlock;
+import com.OsamaClient.newbridge.Hacks.Movement.pathing.GoalNear;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.GoalYLevel;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.Navigator;
 import com.OsamaClient.newbridge.Hacks.Movement.pathing.PathRenderer;
@@ -70,7 +70,8 @@ public class BaseFinder extends Module {
     private static final int GRIEF_CHECK_RADIUS   = 10;    // Umkreis-Check auf Obsidian
     private static final int OBSIDIAN_GRIEF_THRESHOLD = 6; // ab so vielen Obsidian-Blöcken: "gegriefed"
     private static final int MIN_CONTAINERS_FOR_BASE  = 2; // ohne Hopper/Spawner: mind. 2 Storage-Blöcke nötig
-    private static final double MAX_TRAVEL_DIST_SQ = 20.0 * 20.0;
+    private static final double MAX_TRAVEL_DIST_SQ = 8.0 * 8.0;
+    private static final int ARRIVE_RANGE = 3;
     private static final int TARGET_Y_TOLERANCE = 8;       // ab wann "nah genug" an der Grab-Tiefe
 
     // 30x30-Flächen-Check: mind. 20 Target-Blöcke in der Fläche = eindeutig eine Base
@@ -174,8 +175,10 @@ public class BaseFinder extends Module {
         currentSite = best;
         client.player.sendSystemMessage(Component.literal(
                 "§e[BaseFinder] Possible base at " + best.center.toShortString() + ", traveling there..."));
+        // GoalNear statt GoalBlock: das Zentrum liegt oft IN einer Kiste. Mit GoalBlock hätte der
+        // Pathfinder versucht, genau dort zu stehen (Container abbauen / unerreichbar).
         Navigator.INSTANCE.goTo(client, Navigator.OWNER_BASE_FINDER,
-                Navigator.PRIORITY_BASE_FINDER, new GoalBlock(best.center));
+                Navigator.PRIORITY_BASE_FINDER, new GoalNear(best.center, ARRIVE_RANGE));
         phase = Phase.TRAVELING;
     }
 
@@ -297,9 +300,10 @@ public class BaseFinder extends Module {
         }
 
         client.player.sendSystemMessage(Component.literal(
-                "§a[BaseFinder] Reached base at " + currentSite.center.toShortString() + ". Stopping."));
-        this.enabled = false;
-        onDisable();
+                "§a[BaseFinder] Reached base at " + currentSite.center.toShortString() + ", inspecting..."));
+        // Vorher wurde hier direkt gestoppt -> die Inspect-Phase (Grief-Check) lief nie.
+        phase = Phase.INSPECTING;
+        inspectTicks = 0;
     }
 
     // ----------------------------------------------------------- INSPECTING

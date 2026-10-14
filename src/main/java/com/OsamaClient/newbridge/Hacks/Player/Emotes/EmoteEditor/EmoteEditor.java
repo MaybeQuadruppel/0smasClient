@@ -19,7 +19,9 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
@@ -55,6 +57,8 @@ public final class EmoteEditor {
 
     private static final float MAX_PITCH = 25f;
 
+    private static final float HDR_MIRROR_DX = 320f, HDR_AUTOKEY_DX = 420f, HDR_REDO_DX = 480f, HDR_UNDO_DX = 540f;
+
     private final UiRenderer renderer = new UiRenderer();
     private final Ui ui = new Ui(renderer);
 
@@ -89,6 +93,18 @@ public final class EmoteEditor {
 
     private float previewYaw = 180f;
     private float previewPitch = 8f;
+
+    /** Auto-Key: Slider-Änderungen erzeugen/aktualisieren automatisch einen Keyframe an der Abspielposition. */
+    private boolean autoKey = true;
+    private boolean keyDragUndoPending;
+
+    // Undo / Redo (Snapshots von Keyframes + Dauer)
+    private static final int HISTORY_LIMIT = 64;
+    private static final float SNAP_STEP = 0.05f;
+    private final Deque<Snapshot> undoStack = new ArrayDeque<>();
+    private final Deque<Snapshot> redoStack = new ArrayDeque<>();
+
+    private record Snapshot(Map<Bone, TreeMap<Float, float[]>> keys, float duration, Float selected) {}
 
     private long lastNanos;
     private int failures;
@@ -141,6 +157,8 @@ public final class EmoteEditor {
         }
         selectedBone = Bone.ROOT;
         selectedKeyframeTime = null;
+        undoStack.clear();
+        redoStack.clear();
         currentTime = 0f;
         isPlaying = false;
         status = "";
@@ -188,7 +206,7 @@ public final class EmoteEditor {
         renderer.begin();
 
         try {
-            ui.scale = Theme.scale() * (float) EmoteModule.INSTANCE.wheelScale.getValue();
+            ui.scale = fittedScale();
             ui.dt = dt;
             ui.mouseX = UiInput.mouseFbX() / ui.scale;
             ui.mouseY = UiInput.mouseFbY() / ui.scale;
@@ -199,7 +217,14 @@ public final class EmoteEditor {
 
             if (isPlaying) {
                 currentTime += dt;
-                if (currentTime > duration) currentTime = 0f;
+                if (currentTime > duration) {
+                    if (loop) {
+                        currentTime = 0f;
+                    } else {
+                        currentTime = duration; // ohne Loop am Ende stehen bleiben
+                        isPlaying = false;
+                    }
+                }
                 evaluateAllBones();
             }
 
@@ -227,10 +252,12 @@ public final class EmoteEditor {
         float fbW = target.width;
         float fbH = target.height;
 
-        float vx = 250f;
-        float vy = 52f;
-        float vw = Math.max(80f, fbW - 260f);
-        float vh = Math.max(80f, fbH - 142f);
+        // gleiche Geometrie wie drawPreviewViewport(), nur in Pixeln (Einheiten * Skalierung)
+        float sc = fittedScale();
+        float vx = 250f * sc;
+        float vy = 52f * sc;
+        float vw = Math.max(80f, fbW / sc - 260f) * sc;
+        float vh = Math.max(80f, fbH / sc - 142f) * sc;
 
         double guiScale = mc.getWindow().getGuiScale();
         int x0 = (int) Math.round(vx / guiScale);
@@ -308,9 +335,13 @@ public final class EmoteEditor {
         drawButton(isPlaying ? "Pause" : "Play", w - 86f, 8f, 70f, 24f, true, false);
         drawButton("Save", w - 164f, 8f, 70f, 24f, true, false);
         drawButton("Library", w - 242f, 8f, 70f, 24f, true, false);
+        drawButton("Mirror", w - HDR_MIRROR_DX, 8f, 70f, 24f, true, false);
+        drawButton(autoKey ? "Auto Key: On" : "Auto Key: Off", w - HDR_AUTOKEY_DX, 8f, 92f, 24f, true, autoKey);
+        drawButton("Redo", w - HDR_REDO_DX, 8f, 52f, 24f, !redoStack.isEmpty(), false);
+        drawButton("Undo", w - HDR_UNDO_DX, 8f, 52f, 24f, !undoStack.isEmpty(), false);
 
         if (statusTime > 0f && !status.isEmpty()) {
-            float avail = (w - 242f - 12f) - 300f;
+            float avail = (w - HDR_UNDO_DX - 12f) - 300f;
             if (avail > 40f) {
                 ui.text(ui.ellipsize(status, avail, Theme.FONT_SMALL), 300f, 14f, 12f, Theme.FONT_SMALL, Theme.accent());
             }
@@ -348,6 +379,7 @@ public final class EmoteEditor {
         currentY += 12f;
         ui.text("Transforms (" + selectedBone.name() + ")",
                 px + 12f, currentY, 12f, Theme.FONT_SMALL, Theme.TEXT_DIM);
+        drawButton("Reset", px + pw - 62f, currentY - 4f, 50f, 18f, true, false);
         currentY += 22f;
 
         String[] labels = {"Rot X", "Rot Y", "Rot Z", "Pos X", "Pos Y", "Pos Z"};
@@ -395,7 +427,9 @@ public final class EmoteEditor {
         ui.round(vx, vy, vw, vh, 6f, 0x660F1014);
         ui.outline(vx, vy, vw, vh, 6f, 1f, Theme.SETTING_BLOCK_BORDER);
 
-        ui.text("Drag to rotate  -  R resets the view", vx + 12f, vy + 10f, 11f, Theme.FONT_SMALL, Theme.TEXT_DIM);
+        ui.text("Drag to rotate  -  R resets the view  -  M mirror  -  Ctrl+Z/Y undo/redo", vx + 12f, vy + 10f, 11f, Theme.FONT_SMALL, Theme.TEXT_DIM);
+        ui.text("Sliders: right-click = 0, Ctrl+scroll = fine  -  Left/Right = prev/next key  -  Up/Down = bone  -  Shift = no snap",
+                vx + 12f, vy + vh - 18f, 10f, Theme.FONT_SMALL, Theme.TEXT_DIM);
         ui.text(String.format(Locale.ROOT, "Yaw %.0f  Pitch %.0f", previewYaw - 180f, previewPitch),
                 vx + 12f, vy + 25f, 10f, Theme.FONT_SMALL, Theme.TEXT_DIM);
     }
@@ -468,10 +502,21 @@ public final class EmoteEditor {
         ui.textCentered(text, x + w / 2f, y, h, Theme.FONT_SMALL, textCol);
     }
 
+    /** Mindestbreite in UI-Einheiten, damit Kopfzeile und Timeline-Buttons sich nie überlappen. */
+    private static final float MIN_UI_W = 860f, MIN_UI_H = 420f;
+
+    /** Gewünschte Skalierung, aber klein genug, dass das Layout ins Fenster passt. */
+    private float fittedScale() {
+        float want = Theme.scale() * (float) EmoteModule.INSTANCE.wheelScale.getValue();
+        var target = Minecraft.getInstance().gameRenderer.mainRenderTarget();
+        float fit = Math.min(target.width / MIN_UI_W, target.height / MIN_UI_H);
+        return Math.max(0.5f, Math.min(want, fit));
+    }
+
     private void setMouseFromScreen(double mouseX, double mouseY) {
         Minecraft mc = Minecraft.getInstance();
         double guiScale = mc.getWindow().getGuiScale();
-        float currentScale = Theme.scale() * (float) EmoteModule.INSTANCE.wheelScale.getValue();
+        float currentScale = fittedScale();
         if (currentScale <= 0f) currentScale = 1f;
 
         ui.scale = currentScale;
@@ -482,6 +527,15 @@ public final class EmoteEditor {
     public boolean mouseClicked(int button, double mouseX, double mouseY) {
         setMouseFromScreen(mouseX, mouseY);
 
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+            int ch = sliderAtMouse();
+            if (ch >= 0) {
+                pushUndo();
+                applySliderValue(ch, 0f);
+                return true;
+            }
+            return false;
+        }
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
 
         float w = ui.width();
@@ -489,6 +543,14 @@ public final class EmoteEditor {
         float rowY = ty + ROW_DY;
 
         if (ui.hovered(w - 86f, 8f, 70f, 24f)) { togglePlay(); return true; }
+        if (ui.hovered(w - HDR_MIRROR_DX, 8f, 70f, 24f)) { mirrorPose(); return true; }
+        if (ui.hovered(w - HDR_AUTOKEY_DX, 8f, 92f, 24f)) {
+            autoKey = !autoKey;
+            setStatus(autoKey ? "Auto Key on: slider changes are keyed automatically" : "Auto Key off");
+            return true;
+        }
+        if (ui.hovered(w - HDR_REDO_DX, 8f, 52f, 24f)) { redo(); return true; }
+        if (ui.hovered(w - HDR_UNDO_DX, 8f, 52f, 24f)) { undo(); return true; }
         if (ui.hovered(w - 164f, 8f, 70f, 24f)) { saveEmote(); return true; }
         if (ui.hovered(w - 242f, 8f, 70f, 24f)) {
             nameField.end();
@@ -503,8 +565,8 @@ public final class EmoteEditor {
             return true;
         }
 
-        if (ui.hovered(tx + DUR_MINUS_DX, rowY, DUR_BTN_W, ROW_BH)) { changeDuration(-0.25f); return true; }
-        if (ui.hovered(tx + DUR_PLUS_DX, rowY, DUR_BTN_W, ROW_BH)) { changeDuration(0.25f); return true; }
+        if (ui.hovered(tx + DUR_MINUS_DX, rowY, DUR_BTN_W, ROW_BH)) { pushUndo(); changeDuration(-0.25f); return true; }
+        if (ui.hovered(tx + DUR_PLUS_DX, rowY, DUR_BTN_W, ROW_BH)) { pushUndo(); changeDuration(0.25f); return true; }
         if (ui.hovered(tx + LOOP_DX, rowY, LOOP_W, ROW_BH)) { loop = !loop; return true; }
         if (ui.hovered(tx + WHEEL_DX, rowY, WHEEL_W, ROW_BH)) { addToWheel = !addToWheel; return true; }
 
@@ -520,14 +582,21 @@ public final class EmoteEditor {
                 }
             }
 
-            float sliderStartY = startY + bones.length * 30f + 34f;
-            for (int i = 0; i < CHANNEL_COUNT; i++) {
-                float sliderY = sliderStartY + i * 40f;
-                if (ui.hovered(px + 10f, sliderY, pw - 20f, 32f)) {
-                    draggingSlider = i;
-                    updateDraggedSlider();
-                    return true;
-                }
+            // "Reset"-Button neben "Transforms"
+            float resetY = startY + bones.length * 30f + 12f - 4f;
+            if (ui.hovered(px + pw - 62f, resetY, 50f, 18f)) {
+                pushUndo();
+                for (int ch = 0; ch < CHANNEL_COUNT; ch++) applySliderValue(ch, 0f);
+                setStatus("Reset " + selectedBone.name());
+                return true;
+            }
+
+            int ch = sliderAtMouse();
+            if (ch >= 0) {
+                pushUndo();
+                draggingSlider = ch;
+                updateDraggedSlider();
+                return true;
             }
         }
 
@@ -543,9 +612,9 @@ public final class EmoteEditor {
 
         float trackX = tx + 20f, trackY = ty + 42f, trackW = tw - 40f;
 
-        if (ui.hovered(tx + tw - 110f, rowY, 100f, 22f)) { setKeyframe(); return true; }
-        if (selectedKeyframeTime != null && ui.hovered(tx + tw - 170f, rowY, 55f, 22f)) { deleteKeyframe(); return true; }
-        if (!copiedPose.isEmpty() && ui.hovered(tx + tw - 230f, rowY, 55f, 22f)) { pasteKeyframe(); return true; }
+        if (ui.hovered(tx + tw - 110f, rowY, 100f, 22f)) { pushUndo(); setKeyframe(); return true; }
+        if (selectedKeyframeTime != null && ui.hovered(tx + tw - 170f, rowY, 55f, 22f)) { pushUndo(); deleteKeyframe(); return true; }
+        if (!copiedPose.isEmpty() && ui.hovered(tx + tw - 230f, rowY, 55f, 22f)) { pushUndo(); pasteKeyframe(); return true; }
         if (selectedKeyframeTime != null && ui.hovered(tx + tw - 285f, rowY, 50f, 22f)) { copyKeyframe(); return true; }
 
         if (ui.mouseY >= trackY - 12f && ui.mouseY <= trackY + 12f) {
@@ -563,6 +632,7 @@ public final class EmoteEditor {
             }
 
             if (hitTime != null) {
+                keyDragUndoPending = true; // Undo-Snapshot erst, wenn wirklich verschoben wird
                 selectedKeyframeTime = hitTime;
                 draggingKeyframe = true;
                 currentTime = hitTime;
@@ -598,9 +668,14 @@ public final class EmoteEditor {
             float tx = 10f, tw = ui.width() - 20f;
             float trackX = tx + 20f, trackW = tw - 40f;
             float pct = Math.max(0f, Math.min(1f, (ui.mouseX - trackX) / trackW));
-            float newTime = quantizeTime(pct * duration);
+            float raw = pct * duration;
+            boolean free = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_SHIFT) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_SHIFT);
+            float newTime = quantizeTime(free ? raw : Math.round(raw / SNAP_STEP) * SNAP_STEP);
+            newTime = Math.max(0f, Math.min(duration, newTime));
 
-            if (Math.abs(newTime - selectedKeyframeTime) > 0.0001f) {
+            // Nicht auf einen anderen Keyframe schieben (das hat ihn vorher stillschweigend überschrieben)
+            if (Math.abs(newTime - selectedKeyframeTime) > 0.0001f && !isKeyTimeOccupied(newTime)) {
+                if (keyDragUndoPending) { pushUndo(); keyDragUndoPending = false; }
                 for (Bone bone : Bone.values()) {
                     NavigableMap<Float, float[]> map = keyframes.get(bone);
                     if (map.containsKey(selectedKeyframeTime)) {
@@ -635,6 +710,18 @@ public final class EmoteEditor {
     public void mouseScrolled(double mouseX, double mouseY, double delta) {
         setMouseFromScreen(mouseX, mouseY);
         float px = 10f, py = 52f, pw = 230f, ph = ui.height() - 142f;
+        boolean ctrl = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_CONTROL) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_CONTROL);
+        int ch = ctrl ? sliderAtMouse() : -1;
+        if (ch >= 0) {
+            float step = ch < 3 ? 1f : 0.1f;
+            boolean shift = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_SHIFT) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_SHIFT);
+            if (shift) step *= 10f;
+            float min = ch < 3 ? -180f : -10f, max = ch < 3 ? 180f : 10f;
+            float v = boneTransforms.get(selectedBone)[ch] + (float) Math.signum(delta) * step;
+            pushUndo();
+            applySliderValue(ch, Math.max(min, Math.min(max, v)));
+            return;
+        }
         if (ui.mouseX >= px && ui.mouseX <= px + pw && ui.mouseY >= py && ui.mouseY <= py + ph) {
             targetScrollOffset = Math.max(0f,
                     Math.min(targetScrollOffset - (float) delta * 24f, maxScroll));
@@ -658,11 +745,42 @@ public final class EmoteEditor {
             saveEmote();
             return true;
         }
+        if (key == GLFW.GLFW_KEY_Z && UiInput.ctrl(mods)) {
+            if (UiInput.shift(mods)) redo(); else undo();
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_Y && UiInput.ctrl(mods)) {
+            redo();
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_C && UiInput.ctrl(mods)) {
+            copyKeyframe();
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_V && UiInput.ctrl(mods)) {
+            if (!copiedPose.isEmpty()) { pushUndo(); pasteKeyframe(); }
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_M) {
+            mirrorPose();
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT) {
+            jumpToKeyframe(key == GLFW.GLFW_KEY_RIGHT);
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN) {
+            Bone[] bones = Bone.values();
+            int idx = selectedBone.ordinal() + (key == GLFW.GLFW_KEY_DOWN ? 1 : -1);
+            selectedBone = bones[(idx + bones.length) % bones.length];
+            return true;
+        }
         if (key == GLFW.GLFW_KEY_SPACE) {
             togglePlay();
             return true;
         }
         if (key == GLFW.GLFW_KEY_K) {
+            pushUndo();
             setKeyframe();
             return true;
         }
@@ -672,7 +790,7 @@ public final class EmoteEditor {
             return true;
         }
         if (key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) {
-            deleteKeyframe();
+            if (selectedKeyframeTime != null) { pushUndo(); deleteKeyframe(); }
             return true;
         }
         return false;
@@ -698,16 +816,23 @@ public final class EmoteEditor {
     }
 
     private void changeDuration(float delta) {
+        float oldDuration = duration;
         duration = Math.max(0.5f, Math.min(10f, Math.round((duration + delta) * 4f) / 4f));
+        if (oldDuration <= 0f || Math.abs(oldDuration - duration) < 1.0E-4f) return;
+        // Keyframes proportional mitskalieren. Vorher wurden sie auf die neue Dauer geclampt,
+        // wodurch mehrere Keyframes auf derselben Zeit landeten und sich gegenseitig überschrieben.
+        float scale = duration / oldDuration;
         for (Bone bone : Bone.values()) {
             NavigableMap<Float, float[]> map = keyframes.get(bone);
             TreeMap<Float, float[]> moved = new TreeMap<>();
-            for (Map.Entry<Float, float[]> e : map.entrySet()) moved.put(Math.min(e.getKey(), duration), e.getValue());
+            for (Map.Entry<Float, float[]> e : map.entrySet()) {
+                moved.put(quantizeTime(Math.min(duration, e.getKey() * scale)), e.getValue());
+            }
             map.clear();
             map.putAll(moved);
         }
-        currentTime = Math.min(currentTime, duration);
-        if (selectedKeyframeTime != null) selectedKeyframeTime = Math.min(selectedKeyframeTime, duration);
+        currentTime = Math.min(duration, currentTime * scale);
+        if (selectedKeyframeTime != null) selectedKeyframeTime = quantizeTime(Math.min(duration, selectedKeyframeTime * scale));
     }
 
     private void saveEmote() {
@@ -744,23 +869,173 @@ public final class EmoteEditor {
     private void updateDraggedSlider() {
         if (draggingSlider < 0 || draggingSlider >= CHANNEL_COUNT) return;
 
+        // Gleiche Geometrie wie drawSlider(): Spur beginnt bei px+10 und ist pw-20 breit
+        // (vorher px+20 / pw-40 -> Knopf saß nicht unter der Maus).
         float px = 10f, pw = 230f;
         float min = draggingSlider < 3 ? -180f : -10f;
         float max = draggingSlider < 3 ? 180f : 10f;
         float pct = Math.max(0f, Math.min(1f,
-                (ui.mouseX - (px + 20f)) / (pw - 40f)));
+                (ui.mouseX - (px + 10f)) / (pw - 20f)));
         float newValue = min + pct * (max - min);
+        boolean fine = UiInput.keyDown(GLFW.GLFW_KEY_LEFT_SHIFT) || UiInput.keyDown(GLFW.GLFW_KEY_RIGHT_SHIFT);
+        float step = draggingSlider < 3 ? (fine ? 0.5f : 1f) : (fine ? 0.01f : 0.05f);
+        newValue = Math.round(newValue / step) * step;
 
-        boneTransforms.get(selectedBone)[draggingSlider] = newValue;
+        applySliderValue(draggingSlider, newValue);
+    }
 
-        if (selectedKeyframeTime != null) {
-            float[] data = keyframes.get(selectedBone).get(selectedKeyframeTime);
-            if (data != null) {
-                data[draggingSlider] = newValue;
-            } else {
-                keyframes.get(selectedBone).put(selectedKeyframeTime, boneTransforms.get(selectedBone).clone());
+    /** Setzt einen Kanal des gewählten Bones und schreibt ihn in den passenden Keyframe. */
+    private void applySliderValue(int channel, float value) {
+        boneTransforms.get(selectedBone)[channel] = value;
+
+        Float keyTime = selectedKeyframeTime;
+        if (keyTime == null) {
+            Float onKey = keyAt(currentTime);
+            if (onKey != null) keyTime = onKey;
+            else if (autoKey) {
+                setKeyframe(); // legt Keyframe für alle Bones an der Abspielposition an
+                keyTime = selectedKeyframeTime;
             }
         }
+        if (keyTime != null) {
+            float[] data = keyframes.get(selectedBone).get(keyTime);
+            if (data != null) {
+                data[channel] = value;
+            } else {
+                keyframes.get(selectedBone).put(keyTime, boneTransforms.get(selectedBone).clone());
+            }
+        }
+    }
+
+    /** Index des Sliders unter der Maus, -1 wenn keiner. */
+    private int sliderAtMouse() {
+        float px = 10f, py = 52f, pw = 230f, ph = ui.height() - 142f;
+        if (!(ui.mouseX >= px && ui.mouseX <= px + pw && ui.mouseY >= py && ui.mouseY <= py + ph)) return -1;
+        float startY = py + 12f - scrollOffset + 20f;
+        float sliderStartY = startY + Bone.values().length * 30f + 34f;
+        for (int i = 0; i < CHANNEL_COUNT; i++) {
+            if (ui.hovered(px + 10f, sliderStartY + i * 40f, pw - 20f, 32f)) return i;
+        }
+        return -1;
+    }
+
+    private Float keyAt(float time) {
+        for (Bone bone : Bone.values()) {
+            for (Float t : keyframes.get(bone).keySet()) {
+                if (Math.abs(t - time) < 0.0015f) return t;
+            }
+        }
+        return null;
+    }
+
+    private boolean isKeyTimeOccupied(float time) {
+        for (Bone bone : Bone.values()) {
+            for (Float t : keyframes.get(bone).keySet()) {
+                if (Math.abs(t - time) < 0.0005f && !t.equals(selectedKeyframeTime)) return true;
+            }
+        }
+        return false;
+    }
+
+    private void jumpToKeyframe(boolean forward) {
+        TreeSet<Float> times = new TreeSet<>();
+        for (Bone bone : Bone.values()) times.addAll(keyframes.get(bone).keySet());
+        if (times.isEmpty()) return;
+        Float next = forward ? times.higher(currentTime + 0.0005f) : times.lower(currentTime - 0.0005f);
+        if (next == null) next = forward ? times.first() : times.last();
+        isPlaying = false;
+        currentTime = next;
+        selectedKeyframeTime = next;
+        evaluateAllBones();
+    }
+
+    // ── Mirror ──────────────────────────────────────────────────────────────
+
+    private static Bone mirrorOf(Bone b) {
+        return switch (b) {
+            case RIGHT_ARM -> Bone.LEFT_ARM;
+            case LEFT_ARM -> Bone.RIGHT_ARM;
+            case RIGHT_LEG -> Bone.LEFT_LEG;
+            case LEFT_LEG -> Bone.RIGHT_LEG;
+            case RIGHT_ELBOW -> Bone.LEFT_ELBOW;
+            case LEFT_ELBOW -> Bone.RIGHT_ELBOW;
+            case RIGHT_KNEE -> Bone.LEFT_KNEE;
+            case LEFT_KNEE -> Bone.RIGHT_KNEE;
+            default -> b;
+        };
+    }
+
+    /** Spiegelung an der Körpermitte: Rot Y/Z und Pos X negieren. */
+    private static float[] mirrorValues(float[] v) {
+        float[] m = v.clone();
+        m[1] = -m[1];
+        m[2] = -m[2];
+        m[3] = -m[3];
+        return m;
+    }
+
+    /** Spiegelt die Pose links/rechts – im ausgewählten Keyframe bzw. in der aktuellen Pose. */
+    private void mirrorPose() {
+        pushUndo();
+        Float keyTime = selectedKeyframeTime != null ? selectedKeyframeTime : keyAt(currentTime);
+
+        Map<Bone, float[]> src = new EnumMap<>(Bone.class);
+        for (Bone b : Bone.values()) src.put(b, boneTransforms.get(b).clone());
+        for (Bone b : Bone.values()) {
+            float[] mirrored = mirrorValues(src.get(mirrorOf(b)));
+            System.arraycopy(mirrored, 0, boneTransforms.get(b), 0, CHANNEL_COUNT);
+        }
+        if (keyTime != null) {
+            for (Bone b : Bone.values()) keyframes.get(b).put(keyTime, boneTransforms.get(b).clone());
+        } else if (autoKey) {
+            setKeyframe();
+        }
+        setStatus("Pose mirrored");
+    }
+
+    // ── Undo / Redo ─────────────────────────────────────────────────────────
+
+    private Snapshot snapshot() {
+        Map<Bone, TreeMap<Float, float[]>> copy = new EnumMap<>(Bone.class);
+        for (Bone b : Bone.values()) {
+            TreeMap<Float, float[]> m = new TreeMap<>();
+            for (Map.Entry<Float, float[]> e : keyframes.get(b).entrySet()) m.put(e.getKey(), e.getValue().clone());
+            copy.put(b, m);
+        }
+        return new Snapshot(copy, duration, selectedKeyframeTime);
+    }
+
+    private void restore(Snapshot snap) {
+        for (Bone b : Bone.values()) {
+            NavigableMap<Float, float[]> map = keyframes.get(b);
+            map.clear();
+            for (Map.Entry<Float, float[]> e : snap.keys().get(b).entrySet()) map.put(e.getKey(), e.getValue().clone());
+        }
+        duration = snap.duration();
+        selectedKeyframeTime = snap.selected();
+        currentTime = Math.min(currentTime, duration);
+        evaluateAllBones();
+    }
+
+    /** Vor jeder Änderung aufrufen. */
+    private void pushUndo() {
+        undoStack.push(snapshot());
+        while (undoStack.size() > HISTORY_LIMIT) undoStack.removeLast();
+        redoStack.clear();
+    }
+
+    private void undo() {
+        if (undoStack.isEmpty()) { setStatus("Nothing to undo"); return; }
+        redoStack.push(snapshot());
+        restore(undoStack.pop());
+        setStatus("Undo");
+    }
+
+    private void redo() {
+        if (redoStack.isEmpty()) { setStatus("Nothing to redo"); return; }
+        undoStack.push(snapshot());
+        restore(redoStack.pop());
+        setStatus("Redo");
     }
 
     private void updateTimelineFromMouse() {
@@ -864,4 +1139,4 @@ public final class EmoteEditor {
     private float lerp(float a, float b, float f) {
         return a + f * (b - a);
     }
-}
+}

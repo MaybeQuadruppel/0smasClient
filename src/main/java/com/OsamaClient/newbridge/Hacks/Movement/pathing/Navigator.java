@@ -35,6 +35,8 @@ public final class Navigator {
     private final Map<String, NavigationJob> jobs = new LinkedHashMap<>();
 
     private NavigationJob activeJob;
+    /** Welt, in der die Jobs entstanden sind: bei Welt-/Server-Wechsel sind alle Ziele ungültig. */
+    private Object jobLevel;
 
     private Navigator() {}
 
@@ -85,6 +87,17 @@ public final class Navigator {
         }
     }
 
+    private void dropAllJobs(Minecraft mc) {
+        for (NavigationJob job : jobs.values().toArray(NavigationJob[]::new)) {
+            jobs.remove(job.owner);
+            if (job == activeJob) {
+                executor.stop(mc);
+                activeJob = null;
+            }
+            complete(job, false);
+        }
+    }
+
     public boolean isNavigating(String owner) {
         return jobs.containsKey(owner);
     }
@@ -105,7 +118,13 @@ public final class Navigator {
         if (mc.player == null || mc.level == null) {
             if (activeJob != null) executor.stop(mc);
             activeJob = null;
+            if (!jobs.isEmpty()) dropAllJobs(mc);
+            jobLevel = null;
             return;
+        }
+        if (jobLevel != mc.level) {
+            if (jobLevel != null && !jobs.isEmpty()) dropAllJobs(mc); // Koordinaten gehören zur alten Welt
+            jobLevel = mc.level;
         }
 
         selectJob(mc);

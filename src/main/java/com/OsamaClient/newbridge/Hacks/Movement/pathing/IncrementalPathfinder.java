@@ -19,7 +19,6 @@ public final class IncrementalPathfinder {
 
     private static final double MIN_IMPROVEMENT = 0.01;
     private static final int    MAX_TOTAL_ITERATIONS = 100_000;
-    private static final int    PATH_CLEARANCE_SQ = 2 * 2;
 
     private final Minecraft mc;
     private final Goal      goal;
@@ -34,6 +33,9 @@ public final class IncrementalPathfinder {
     public IncrementalPathfinder(Minecraft mc, BlockPos start, Goal goal) {
         this.mc   = mc;
         this.goal = goal;
+
+        // Werkzeug-/Abbauzeit-Cache pro Suche neu aufbauen (Inventar kann sich geändert haben)
+        BlockHelper.beginSearch();
 
         this.openSet = new BinaryHeapOpenSet();
         this.nodeMap = new Long2ObjectOpenHashMap<>(4096, 0.75f);
@@ -76,7 +78,6 @@ public final class IncrementalPathfinder {
 
                 BlockPos dp       = res.dest;
                 if (MoveBlacklist.isBlocked(current.x, current.y, current.z, dp.getX(), dp.getY(), dp.getZ())) continue;
-                if (isTooCloseToEarlierPath(current, dp)) continue;
                 PathNode neighbor = getOrCreate(dp.getX(), dp.getY(), dp.getZ());
 
                 double tentativeCost = current.cost + res.cost;
@@ -102,6 +103,12 @@ public final class IncrementalPathfinder {
         }
 
         return null; // still running
+    }
+
+    /** Stops the search and returns the best (partial) path found so far. */
+    public PathResult finishNow() {
+        done = true;
+        return buildResult();
     }
 
     private PathResult buildResult() {
@@ -144,20 +151,5 @@ public final class IncrementalPathfinder {
             nodeMap.put(hash, node);
         }
         return node;
-    }
-
-    private boolean isTooCloseToEarlierPath(PathNode current, BlockPos candidate) {
-        PathNode earlier = current.previous;
-        int ignoredRecentNodes = 0;
-        while (earlier != null) {
-            if (ignoredRecentNodes++ >= 2) {
-                int dx = candidate.getX() - earlier.x;
-                int dy = candidate.getY() - earlier.y;
-                int dz = candidate.getZ() - earlier.z;
-                if (dx * dx + dy * dy + dz * dz <= PATH_CLEARANCE_SQ) return true;
-            }
-            earlier = earlier.previous;
-        }
-        return false;
     }
 }

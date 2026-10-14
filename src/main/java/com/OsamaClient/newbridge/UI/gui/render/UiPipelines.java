@@ -45,6 +45,8 @@ public final class UiPipelines {
 
     public static RenderPipeline SDF;
     public static RenderPipeline TEXT;
+    /** RGBA-Bilder (Minimap usw.). */
+    public static RenderPipeline IMAGE;
     /** Blur down/up passes into our own textures (no blending). */
     public static RenderPipeline BLUR;
     /** Final blur pass onto the main target, blended with the open-animation alpha. */
@@ -72,6 +74,19 @@ public final class UiPipelines {
                 .withLocation(id("pipeline/ui_text"))
                 .withVertexShader(id("core/ui_text"))
                 .withFragmentShader(id("core/ui_text"))
+                .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+                .withVertexBinding(0, TEXT_FORMAT)
+                .withPrimitiveTopology(PrimitiveTopology.QUADS)
+                .withDepthStencilState(Optional.empty())
+                .withCull(false)
+                .build());
+
+        IMAGE = RenderPipelines.register(RenderPipeline.builder(RenderPipelines.GLOBALS_SNIPPET)
+                .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+                .withLocation(id("pipeline/ui_image"))
+                .withVertexShader(id("core/ui_text"))
+                .withFragmentShader(id("core/ui_image"))
                 .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
                 .withVertexBinding(0, TEXT_FORMAT)
                 .withPrimitiveTopology(PrimitiveTopology.QUADS)

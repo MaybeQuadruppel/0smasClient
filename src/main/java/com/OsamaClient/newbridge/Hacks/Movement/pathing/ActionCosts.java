@@ -13,7 +13,9 @@ public interface ActionCosts {
     double WALK_ONE_BLOCK_COST     = 20.0 / 4.317;   // ~4.633
     double SPRINT_ONE_BLOCK_COST   = 20.0 / 5.612;   // ~3.564
     double WALK_ONE_IN_WATER_COST  = 20.0 / 2.2;     // ~9.091
-    public static final double FALLING_BLOCK_PENALTY = 50.0;
+    double SQRT_2                  = Math.sqrt(2.0);
+    double WALK_DIAGONAL_COST      = WALK_ONE_BLOCK_COST * SQRT_2;
+    double FALLING_BLOCK_PENALTY   = 50.0;
     // Jump: from Baritone's distanceToTicks math
     double FALL_1_25_BLOCKS_COST   = distanceToTicks(1.25);
     double FALL_0_25_BLOCKS_COST   = distanceToTicks(0.25);
@@ -22,6 +24,16 @@ public interface ActionCosts {
     double WATER_PENALTY           = WALK_ONE_IN_WATER_COST * 3.0;
     double MINING_OVERHEAD         = WALK_ONE_BLOCK_COST * 2.0;
     double CARVED_TUNNEL_PENALTY   = WALK_ONE_BLOCK_COST * 8.0;
+
+    /**
+     * Extra cost for placing a block under yourself (pillar). Deliberately high so a
+     * normal jump onto a 1-block step is always preferred; pillaring is only used when
+     * there is no step to jump on.
+     */
+    double PLACE_BLOCK_COST        = 20.0;
+
+    /** Maximum height the bot drops down in one move (3 = no fall damage). */
+    int MAX_FALL_HEIGHT            = 3;
 
     /**
      * Converts fall distance to ticks using Minecraft's velocity formula.

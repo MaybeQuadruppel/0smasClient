@@ -93,6 +93,16 @@ public class ModuleManager {
         modules.add(new Parkour());
         modules.add(new AutoRespawn());
         modules.add(new AutoTool());
+        modules.add(new WallHit());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.Profiles());
+        modules.add(new Waypoints());
+        modules.add(new Breadcrumbs());
+        modules.add(new Fullbox());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.minimap.Minimap());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Player.AutoArmor());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Misc.stash.StashLogger());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.macro.Macros());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Player.AutoLog());
 
 
 

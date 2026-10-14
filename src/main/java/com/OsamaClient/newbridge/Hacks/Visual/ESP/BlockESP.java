@@ -41,9 +41,10 @@ public class BlockESP extends Module {
 
     private final BlockPicker blockPicker;
     private int tickCounter = 0;
-    private boolean isScanning = false;
+    private volatile boolean isScanning = false;
 
-    private final List<RenderBox> renderBoxes = new CopyOnWriteArrayList<>();
+    /** Wird vom Scan-Thread komplett ausgetauscht (kein Leeren/Befüllen -> kein Flackern, kein Race). */
+    private volatile List<RenderBox> renderBoxes = List.of();
 
     public BlockESP() {
         super("BlockESP", "Look-Up Blocks with Chams", Category.VISUAL);
@@ -66,7 +67,7 @@ public class BlockESP extends Module {
         if (client.level == null || client.player == null || !this.enabled) return;
 
         if (blockPicker.selectedBlocks.isEmpty()) {
-            renderBoxes.clear();
+            renderBoxes = List.of();
             return;
         }
 
@@ -78,8 +79,8 @@ public class BlockESP extends Module {
         int pZ = client.player.chunkPosition().z();
         int radius = (int) rangeInChunks;
 
-        new Thread(() -> {
-            isScanning = true;
+        isScanning = true;
+        Thread scanner = new Thread(() -> {
             try {
                 List<RenderBox> found = new ArrayList<>();
 
@@ -91,14 +92,15 @@ public class BlockESP extends Module {
                         }
                     }
                 }
-                renderBoxes.clear();
-                renderBoxes.addAll(found);
+                renderBoxes = found;
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
                 isScanning = false;
             }
-        }).start();
+        }, "newbridge-blockesp-scan");
+        scanner.setDaemon(true);
+        scanner.start();
     }
 
     private void scanChunk(ClientLevel level, LevelChunk chunk, List<RenderBox> found) {
@@ -308,4 +310,4 @@ public class BlockESP extends Module {
     }
 
     private record RenderBox(AABB bounds, int argb) {}
-}
+}

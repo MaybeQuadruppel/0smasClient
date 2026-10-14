@@ -43,14 +43,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
+import java.util.*;
 
 public class PlayerESP extends Module {
     public static PlayerESP INSTANCE;
@@ -63,16 +56,9 @@ public class PlayerESP extends Module {
     public String renderMode = "Both";
     public boolean renderTracers = false;
     public boolean distanceColors = false;
-    /** Färbt Fill/Outline eines Ziels komplett in {@link #occludedColor} ein, sobald kein Sample-Punkt
-     *  des Ziels ein freies Block-Raycast zur Kamera hat (siehe {@link #isTargetVisible}) - sonst normale
-     *  Ziel-Farbe. Reines Block-Raycast statt GPU-Depth-Test, damit ein Ziel nie durch seinen eigenen
-     *  Körper "verdeckt" erscheinen kann. Wirkt nur auf Fill/Outline, nicht auf Skeleton/Tracer. */
     public boolean splitVisibility = false;
+    public boolean teamColorOverride = true; // NEU: Steuert, ob Teamfarben invertiert/überschrieben werden
     public final ColorPicker occludedColor = new ColorPicker("Occluded Color", 0xFFFF3B3B, null);
-    /** Günstige "Fake-Glow"-Halo statt echtem Bloom/Post-Processing: siehe {@link #line}-Overload
-     *  weiter unten - zieht dieselbe Linie mehrfach mit wachsender Breite/sinkender Deckkraft.
-     *  Wirkt auf alle Linien-Draws dieses Moduls (Outline-Box, Skeleton, Tracer), egal ob
-     *  {@link #splitVisibility} an oder aus ist, weil alle davon durch denselben Low-Level-Aufruf laufen. */
     public boolean glow = false;
     public double glowStrength = 1.0;
     public EntityFilterPicker targetPicker;
@@ -82,8 +68,8 @@ public class PlayerESP extends Module {
     private final List<Entity> targets = new ArrayList<>();
     private int[] targetColors = new int[64];
     private static final Map<Entity, LivingEntityRenderState> STATE_CACHE = new WeakHashMap<>();
-    private static final Map<ModelPart, Map<String, ModelPart>> CHILDREN_CACHE = new WeakHashMap<>();
-    private static final Map<ModelPart, Vector3f> LOCAL_CENTER_CACHE = new WeakHashMap<>();
+    private static final Map<ModelPart, Map<String, ModelPart>> CHILDREN_CACHE = new IdentityHashMap<>();
+    private static final Map<ModelPart, Vector3f> LOCAL_CENTER_CACHE = new IdentityHashMap<>();
     private static final Map<String, Boolean> OVERLAY_CACHE = new HashMap<>();
 
     private static final PoseStack CALC_STACK = new PoseStack();
@@ -135,16 +121,19 @@ public class PlayerESP extends Module {
         this.settings.add(new ToggleButton("Distance Colors", distanceColors, val -> distanceColors = val)
                 .withDescription("Uses distance-based colors for all ESP modes."));
 
+        this.settings.add(new ToggleButton("Team Color Override", teamColorOverride, val -> teamColorOverride = val)
+                .withDescription("Inverts ESP colors for teammates."));
+
         this.settings.add(new ToggleButton("Tracers", renderTracers, val -> renderTracers = val)
                 .withDescription("Draws tracer lines to entities."));
 
         this.settings.add(new ToggleButton("Split Visibility", splitVisibility, val -> splitVisibility = val)
-                .withDescription("Fill/Outline: shows the part of a target you actually have line of sight to in its normal color, and the part hidden behind terrain in \"Occluded Color\" - instead of always drawing fully see-through."));
+                .withDescription("Splits every line/face exactly where terrain blocks the view: visible part in normal color, hidden part in occluded color. Entities never count as obstacles."));
         this.settings.add(occludedColor
-                .withDescription("Color for the part of the hitbox currently blocked by terrain (only with \"Split Visibility\")."));
+                .withDescription("Color for the part of the hitbox blocked by terrain."));
 
         this.settings.add(new ToggleButton("Glow", glow, val -> glow = val)
-                .withDescription("Adds a soft glow halo around all ESP lines (Outline, Skeleton, Tracers)."));
+                .withDescription("Adds a soft glow halo around all ESP lines."));
         this.settings.add(new Slider("Glow Strength", 0.0, 3.0, glowStrength, val -> glowStrength = val)
                 .withDescription("How strong/wide the glow halo is."));
 
@@ -172,39 +161,18 @@ public class PlayerESP extends Module {
 
         float tickDelta = event.getTickDelta();
 
-        boolean drawFill = (renderMode.equals("Fill") || renderMode.equals("Both")) && !renderMode.equals("None");
-        boolean drawOutline = (renderMode.equals("Outline") || renderMode.equals("Both")) && !renderMode.equals("None");
+        boolean drawFill = renderMode.equals("Fill") || renderMode.equals("Both");
+        boolean drawOutline = renderMode.equals("Outline") || renderMode.equals("Both");
         boolean drawSkeleton = renderMode.equals("Skeleton");
 
         collectTargets(client);
         if (targets.isEmpty()) return;
 
-        // Split Visibility: ob ein Ziel "sichtbar" oder "verdeckt" ist, wird jetzt per reinem
-        // Block-Raycast (Level#clip) entschieden statt per GPU-Depth-Test gegen den fertigen
-        // Depth-Buffer. Der Depth-Test-Ansatz (HitboxChamsPipeline) konnte strukturell nicht
-        // zwischen "von einer Wand verdeckt" und "vom eigenen Körper verdeckt" unterscheiden - die
-        // Rückseite der Box liegt aus Kamerasicht IMMER hinter der eigenen Körper-Vorderseite, ganz
-        // unabhängig von echten Wänden. Level#clip kennt gar keine Entities und kann daher nie am
-        // eigenen Modell "hängen bleiben".
-        boolean[] targetVisible = null;
-        if (splitVisibility && (drawFill || drawOutline)) {
-            try {
-                targetVisible = new boolean[targets.size()];
-                Vec3 eye = new Vec3(camX, camY, camZ);
-                for (int i = 0; i < targets.size(); i++) {
-                    targetVisible[i] = isTargetVisible(client.level, eye, targets.get(i), tickDelta, client.player);
-                }
-            } catch (RuntimeException e) {
-                // a broken raycast must never take the whole ESP down with it - fail open (draw
-                // everyone in their normal color this frame) instead of rendering nothing at all
-                if (!loggedVisibilityError) {
-                    loggedVisibilityError = true;
-                    LOG.error("Split Visibility raycast failed, falling back to normal colors", e);
-                }
-                targetVisible = null;
-            }
-        }
-        boolean[] visibleFlags = targetVisible;
+        // Split Visibility: jede Kante / Flaeche wird einzeln gegen Bloecke geraycastet.
+        // Entities zaehlen dabei nie als Hindernis (ClipContext prueft nur Block-Kollision).
+        boolean split = splitVisibility && !renderMode.equals("None");
+        beginSplitFrame(split ? client.level : null, camX, camY, camZ, client.player);
+        int occColor = occludedColor.getColor() | 0xFF000000;
 
         float startX = 0f, startY = 0f, startZ = 0f;
         if (renderTracers) {
@@ -223,40 +191,35 @@ public class PlayerESP extends Module {
         }
 
         try {
-            // --- SCHLEIFE 1: FILLS ---
+            // --- FILLS ---
             if (drawFill) {
                 VertexConsumer fillConsumer = bufferSource.getBuffer(RenderTypes.storageEspFillSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
                     Entity living = targets.get(i);
-                    int color;
-                    if (Trajectories.targetedEntity == living) {
-                        color = 0x80FF0000;
-                    } else if (visibleFlags != null && !visibleFlags[i]) {
-                        color = halfAlpha(occludedColor.getColor() | 0xFF000000);
-                    } else {
-                        color = halfAlpha(targetColors[i]);
-                    }
-                    renderRotatedBox(poseStack, fillConsumer, living, tickDelta, camX, camY, camZ, color, true, (float) outlineWidth);
+                    this.split.beginTape(living.getId() * 4);
+                    renderRotatedBox(poseStack, fillConsumer, living, tickDelta, camX, camY, camZ,
+                            halfAlpha(targetColors[i]), halfAlpha(occColor), true, (float) outlineWidth);
+                    this.split.endTape();
                 }
             }
 
-            // --- SCHLEIFE 2: OUTLINES ---
+            // --- OUTLINES ---
             if (drawOutline) {
                 VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
                     Entity living = targets.get(i);
-                    int color = (visibleFlags != null && !visibleFlags[i])
-                            ? (occludedColor.getColor() | 0xFF000000)
-                            : targetColors[i];
-                    renderRotatedBox(poseStack, lineConsumer, living, tickDelta, camX, camY, camZ, color, false, (float) outlineWidth);
+                    this.split.beginTape(living.getId() * 4 + 1);
+                    renderRotatedBox(poseStack, lineConsumer, living, tickDelta, camX, camY, camZ,
+                            targetColors[i], occColor, false, (float) outlineWidth);
+                    this.split.endTape();
                 }
             }
 
-            // --- SCHLEIFE 3: SKELETON ---
+            // --- SKELETON ---
             if (drawSkeleton) {
                 VertexConsumer lineConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
-                    if (!(targets.get(i) instanceof LivingEntity living)) continue; // skeleton needs a living model
+                    if (!(targets.get(i) instanceof LivingEntity living)) continue;
                     int color = targetColors[i];
                     EntityRenderer<?, ?> renderer = client.getEntityRenderDispatcher().getRenderer(living);
                     if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> livingRenderer)) continue;
@@ -290,11 +253,14 @@ public class PlayerESP extends Module {
                     Matrix4f matrix = poseStack.last().pose();
                     Matrix3f normalMatrix = poseStack.last().normal();
 
+                    skeletonOccColor = occColor;
+                    this.split.beginTape(living.getId() * 4 + 2);
                     renderSkeletonPart(calcStack, "root", model.root(), lineConsumer, matrix, normalMatrix, color, (float) outlineWidth, null);
+                    this.split.endTape();
                 }
             }
 
-            // --- SCHLEIFE 4: TRACERS ---
+            // --- TRACERS ---
             if (renderTracers) {
                 VertexConsumer tracerConsumer = bufferSource.getBuffer(RenderTypes.storageEspLinesSeeThrough());
                 for (int i = 0; i < targets.size(); i++) {
@@ -315,17 +281,12 @@ public class PlayerESP extends Module {
                 }
             }
         } finally {
-            // Immer hochladen & den Frame abschließen, auch wenn ein Pass (z.B. Skeleton
-            // bei einem Mod-Renderer) eine Exception wirft. Sonst stapeln sich die
-            // Draws im Buffer jeden Frame weiter an.
             bufferSource.uploadAndDraw();
             targets.clear();
+            beginSplitFrame(null, 0, 0, 0, null);
         }
     }
 
-    // Sammelt die Ziele EINMAL pro Frame. Vorher lief jeder Pass (Fill/Outline/
-    // Skeleton/Tracer) erneut über alle Entities und rief pro Entity jedes Mal
-    // TeamUtils.isTeammate() auf, das Display-Names/Components neu aufbaut.
     private void collectTargets(Minecraft client) {
         targets.clear();
         for (Entity entity : client.level.entitiesForRendering()) {
@@ -344,12 +305,11 @@ public class PlayerESP extends Module {
             if (targets.size() == targetColors.length) {
                 targetColors = Arrays.copyOf(targetColors, targetColors.length * 2);
             }
-            targetColors[targets.size()] = isTrajTarget ? 0xFFFF0000 : getEntityColor(client.player, entity, filterKey, 1.0f);
+            targetColors[targets.size()] = getEntityColor(client.player, entity, filterKey, 1.0f);
             targets.add(entity);
         }
     }
 
-    // Entspricht getEntityColor(..., 0.5f): halbiert nur den Alpha-Kanal.
     private static int halfAlpha(int argb) {
         return (((argb >>> 24) >> 1) << 24) | (argb & 0x00FFFFFF);
     }
@@ -362,7 +322,8 @@ public class PlayerESP extends Module {
             color = getAdjustedColor(targetPicker.getColor(target.getType(), filterKey), alphaMultiplier);
         }
 
-        if (TeamUtils.isTeammate(target)) {
+        // Respektiert nun den Toggle-Status im UI!
+        if (teamColorOverride && TeamUtils.isTeammate(target)) {
             color = invertColor(color);
         }
 
@@ -396,17 +357,17 @@ public class PlayerESP extends Module {
         }
 
         if (parentPos != null && parentPos.distanceToSqr(currentPivot) > 1.0E-4) {
-            line(baseMatrix, normalMatrix, consumer,
+            segLine(baseMatrix, normalMatrix, consumer,
                     (float) parentPos.x, (float) parentPos.y, (float) parentPos.z,
                     (float) currentPivot.x, (float) currentPivot.y, (float) currentPivot.z,
-                    color, lineWidth);
+                    color, skeletonOccColor, lineWidth);
         }
 
         if (currentPivot.distanceToSqr(currentCenter) > 1.0E-4) {
-            line(baseMatrix, normalMatrix, consumer,
+            segLine(baseMatrix, normalMatrix, consumer,
                     (float) currentPivot.x, (float) currentPivot.y, (float) currentPivot.z,
                     (float) currentCenter.x, (float) currentCenter.y, (float) currentCenter.z,
-                    color, lineWidth);
+                    color, skeletonOccColor, lineWidth);
         }
 
         Vec3 nextParentPos = (currentCenter != currentPivot) ? currentCenter : currentPivot;
@@ -524,7 +485,28 @@ public class PlayerESP extends Module {
         return (a << 24) | (r << 16) | (g << 8) | 0;
     }
 
-    private void renderRotatedBox(PoseStack poseStack, VertexConsumer consumer, Entity entity, float tickDelta, double camX, double camY, double camZ, int color, boolean isFill, float lineWidth) {
+    // Ecken-Indizes: bit0 = x2, bit1 = y2, bit2 = z2
+    private static final int[][] BOX_FACES = {
+            {0, 1, 5, 4}, // unten  (0,-1,0)
+            {6, 7, 3, 2}, // oben   (0, 1,0)
+            {0, 2, 3, 1}, // Nord   (0,0,-1)
+            {5, 7, 6, 4}, // Sued   (0,0, 1)
+            {4, 6, 2, 0}, // West   (-1,0,0)
+            {1, 3, 7, 5}  // Ost    ( 1,0,0)
+    };
+    private static final float[][] BOX_FACE_NORMALS = {
+            {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}
+    };
+    private static final int[][] BOX_EDGES = {
+            {0, 1}, {1, 5}, {5, 4}, {4, 0},
+            {2, 3}, {3, 7}, {7, 6}, {6, 2},
+            {0, 2}, {1, 3}, {5, 7}, {4, 6}
+    };
+    private final float[] cornerBuf = new float[24];
+
+    private void renderRotatedBox(PoseStack poseStack, VertexConsumer consumer, Entity entity, float tickDelta,
+                                  double camX, double camY, double camZ, int color, int occColor,
+                                  boolean isFill, float lineWidth) {
         double x = Mth.lerp(tickDelta, entity.xo, entity.getX()) - camX;
         double y = Mth.lerp(tickDelta, entity.yo, entity.getY()) - camY;
         double z = Mth.lerp(tickDelta, entity.zo, entity.getZ()) - camZ;
@@ -533,23 +515,122 @@ public class PlayerESP extends Module {
         float h = entity.getBbHeight();
         float yaw = entity instanceof LivingEntity le ? Mth.lerp(tickDelta, le.yBodyRotO, le.yBodyRot) : 0f;
 
-        poseStack.pushPose();
-        poseStack.translate(x, y, z);
-        poseStack.mulPose(Axis.YP.rotationDegrees(-yaw));
+        // Ecken direkt kamera-relativ berechnen (gleiche Rotation wie vorher Axis.YP.rotationDegrees(-yaw)),
+        // damit wir fuer Split-Visibility echte Weltpositionen raycasten koennen.
+        float rad = (float) Math.toRadians(-yaw);
+        float cos = Mth.cos(rad), sin = Mth.sin(rad);
+        float[] c = cornerBuf;
+        for (int i = 0; i < 8; i++) {
+            float lx = (i & 1) != 0 ? w : -w;
+            float ly = (i & 2) != 0 ? h : 0f;
+            float lz = (i & 4) != 0 ? w : -w;
+            c[i * 3] = (float) x + lx * cos + lz * sin;
+            c[i * 3 + 1] = (float) y + ly;
+            c[i * 3 + 2] = (float) z - lx * sin + lz * cos;
+        }
 
         Matrix4f matrix = poseStack.last().pose();
         Matrix3f normalMatrix = poseStack.last().normal();
 
-        float x1 = -w, y1 = 0f, z1 = -w;
-        float x2 = w, y2 = h, z2 = w;
-
         if (isFill) {
-            renderFilledBox(matrix, normalMatrix, consumer, x1, y1, z1, x2, y2, z2, color);
+            int a = (color >>> 24), r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
+            for (int f = 0; f < 6; f++) {
+                int[] q = BOX_FACES[f];
+                float[] ln = BOX_FACE_NORMALS[f];
+                float nx = ln[0] * cos + ln[2] * sin;
+                float nz = -ln[0] * sin + ln[2] * cos;
+                if (split.active()) {
+                    splitQuad(matrix, normalMatrix, consumer, c, q, nx, ln[1], nz, color, occColor);
+                } else {
+                    addQuad(matrix, normalMatrix, consumer,
+                            c[q[0] * 3], c[q[0] * 3 + 1], c[q[0] * 3 + 2],
+                            c[q[1] * 3], c[q[1] * 3 + 1], c[q[1] * 3 + 2],
+                            c[q[2] * 3], c[q[2] * 3 + 1], c[q[2] * 3 + 2],
+                            c[q[3] * 3], c[q[3] * 3 + 1], c[q[3] * 3 + 2],
+                            nx, ln[1], nz, r, g, b, a);
+                }
+            }
         } else {
-            renderBoxOutline(matrix, normalMatrix, consumer, x1, y1, z1, x2, y2, z2, color, lineWidth);
+            for (int[] e : BOX_EDGES) {
+                segLine(matrix, normalMatrix, consumer,
+                        c[e[0] * 3], c[e[0] * 3 + 1], c[e[0] * 3 + 2],
+                        c[e[1] * 3], c[e[1] * 3 + 1], c[e[1] * 3 + 2],
+                        color, occColor, lineWidth);
+            }
         }
+    }
 
-        poseStack.popPose();
+    // ===================== SPLIT VISIBILITY =====================
+    // Logik in SplitVisibility (headless testbar); hier nur das Zeichnen.
+
+    private final SplitVisibility split = new SplitVisibility();
+    private int skeletonOccColor;
+
+    private void beginSplitFrame(Level level, double camX, double camY, double camZ, Entity self) {
+        if (level == null) {
+            split.end();
+            return;
+        }
+        split.onError(() -> {
+            if (!loggedVisibilityError) {
+                loggedVisibilityError = true;
+                LOG.error("Split Visibility raycast failed, falling back to normal colors");
+            }
+        });
+        split.begin(level, self == null ? null : net.minecraft.world.phys.shapes.CollisionContext.of(self), camX, camY, camZ);
+    }
+
+    /** Zeichnet eine Linie; bei Split-Visibility wird sie an den Verdeckungsgrenzen zweifarbig geteilt. */
+    private void segLine(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
+                         float ax, float ay, float az, float bx, float by, float bz,
+                         int color, int occColor, float lineWidth) {
+        if (!split.active()) {
+            line(matrix, normalMatrix, consumer, ax, ay, az, bx, by, bz, color, lineWidth);
+            return;
+        }
+        float dx = bx - ax, dy = by - ay, dz = bz - az;
+        split.splitLine(ax, ay, az, bx, by, bz, (t0, t1, visible) ->
+                emitSegment(matrix, normalMatrix, consumer, ax, ay, az, dx, dy, dz, t0, t1,
+                        visible ? color : occColor, lineWidth));
+    }
+
+    private static void emitSegment(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
+                                    float ax, float ay, float az, float dx, float dy, float dz,
+                                    float t0, float t1, int color, float lineWidth) {
+        if (t1 - t0 < 1.0E-4f) return;
+        line(matrix, normalMatrix, consumer,
+                ax + dx * t0, ay + dy * t0, az + dz * t0,
+                ax + dx * t1, ay + dy * t1, az + dz * t1,
+                color, lineWidth);
+    }
+
+    /** Unterteilt eine Box-Flaeche in Zellen und faerbt jede Zelle nach ihrer Sichtbarkeit. */
+    private void splitQuad(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
+                           float[] c, int[] q, float nx, float ny, float nz, int color, int occColor) {
+        float p1x = c[q[0] * 3], p1y = c[q[0] * 3 + 1], p1z = c[q[0] * 3 + 2];
+        float ux = c[q[1] * 3] - p1x, uy = c[q[1] * 3 + 1] - p1y, uz = c[q[1] * 3 + 2] - p1z;
+        float vx = c[q[3] * 3] - p1x, vy = c[q[3] * 3 + 1] - p1y, vz = c[q[3] * 3 + 2] - p1z;
+        float uLen = (float) Math.sqrt(ux * ux + uy * uy + uz * uz);
+        float vLen = (float) Math.sqrt(vx * vx + vy * vy + vz * vz);
+
+        int ns = split.cellsFor(uLen), nt = split.cellsFor(vLen);
+        int vr = (color >> 16) & 0xFF, vg = (color >> 8) & 0xFF, vb = color & 0xFF, va = color >>> 24;
+        int or = (occColor >> 16) & 0xFF, og = (occColor >> 8) & 0xFF, ob = occColor & 0xFF, oa = occColor >>> 24;
+
+        for (int i = 0; i < ns; i++) {
+            float s0 = (float) i / ns, s1 = (float) (i + 1) / ns, sm = (s0 + s1) * 0.5f;
+            for (int j = 0; j < nt; j++) {
+                float t0 = (float) j / nt, t1 = (float) (j + 1) / nt, tm = (t0 + t1) * 0.5f;
+                boolean vis = split.cellVisible(p1x + ux * sm + vx * tm, p1y + uy * sm + vy * tm, p1z + uz * sm + vz * tm);
+                addQuad(matrix, normalMatrix, consumer,
+                        p1x + ux * s0 + vx * t0, p1y + uy * s0 + vy * t0, p1z + uz * s0 + vz * t0,
+                        p1x + ux * s1 + vx * t0, p1y + uy * s1 + vy * t0, p1z + uz * s1 + vz * t0,
+                        p1x + ux * s1 + vx * t1, p1y + uy * s1 + vy * t1, p1z + uz * s1 + vz * t1,
+                        p1x + ux * s0 + vx * t1, p1y + uy * s0 + vy * t1, p1z + uz * s0 + vz * t1,
+                        nx, ny, nz,
+                        vis ? vr : or, vis ? vg : og, vis ? vb : ob, vis ? va : oa);
+            }
+        }
     }
 
     private String getFilterKey(Entity entity) {
@@ -559,38 +640,6 @@ public class PlayerESP extends Module {
         if (entity instanceof Animal) return "Animals";
         if (entity instanceof Villager || entity instanceof WanderingTrader) return "NPCs";
         return null;
-    }
-
-    /**
-     * True if there is a clear block-only line of sight from {@code from} to {@code to} - entities are
-     * never considered, so this can never "hang" on the target's own body the way a GPU depth-test
-     * against the finished depth buffer would.
-     */
-    private boolean isVisible(Level level, Vec3 from, Vec3 to, Entity self) {
-        ClipContext ctx = new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, self);
-        BlockHitResult result = level.clip(ctx);
-        return result.getType() == HitResult.Type.MISS;
-    }
-
-    /**
-     * A target counts as visible if ANY of a few sample points on it (feet/middle/head) has a clear
-     * block-only line of sight - so a target only partially peeking out from behind cover still shows
-     * up in its normal color instead of flipping fully to "occluded".
-     */
-    private boolean isTargetVisible(Level level, Vec3 eye, Entity target, float tickDelta, Entity self) {
-        double x = Mth.lerp(tickDelta, target.xo, target.getX());
-        double y = Mth.lerp(tickDelta, target.yo, target.getY());
-        double z = Mth.lerp(tickDelta, target.zo, target.getZ());
-        float h = target.getBbHeight();
-        Vec3[] samples = {
-                new Vec3(x, y + h * 0.9, z),
-                new Vec3(x, y + h * 0.5, z),
-                new Vec3(x, y + h * 0.1, z)
-        };
-        for (Vec3 point : samples) {
-            if (isVisible(level, eye, point, self)) return true;
-        }
-        return false;
     }
 
     private int getAdjustedColor(int argb, float alphaMultiplier) {
@@ -607,20 +656,6 @@ public class PlayerESP extends Module {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    private static void renderFilledBox(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color) {
-        int a = (color >> 24) & 0xFF;
-        int r = (color >> 16) & 0xFF;
-        int g = (color >> 8) & 0xFF;
-        int b = color & 0xFF;
-
-        addQuad(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2, 0, -1, 0, r, g, b, a);
-        addQuad(matrix, normalMatrix, consumer, x1, y2, z2, x2, y2, z2, x2, y2, z1, x1, y2, z1, 0, 1, 0, r, g, b, a);
-        addQuad(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1, 0, 0, -1, r, g, b, a);
-        addQuad(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, x1, y2, z2, x1, y1, z2, 0, 0, 1, r, g, b, a);
-        addQuad(matrix, normalMatrix, consumer, x1, y1, z2, x1, y2, z2, x1, y2, z1, x1, y1, z1, -1, 0, 0, r, g, b, a);
-        addQuad(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2, 1, 0, 0, r, g, b, a);
-    }
-
     private static void addQuad(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
                                 float x1, float y1, float z1, float x2, float y2, float z2,
                                 float x3, float y3, float z3, float x4, float y4, float z4,
@@ -631,23 +666,6 @@ public class PlayerESP extends Module {
         consumer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a).setUv(0f, 0f).setOverlay(OverlayTexture.NO_OVERLAY).setNormal(normal.x(), normal.y(), normal.z());
         consumer.addVertex(matrix, x3, y3, z3).setColor(r, g, b, a).setUv(0f, 0f).setOverlay(OverlayTexture.NO_OVERLAY).setNormal(normal.x(), normal.y(), normal.z());
         consumer.addVertex(matrix, x4, y4, z4).setColor(r, g, b, a).setUv(0f, 0f).setOverlay(OverlayTexture.NO_OVERLAY).setNormal(normal.x(), normal.y(), normal.z());
-    }
-
-    private static void renderBoxOutline(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color, float lineWidth) {
-        line(matrix, normalMatrix, consumer, x1, y1, z1, x2, y1, z1, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y1, z2, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x2, y1, z2, x1, y1, z2, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y1, z1, color, lineWidth);
-
-        line(matrix, normalMatrix, consumer, x1, y2, z1, x2, y2, z1, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x2, y2, z1, x2, y2, z2, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x2, y2, z2, x1, y2, z2, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x1, y2, z2, x1, y2, z1, color, lineWidth);
-
-        line(matrix, normalMatrix, consumer, x1, y1, z1, x1, y2, z1, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x2, y1, z1, x2, y2, z1, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x2, y1, z2, x2, y2, z2, color, lineWidth);
-        line(matrix, normalMatrix, consumer, x1, y1, z2, x1, y2, z2, color, lineWidth);
     }
 
     private static void line(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer, float x1, float y1, float z1, float x2, float y2, float z2, int color, float lineWidth) {
@@ -661,12 +679,6 @@ public class PlayerESP extends Module {
     private static void line(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
                              float x1, float y1, float z1, float x2, float y2, float z2,
                              int r, int g, int b, int a, float lineWidth) {
-        // Günstige "Fake-Glow"-Halo statt echtem Bloom/Post-Processing (das bräuchte einen extra
-        // Blur-Pass über einen eigenen Render-Target, wie ihn ClickGuis BlurRenderer für den GUI-
-        // Hintergrund macht - hier nicht nötig): dieselbe Linie einfach mehrfach zeichnen, breiter und
-        // blasser werdend, VOR der eigentlichen scharfen Linie, sodass die scharfe Linie oben landet.
-        // Läuft für ALLE Linien-Draws dieses Moduls (Outline-Box, Skeleton-Bones, Tracer), weil sie alle
-        // letztlich hier durchlaufen - unabhängig davon, ob Split Visibility an oder aus ist.
         PlayerESP esp = INSTANCE;
         if (esp != null && esp.glow && esp.glowStrength > 0.001 && a > 0) {
             float strength = (float) esp.glowStrength;

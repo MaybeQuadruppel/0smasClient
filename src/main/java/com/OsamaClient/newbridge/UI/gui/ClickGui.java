@@ -215,7 +215,47 @@ public final class ClickGui {
         ui.alpha = open;
 
         searchBar.draw(ui);
+        drawDock();
         drawTooltip(dt);
+    }
+
+    // ------------------------------------------------------------------ dock (Waypoints, Profiles, ...)
+
+    private final java.util.List<float[]> dockRects = new java.util.ArrayList<>();
+
+    /** Kleine Leiste unten rechts mit Buttons für die eigenen Fenster. */
+    private void drawDock() {
+        var entries = com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.dock();
+        dockRects.clear();
+        if (entries.isEmpty()) return;
+        float h = 12f, gap = 3f, pad = 6f;
+        float total = 0;
+        for (var e : entries) total += ui.textWidth(e.label(), Theme.FONT_SMALL) + 2 * pad + gap;
+        float x = ui.width() - total - 4f, y = ui.height() - h - 4f;
+        for (var e : entries) {
+            float w = ui.textWidth(e.label(), Theme.FONT_SMALL) + 2 * pad;
+            boolean hover = ui.hovered(x, y, w, h);
+            float g = Theme.glow();
+            if (g > 0) ui.glow(x, y, w, h, Theme.radius(), 5f, Theme.accent((hover ? 0.3f : 0.12f) * g));
+            ui.round(x, y, w, h, Theme.radius(), hover ? Theme.ROW_HOVER : Theme.panelBg());
+            ui.outline(x, y, w, h, Theme.radius(), 1f, hover ? Theme.accent(0.9f) : Theme.OUTLINE);
+            ui.textCentered(e.label(), x + w / 2f, y, h, Theme.FONT_SMALL, hover ? Theme.TEXT : Theme.TEXT_DIM);
+            if (hover) hint(e.description());
+            dockRects.add(new float[]{x, y, w, h});
+            x += w + gap;
+        }
+    }
+
+    private boolean dockClicked() {
+        var entries = com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.dock();
+        for (int i = 0; i < dockRects.size() && i < entries.size(); i++) {
+            float[] r = dockRects.get(i);
+            if (ui.mouseX >= r[0] && ui.mouseX < r[0] + r[2] && ui.mouseY >= r[1] && ui.mouseY < r[1] + r[3]) {
+                com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(entries.get(i).factory().get());
+                return true;
+            }
+        }
+        return false;
     }
 
     private Panel topPanelAtMouse() {
@@ -276,6 +316,7 @@ public final class ClickGui {
             bindingRow.binding = false;
             bindingRow = null;
         }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && dockClicked()) return;
         if (searchBar.mouseClicked(button)) {
             if (focused != null) focused.blur();
             focused = null;
