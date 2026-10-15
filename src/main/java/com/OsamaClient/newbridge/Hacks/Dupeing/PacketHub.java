@@ -55,6 +55,8 @@ public final class PacketHub {
 
     /** Test/debug: counts every packet that passes the hook, by class simple name. */
     public static volatile boolean tracking;
+    /** Movement packets that claimed onGround = true while tracking (after AntiHunger rewrote them). */
+    public static final AtomicInteger groundPackets = new AtomicInteger();
     private static final Map<String, AtomicInteger> SEEN = new ConcurrentHashMap<>();
 
     /** PingSpoof settings (outgoing keepalive/pong delay). */
@@ -88,7 +90,10 @@ public final class PacketHub {
 
     /** @return true if the packet was taken (held or dropped) and must not be sent now. */
     public static boolean intercept(Packet<?> packet) {
-        if (tracking) SEEN.computeIfAbsent(packet.getClass().getSimpleName(), k -> new AtomicInteger()).incrementAndGet();
+        if (tracking) {
+            SEEN.computeIfAbsent(packet.getClass().getSimpleName(), k -> new AtomicInteger()).incrementAndGet();
+            if (packet instanceof net.minecraft.network.protocol.game.ServerboundMovePlayerPacket mv && mv.isOnGround()) groundPackets.incrementAndGet();
+        }
         if (BYPASS.get()) return false;
 
         synchronized (PacketHub.class) {

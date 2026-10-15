@@ -78,6 +78,7 @@ public class AimAssist extends Module {
     }
 
     public boolean isValidTarget(Entity entity) {
+        if (AntiBot.isBot(entity)) return false;
         if (!(entity instanceof LivingEntity) || entity == Minecraft.getInstance().player || !entity.isAlive()) {
             return false;
         }

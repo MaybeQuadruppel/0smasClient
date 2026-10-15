@@ -18,6 +18,10 @@ public class ClientConnectionMixin {
 
     @Inject(method = "send(Lnet/minecraft/network/protocol/Packet;)V", at = @At("HEAD"), cancellable = true)
     private void onSendPacket(Packet<?> packet, CallbackInfo ci) {
+        if (com.OsamaClient.newbridge.Hacks.Movement.AntiHunger.handle(packet)) {
+            ci.cancel();
+            return;
+        }
         if (com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.intercept(packet)) {
             ci.cancel();
             return;

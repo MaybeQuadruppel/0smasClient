@@ -104,6 +104,12 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("guidesync: sends close packet, screen stays open", () -> guarded(ctx, srv, () -> testGuiDesync(ctx, srv)));
             run("packetburst: sends N packets", () -> guarded(ctx, srv, () -> testPacketBurst(ctx, srv)));
             run("bundledupe: runs the packet loop and stops at max cycles", () -> guarded(ctx, srv, () -> testBundleDupe(ctx, srv)));
+            run("blink: holds movement, releases on disable", () -> guarded(ctx, srv, () -> testBlink(ctx, srv)));
+            run("antihunger: hides onGround from the server", () -> guarded(ctx, srv, () -> testAntiHunger(ctx, srv)));
+            run("airplace: places a block in mid air", () -> guarded(ctx, srv, () -> testAirPlace(ctx, srv)));
+            run("surround: boxes the feet in with obsidian", () -> guarded(ctx, srv, () -> testSurround(ctx, srv)));
+            run("antibot: fake players are not valid targets", () -> guarded(ctx, srv, () -> testAntiBot(ctx, srv)));
+            run("viewmodel: moves the first person hand (screenshots)", () -> guarded(ctx, srv, () -> testViewmodel(ctx, srv)));
             run("notifications + friends", () -> guarded(ctx, srv, () -> testNotificationsFriends(ctx, srv)));
             run("hud redesign: widgets, layout editor drag, teammates, nametags (screenshots)", () -> testHudRedesign(ctx, srv));
             run("ui tabs + hud keystrokes + enchantment picker (screenshots)", () -> testUiTabsAndHud(ctx, srv));
@@ -906,7 +912,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
                 mc.options.keyUse.setDown(false);
                 for (String n : new String[]{"AutoGap", "ShieldBlock", "SafeWalk", "BHop", "Zoom", "ArmorWarning", "AutoDrop",
                         "AutoReplenish", "ToolSaver", "AntiVoid", "Teabag", "HotbarDance", "TotemAlert", "InvFullAlert",
-                        "Notifications", "Friends", "PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe"}) {
+                        "Notifications", "Friends", "PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe", "Blink", "AntiHunger", "AirPlace", "Surround", "AntiBot", "Viewmodel"}) {
                     var m = ModuleManager.getModuleByName(n);
                     if (m != null && m.enabled) m.toggle();
                 }
@@ -1593,6 +1599,150 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             LOG.info("\n{}", sb);
         } catch (Exception e) {
             LOG.error("Could not write report", e);
+        }
+    }
+
+    private void testBlink(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        double start = serverX(srv);
+        on(ctx, "Blink");
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
+        ctx.waitTicks(20);
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(false));
+        double client = ctx.computeOnClient(mc -> mc.player.getX());
+        int held = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.heldCount());
+        double server = serverX(srv);
+        log("blink held=" + held + " clientX=" + (client - start) + " serverX=" + (server - start));
+        assertTrue(held > 5, "nothing held: " + held);
+        assertTrue(Math.abs(server - start) < 0.01, "server saw movement: " + (server - start));
+        assertTrue(client - start > 1.0, "client did not move");
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("Blink").toggle());
+        ctx.waitTicks(20);
+        boolean connected = ctx.computeOnClient(mc -> mc.getConnection() != null && mc.getConnection().getConnection().isConnected());
+        double after = serverX(srv);
+        double clientAfter = ctx.computeOnClient(mc -> mc.player.getX());
+        log("blink after release serverX=" + (after - start) + " clientX=" + (clientAfter - start));
+        assertTrue(connected, "kicked after release");
+        assertTrue(Math.abs(after - clientAfter) < 1.0, "server did not catch up: " + (after - clientAfter));
+    }
+
+    private void testAntiHunger(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        ctx.runOnClient(mc -> { com.OsamaClient.newbridge.Hacks.Movement.AntiHunger.rewritten = 0; com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.set(0); com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.tracking = true; });
+        on(ctx, "AntiHunger");
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
+        ctx.waitTicks(30);
+        boolean clientGround = ctx.computeOnClient(mc -> mc.player.onGround());
+        int sentGround = com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.get();
+        int n = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Movement.AntiHunger.rewritten);
+        log("antihunger rewritten=" + n + " clientGround=" + clientGround + " groundPacketsSent=" + sentGround);
+        assertTrue(clientGround, "client should be on the ground");
+        assertTrue(sentGround == 0, "packets still claimed onGround: " + sentGround);
+        assertTrue(n > 5, "no packets rewritten: " + n);
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("AntiHunger").toggle());
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.set(0));
+        ctx.waitTicks(10);
+        int restored = com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.get();
+        assertTrue(restored > 0, "onGround not reported again after disabling");
+    }
+
+    private void testAirPlace(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @a hotbar.0 with stone 64");
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> { mc.player.setXRot(-25f); mc.player.getInventory().setSelectedSlot(0); });
+        on(ctx, "AirPlace");
+        net.minecraft.core.BlockPos target = ctx.computeOnClient(mc -> ((net.minecraft.world.phys.BlockHitResult) mc.player.pick(5, 0f, false)).getBlockPos());
+        ctx.runOnClient(mc -> mc.options.keyUse.setDown(true));
+        ctx.waitTicks(8);
+        ctx.runOnClient(mc -> mc.options.keyUse.setDown(false));
+        boolean solid = ctx.computeOnClient(mc -> !mc.level.getBlockState(target).isAir());
+        int placed = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Player.AirPlace.INSTANCE.placed);
+        log("airplace target=" + target + " solid=" + solid + " placed=" + placed);
+        assertTrue(solid, "no block at " + target);
+        assertTrue(placed >= 1, "placed=" + placed);
+    }
+
+    private void testSurround(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @a hotbar.0 with obsidian 64");
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> mc.player.getInventory().setSelectedSlot(0));
+        net.minecraft.core.BlockPos feet = ctx.computeOnClient(mc -> mc.player.blockPosition());
+        on(ctx, "Surround");
+        ctx.waitTicks(30);
+        int ok = 0;
+        StringBuilder missing = new StringBuilder();
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            net.minecraft.core.BlockPos q = feet.relative(d);
+            boolean obs = ctx.computeOnClient(mc -> mc.level.getBlockState(q).is(net.minecraft.world.level.block.Blocks.OBSIDIAN));
+            if (obs) ok++; else missing.append(d).append(' ');
+        }
+        int slot = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+        log("surround ok=" + ok + " missing=" + missing + " slot=" + slot);
+        assertTrue(ok == 4, "missing sides: " + missing);
+        // Repairs a hole.
+        net.minecraft.core.BlockPos hole = feet.east();
+        srv.runCommand(String.format(java.util.Locale.ROOT, "setblock %d %d %d air", hole.getX(), hole.getY(), hole.getZ()));
+        ctx.waitTicks(15);
+        boolean fixed = ctx.computeOnClient(mc -> mc.level.getBlockState(hole).is(net.minecraft.world.level.block.Blocks.OBSIDIAN));
+        assertTrue(fixed, "hole was not repaired");
+    }
+
+    private void testAntiBot(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        boolean[] r = ctx.computeOnClient(mc -> {
+            var bot = new net.minecraft.client.player.RemotePlayer(mc.level, new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "RealName"));
+            bot.setId(987654);
+            bot.setPos(mc.player.getX() + 2, mc.player.getY(), mc.player.getZ());
+            var ab = com.OsamaClient.newbridge.Hacks.Combat.AntiBot.INSTANCE;
+            boolean offBot = com.OsamaClient.newbridge.Hacks.Combat.AntiBot.isBot(bot);
+            if (!ab.enabled) ab.toggle();
+            bot.tickCount = 0;
+            boolean freshOk = !com.OsamaClient.newbridge.Hacks.Combat.AntiBot.isBot(bot);
+            bot.tickCount = 45;
+            boolean noTab = com.OsamaClient.newbridge.Hacks.Combat.AntiBot.isBot(bot);
+            boolean ka = !com.OsamaClient.newbridge.Hacks.Combat.KillAura.INSTANCE.isValidTarget(bot, mc);
+            boolean self = !com.OsamaClient.newbridge.Hacks.Combat.AntiBot.isBot(mc.player);
+            ab.toggle();
+            boolean offAgain = !com.OsamaClient.newbridge.Hacks.Combat.AntiBot.isBot(bot);
+            return new boolean[]{!offBot, freshOk, noTab, offAgain, self, ka};
+        });
+        log("antibot " + java.util.Arrays.toString(r));
+        String[] names = {"off => not bot", "fresh player ok", "no tab entry => bot", "disabled again => not bot", "self ok", "killaura ignores bot"};
+        for (int i = 0; i < r.length; i++) assertTrue(r[i], "antibot: " + names[i]);
+    }
+
+    private void testViewmodel(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @a hotbar.0 with diamond_sword");
+        ctx.waitTicks(10);
+        java.nio.file.Path a = ctx.takeScreenshot("newbridge_viewmodel_off");
+        ctx.runOnClient(mc -> {
+            var v = com.OsamaClient.newbridge.Hacks.Visual.Viewmodel.INSTANCE;
+            v.mainX = -0.4; v.mainY = 0.3; v.mainScale = 0.5; v.mainRotZ = 30;
+            if (!v.enabled) v.toggle();
+        });
+        ctx.waitTicks(5);
+        java.nio.file.Path b = ctx.takeScreenshot("newbridge_viewmodel_on");
+        int applied = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.Viewmodel.INSTANCE.applied);
+        boolean differs;
+        try { differs = !java.util.Arrays.equals(java.nio.file.Files.readAllBytes(a), java.nio.file.Files.readAllBytes(b)); }
+        catch (java.io.IOException e) { throw new RuntimeException(e); }
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.Viewmodel.INSTANCE.toggle());
+        log("viewmodel applied=" + applied + " differs=" + differs);
+        assertTrue(applied > 0, "mixin never applied");
+        assertTrue(differs, "screenshot unchanged");
+    }
+
+    private static int aboveGround(net.minecraft.server.level.ServerPlayer sp) {
+        try {
+            var f = net.minecraft.server.network.ServerGamePacketListenerImpl.class.getDeclaredField("aboveGroundTickCount");
+            f.setAccessible(true);
+            return f.getInt(sp.connection);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
         }
     }
 }

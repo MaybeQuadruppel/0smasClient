@@ -86,6 +86,7 @@ public class KillAura extends Module {
     }
 
     public boolean isValidTarget(Entity entity, Minecraft client) {
+        if (AntiBot.isBot(entity)) return false;
         if (!(entity instanceof LivingEntity target) || target == client.player || !target.isAlive()) {
             return false;
         }

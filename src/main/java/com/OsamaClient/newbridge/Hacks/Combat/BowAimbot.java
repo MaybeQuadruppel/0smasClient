@@ -361,6 +361,7 @@ public class BowAimbot extends Module {
 
     /** Wie in AimAssist: Gruppen-Filter des EntityFilterPickers direkt auswerten. */
     private boolean isValidTarget(Entity entity) {
+        if (AntiBot.isBot(entity)) return false;
         if (entity == Minecraft.getInstance().player || !entity.isAlive()) return false;
 
         if (filter.isFilterEnabled("Players") && entity instanceof Player) return true;
@@ -371,4 +372,4 @@ public class BowAimbot extends Module {
 
         return false;
     }
-}
+}

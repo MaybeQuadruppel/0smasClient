@@ -93,6 +93,12 @@ public class ModuleManager {
         modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.PacketGate());
         modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.PingSpoof());
         modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.GuiDesync());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Movement.Blink());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Movement.AntiHunger());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Player.AirPlace());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Combat.Surround());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Combat.AntiBot());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.Viewmodel());
         modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.PacketBurst());
         modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.BundleDupe());
 //        modules.add(new TestEnderChestESP());
