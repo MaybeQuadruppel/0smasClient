@@ -99,6 +99,11 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("teabag: toggles crouch near an entity", () -> guarded(ctx, srv, () -> testTeabag(ctx, srv)));
             run("hotbardance: cycles the hotbar slot", () -> guarded(ctx, srv, () -> testHotbarDance(ctx, srv)));
             run("totemalert + invfullalert: flags", () -> guarded(ctx, srv, () -> testAlerts(ctx, srv)));
+            run("packetgate: holds movement packets until released, cancel mode drops", () -> guarded(ctx, srv, () -> testPacketGate(ctx, srv)));
+            run("pingspoof: delays pong replies", () -> guarded(ctx, srv, () -> testPingSpoof(ctx, srv)));
+            run("guidesync: sends close packet, screen stays open", () -> guarded(ctx, srv, () -> testGuiDesync(ctx, srv)));
+            run("packetburst: sends N packets", () -> guarded(ctx, srv, () -> testPacketBurst(ctx, srv)));
+            run("bundledupe: runs the packet loop and stops at max cycles", () -> guarded(ctx, srv, () -> testBundleDupe(ctx, srv)));
             run("notifications + friends", () -> guarded(ctx, srv, () -> testNotificationsFriends(ctx, srv)));
             run("hud redesign: widgets, layout editor drag, teammates, nametags (screenshots)", () -> testHudRedesign(ctx, srv));
             run("ui tabs + hud keystrokes + enchantment picker (screenshots)", () -> testUiTabsAndHud(ctx, srv));
@@ -901,12 +906,15 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
                 mc.options.keyUse.setDown(false);
                 for (String n : new String[]{"AutoGap", "ShieldBlock", "SafeWalk", "BHop", "Zoom", "ArmorWarning", "AutoDrop",
                         "AutoReplenish", "ToolSaver", "AntiVoid", "Teabag", "HotbarDance", "TotemAlert", "InvFullAlert",
-                        "Notifications", "Friends"}) {
+                        "Notifications", "Friends", "PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe"}) {
                     var m = ModuleManager.getModuleByName(n);
                     if (m != null && m.enabled) m.toggle();
                 }
                 if (mc.player != null) mc.player.getInventory().setSelectedSlot(0);
             });
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.discard();
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.pingDelayMs = 0;
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.tracking = false;
             srv.runCommand("kill @e[tag=gt]");
             srv.runCommand("kill @e[type=item]");
             srv.runCommand("difficulty peaceful");
@@ -1113,6 +1121,128 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         assertTrue(!missing2, "totem alert still flags with a totem");
         assertTrue(!full2, "inv alert flags with free slots");
         ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.InvFullAlert.INSTANCE.freeSlots = 3);
+    }
+
+    private double serverX(TestServerContext srv) {
+        return srv.computeOnServer(s -> s.getPlayerList().getPlayers().get(0).getX());
+    }
+
+    private void testPacketGate(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        double start = serverX(srv);
+        ctx.runOnClient(mc -> {
+            var g = com.OsamaClient.newbridge.Hacks.Dupeing.PacketGate.INSTANCE;
+            g.preset = "Movement";
+            g.mode = "Delay";
+        });
+        on(ctx, "PacketGate");
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
+        ctx.waitTicks(25);
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(false));
+        ctx.waitTicks(3);
+        int held = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.heldCount());
+        double clientX = ctx.computeOnClient(mc -> mc.player.getX());
+        double serverHeld = serverX(srv);
+        log("packetgate held=" + held + " clientX=" + (clientX - ox) + " serverX=" + (serverHeld - ox) + " start=" + (start - ox));
+        assertTrue(held > 10, "movement packets not held: " + held);
+        assertTrue(clientX - start > 1.5, "client did not move");
+        assertTrue(serverHeld - start < 0.5, "server moved while gate was open: " + (serverHeld - start));
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("PacketGate").toggle());
+        ctx.waitTicks(45);
+        int after = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.heldCount());
+        int paced = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.pacedCount());
+        boolean connected = ctx.computeOnClient(mc -> mc.getConnection() != null && mc.getConnection().getConnection().isConnected());
+        log("packetgate after flush held=" + after + " paced=" + paced + " connected=" + connected);
+        assertTrue(after == 0 && paced == 0, "still holding after flush: " + after + "/" + paced);
+        assertTrue(connected, "server kicked us after the flush");
+        // cancel mode: nothing is queued
+        ctx.runOnClient(mc -> {
+            var g = com.OsamaClient.newbridge.Hacks.Dupeing.PacketGate.INSTANCE;
+            g.mode = "Cancel";
+        });
+        on(ctx, "PacketGate");
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(false));
+        int heldCancel = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.heldCount());
+        assertTrue(heldCancel == 0, "cancel mode queued packets: " + heldCancel);
+        ctx.runOnClient(mc -> { ModuleManager.getModuleByName("PacketGate").toggle(); com.OsamaClient.newbridge.Hacks.Dupeing.PacketGate.INSTANCE.mode = "Delay"; });
+    }
+
+    private void testPingSpoof(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        ctx.runOnClient(mc -> {
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.resetSeen();
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.tracking = true;
+            com.OsamaClient.newbridge.Hacks.Dupeing.PingSpoof.INSTANCE.delayMs = 300;
+        });
+        on(ctx, "PingSpoof");
+        ctx.runOnClient(mc -> mc.getConnection().send(new net.minecraft.network.protocol.common.ServerboundPongPacket(4242)));
+        int early = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.seen("ServerboundPongPacket"));
+        int delayed = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.pingDelayed.get());
+        ctx.waitTicks(14);
+        int later = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.seen("ServerboundPongPacket"));
+        log("pingspoof early=" + early + " later=" + later + " delayed=" + delayed);
+        assertTrue(early == 1 && delayed >= 1, "pong not intercepted");
+        assertTrue(later == 2, "delayed pong never released: " + later);
+    }
+
+    private void testGuiDesync(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        ctx.runOnClient(mc -> {
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.resetSeen();
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.tracking = true;
+            mc.gui.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+        });
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("GuiDesync").toggle());
+        ctx.waitTicks(2);
+        int closes = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.seen("ServerboundContainerClosePacket"));
+        boolean screenOpen = ctx.computeOnClient(mc -> mc.gui.screen() != null);
+        boolean stillEnabled = ctx.computeOnClient(mc -> ModuleManager.getModuleByName("GuiDesync").enabled);
+        ctx.runOnClient(mc -> mc.gui.setScreen(null));
+        assertTrue(closes == 1, "close packets sent: " + closes);
+        assertTrue(screenOpen, "screen was closed");
+        assertTrue(!stillEnabled, "one-shot module stayed enabled");
+    }
+
+    private void testPacketBurst(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        ctx.runOnClient(mc -> {
+            var b = com.OsamaClient.newbridge.Hacks.Dupeing.PacketBurst.INSTANCE;
+            b.mode = "Swing";
+            b.count = 7;
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.resetSeen();
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.tracking = true;
+            b.toggle();
+        });
+        ctx.waitTicks(3);
+        int sent = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketBurst.INSTANCE.lastSent);
+        int seen = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.seen("ServerboundPunchPacket"));
+        assertTrue(sent == 7 && seen == 7, "burst sent=" + sent + " seen=" + seen);
+        assertTrue(!ctx.computeOnClient(mc -> ModuleManager.getModuleByName("PacketBurst").enabled), "burst stayed enabled");
+    }
+
+    private void testBundleDupe(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @p hotbar.0 with bundle[bundle_contents=[{id:\"minecraft:cobblestone\",count:5}]]");
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> {
+            var d = com.OsamaClient.newbridge.Hacks.Dupeing.BundleDupe.INSTANCE;
+            d.maxCycles = 2; d.bundlePackets = 3; d.pickupDelayMs = 10; d.putBackDelayMs = 10; d.dropDelayMs = 10;
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.resetSeen();
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.tracking = true;
+            d.toggle();
+        });
+        ctx.waitTicks(20);
+        int cycles = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.BundleDupe.INSTANCE.cycles);
+        boolean running = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.BundleDupe.INSTANCE.isRunning());
+        int sel = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.seen("ServerboundSelectBundleItemPacket"));
+        log("bundledupe cycles=" + cycles + " running=" + running + " select=" + sel);
+        ctx.runOnClient(mc -> { var d = com.OsamaClient.newbridge.Hacks.Dupeing.BundleDupe.INSTANCE; d.maxCycles = 0; d.bundlePackets = 20; d.pickupDelayMs = 30; d.putBackDelayMs = 20; d.dropDelayMs = 50; });
+        assertTrue(cycles == 2, "cycles " + cycles);
+        assertTrue(!running, "loop still running");
+        assertTrue(sel >= 6, "bundle select packets " + sel);
     }
 
     private void testNotificationsFriends(ClientGameTestContext ctx, TestServerContext srv) {

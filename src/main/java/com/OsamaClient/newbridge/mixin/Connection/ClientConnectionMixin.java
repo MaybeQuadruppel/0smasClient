@@ -18,6 +18,10 @@ public class ClientConnectionMixin {
 
     @Inject(method = "send(Lnet/minecraft/network/protocol/Packet;)V", at = @At("HEAD"), cancellable = true)
     private void onSendPacket(Packet<?> packet, CallbackInfo ci) {
+        if (com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.intercept(packet)) {
+            ci.cancel();
+            return;
+        }
         try {
             if (ModuleManager.modules == null || ModuleManager.modules.isEmpty()) return;
 
@@ -47,4 +51,4 @@ public class ClientConnectionMixin {
             ci.cancel();
         }
     }
-}
+}

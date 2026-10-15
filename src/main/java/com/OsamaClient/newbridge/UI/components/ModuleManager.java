@@ -90,6 +90,11 @@ public class ModuleManager {
         modules.add(new com.OsamaClient.newbridge.Hacks.Donut.InvFullAlert());
         modules.add(new com.OsamaClient.newbridge.Hacks.Client.Notifications());
         modules.add(new com.OsamaClient.newbridge.Hacks.Client.Friends());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.PacketGate());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.PingSpoof());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.GuiDesync());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.PacketBurst());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.BundleDupe());
 //        modules.add(new TestEnderChestESP());
         modules.add(new ClickTP());
         modules.add(new AutoTrade());

@@ -74,6 +74,8 @@ public class EntryPoint implements ClientModInitializer {
             }
         });
 
+        ClientTickEvents.START_CLIENT_TICK.register(client -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.onClientTick());
+
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
 
