@@ -97,7 +97,9 @@ public final class PacketHub {
         if (BYPASS.get()) return false;
 
         synchronized (PacketHub.class) {
-            if (!PACED.isEmpty()) {          // keep the order while a paced release is running
+            // The tick-end packet must never wait behind paced position packets: it is what tells the 26.x server a
+            // new tick started, so delaying it makes the next paced position count as a second one in the same tick.
+            if (!PACED.isEmpty() && !(packet instanceof net.minecraft.network.protocol.game.ServerboundClientTickEndPacket)) { // keep the order while a paced release is running
                 PACED.add(packet);
                 return true;
             }
@@ -159,14 +161,25 @@ public final class PacketHub {
     }
 
     /** Releases every held packet in the original order (position packets paced one per tick). */
-    public static int flush() {
+    public static int flush() { return flush(false); }
+
+    /**
+     * @param keepLatestPosition true while the gate stays open afterwards (no live position packet will follow), so the
+     *                           newest held position is sent as the single position packet of the release.
+     */
+    public static int flush(boolean keepLatestPosition) {
         List<Packet<?>> copy;
         synchronized (PacketHub.class) {
             copy = new ArrayList<>(HELD);
             HELD.clear();
             // The 26.x server kicks clients that send two position packets between two tick-end packets, and the
             // client's own live position packet already carries the current position, so held ones are dropped.
-            for (Packet<?> p : copy) if (!isPosition(p)) PACED.add(p);
+            Packet<?> lastPos = null;
+            for (Packet<?> p : copy) {
+                if (isPosition(p)) lastPos = p;
+                else PACED.add(p);
+            }
+            if (keepLatestPosition && lastPos != null) PACED.add(lastPos);
         }
         // Not sent here: the server resets its "position received" flag on the client's tick-end packet, so the
         // first paced position packet must go out at the start of the next tick (onClientTick).

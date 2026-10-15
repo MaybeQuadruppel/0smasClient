@@ -104,10 +104,11 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("guidesync: sends close packet, screen stays open", () -> guarded(ctx, srv, () -> testGuiDesync(ctx, srv)));
             run("packetburst: sends N packets", () -> guarded(ctx, srv, () -> testPacketBurst(ctx, srv)));
             run("bundledupe: runs the packet loop and stops at max cycles", () -> guarded(ctx, srv, () -> testBundleDupe(ctx, srv)));
-            run("blink: holds movement, releases on disable", () -> guarded(ctx, srv, () -> testBlink(ctx, srv)));
+            run("fakelag: hold mode (blink) holds movement, releases on disable", () -> guarded(ctx, srv, () -> testBlink(ctx, srv)));
+            run("fakelag: interval mode releases periodically", () -> guarded(ctx, srv, () -> testFakeLagInterval(ctx, srv)));
             run("antihunger: hides onGround from the server", () -> guarded(ctx, srv, () -> testAntiHunger(ctx, srv)));
             run("airplace: places a block in mid air", () -> guarded(ctx, srv, () -> testAirPlace(ctx, srv)));
-            run("surround: boxes the feet in with obsidian", () -> guarded(ctx, srv, () -> testSurround(ctx, srv)));
+            run("fullbox self mode: surrounds the own feet with obsidian", () -> guarded(ctx, srv, () -> testSurround(ctx, srv)));
             run("antibot: fake players are not valid targets", () -> guarded(ctx, srv, () -> testAntiBot(ctx, srv)));
             run("viewmodel: moves the first person hand (screenshots)", () -> guarded(ctx, srv, () -> testViewmodel(ctx, srv)));
             run("notifications + friends", () -> guarded(ctx, srv, () -> testNotificationsFriends(ctx, srv)));
@@ -912,7 +913,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
                 mc.options.keyUse.setDown(false);
                 for (String n : new String[]{"AutoGap", "ShieldBlock", "SafeWalk", "BHop", "Zoom", "ArmorWarning", "AutoDrop",
                         "AutoReplenish", "ToolSaver", "AntiVoid", "Teabag", "HotbarDance", "TotemAlert", "InvFullAlert",
-                        "Notifications", "Friends", "PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe", "Blink", "AntiHunger", "AirPlace", "Surround", "AntiBot", "Viewmodel"}) {
+                        "Notifications", "Friends", "PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe", "FakeLag", "Fullbox", "AntiHunger", "AirPlace", "AntiBot", "Viewmodel"}) {
                     var m = ModuleManager.getModuleByName(n);
                     if (m != null && m.enabled) m.toggle();
                 }
@@ -1605,7 +1606,8 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
     private void testBlink(ClientGameTestContext ctx, TestServerContext srv) {
         flatStage(ctx, srv);
         double start = serverX(srv);
-        on(ctx, "Blink");
+        setMode(ctx, "FakeLag", "Mode", 1);
+        on(ctx, "FakeLag");
         ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
         ctx.waitTicks(20);
         ctx.runOnClient(mc -> mc.options.keyUp.setDown(false));
@@ -1616,7 +1618,8 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         assertTrue(held > 5, "nothing held: " + held);
         assertTrue(Math.abs(server - start) < 0.01, "server saw movement: " + (server - start));
         assertTrue(client - start > 1.0, "client did not move");
-        ctx.runOnClient(mc -> ModuleManager.getModuleByName("Blink").toggle());
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("FakeLag").toggle());
+        setMode(ctx, "FakeLag", "Mode", 0);
         ctx.waitTicks(20);
         boolean connected = ctx.computeOnClient(mc -> mc.getConnection() != null && mc.getConnection().getConnection().isConnected());
         double after = serverX(srv);
@@ -1624,6 +1627,36 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         log("blink after release serverX=" + (after - start) + " clientX=" + (clientAfter - start));
         assertTrue(connected, "kicked after release");
         assertTrue(Math.abs(after - clientAfter) < 1.0, "server did not catch up: " + (after - clientAfter));
+    }
+
+    private void setMode(ClientGameTestContext ctx, String module, String label, int idx) {
+        ctx.runOnClient(mc -> {
+            for (var c : ModuleManager.getModuleByName(module).settings)
+                if (c instanceof com.OsamaClient.newbridge.UI.components.ModeButton mb && mb.getLabel().equals(label)) mb.setIndex(idx);
+        });
+    }
+
+    private void setToggle(ClientGameTestContext ctx, String module, String label, boolean v) {
+        ctx.runOnClient(mc -> {
+            for (var c : ModuleManager.getModuleByName(module).settings)
+                if (c instanceof com.OsamaClient.newbridge.UI.components.ToggleButton tb && tb.getLabel().equals(label)) tb.setValue(v);
+        });
+    }
+
+    private void testFakeLagInterval(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        double start = serverX(srv);
+        setMode(ctx, "FakeLag", "Mode", 0);
+        on(ctx, "FakeLag");
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
+        ctx.waitTicks(35);
+        double server = serverX(srv);
+        double client = ctx.computeOnClient(mc -> mc.player.getX());
+        boolean connected = ctx.computeOnClient(mc -> mc.getConnection() != null && mc.getConnection().getConnection().isConnected());
+        log("fakelag interval serverX=" + (server - start) + " clientX=" + (client - start) + " connected=" + connected);
+        assertTrue(connected, "kicked");
+        assertTrue(server - start > 0.5, "server never received a release");
+        assertTrue(client - server > 0.05, "server is not lagging behind: " + (client - server));
     }
 
     private void testAntiHunger(ClientGameTestContext ctx, TestServerContext srv) {
@@ -1670,7 +1703,10 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         ctx.waitTicks(5);
         ctx.runOnClient(mc -> mc.player.getInventory().setSelectedSlot(0));
         net.minecraft.core.BlockPos feet = ctx.computeOnClient(mc -> mc.player.blockPosition());
-        on(ctx, "Surround");
+        setMode(ctx, "Fullbox", "Target", 1);
+        setToggle(ctx, "Fullbox", "Head", false);
+        setToggle(ctx, "Fullbox", "Roof", false);
+        on(ctx, "Fullbox");
         ctx.waitTicks(30);
         int ok = 0;
         StringBuilder missing = new StringBuilder();
@@ -1687,6 +1723,9 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         srv.runCommand(String.format(java.util.Locale.ROOT, "setblock %d %d %d air", hole.getX(), hole.getY(), hole.getZ()));
         ctx.waitTicks(15);
         boolean fixed = ctx.computeOnClient(mc -> mc.level.getBlockState(hole).is(net.minecraft.world.level.block.Blocks.OBSIDIAN));
+        setMode(ctx, "Fullbox", "Target", 0);
+        setToggle(ctx, "Fullbox", "Head", true);
+        setToggle(ctx, "Fullbox", "Roof", true);
         assertTrue(fixed, "hole was not repaired");
     }
 

@@ -59,6 +59,7 @@ public class Fullbox extends Module {
     private double delay = 1;
     private String blockMode = "Obsidian";
     private boolean floor = true, top = true, head = true;
+    private boolean targetSelf = false, center = true;
     private boolean silent = true, swapBack = true, swing = true;
     private boolean ignoreTeammates = true, onlyOnGround = false, render = true;
     private int color = 0xFFA78BFA;
@@ -78,6 +79,10 @@ public class Fullbox extends Module {
         filter.filters.put("Animals", false);
         settings.add(new Slider("Range", 2.0, 6.0, range, 0.1, v -> range = v)
                 .withDescription("Max distance from your eyes to a placement face."));
+        settings.add(new ModeButton("Target", List.of("Enemy", "Self"), 0, v -> targetSelf = v.equals("Self"))
+                .withDescription("Enemy = trap the nearest target. Self = surround your own feet (Head / Roof close you in completely)."));
+        settings.add(new ToggleButton("Center", center, v -> center = v)
+                .withDescription("Self mode: move to the middle of your block first so nothing overlaps you."));
         settings.add(new Slider("Blocks/Tick", 1, 6, blocksPerTick, 1, v -> blocksPerTick = v)
                 .withDescription("How many blocks may be placed per tick."));
         settings.add(new Slider("Delay", 0, 10, delay, 1, v -> delay = v)
@@ -122,13 +127,18 @@ public class Fullbox extends Module {
     public void onTick(Minecraft mc) {
         if (mc.player == null || mc.level == null || mc.gameMode == null || mc.getConnection() == null) return;
         LocalPlayer player = mc.player;
-        target = findTarget(mc);
+        target = targetSelf ? player : findTarget(mc);
+        if (targetSelf && center && player.onGround()) {
+            double cx = Math.floor(player.getX()) + 0.5, cz = Math.floor(player.getZ()) + 0.5;
+            if (Math.abs(player.getX() - cx) > 0.2 || Math.abs(player.getZ() - cz) > 0.2)
+                player.setDeltaMovement((cx - player.getX()) * 0.5, player.getDeltaMovement().y, (cz - player.getZ()) * 0.5);
+        }
         if (target == null) {
             lastPlan = List.of();
             return;
         }
         AABB box = target.getBoundingBox();
-        lastPlan = TrapPlanner.plan(mc.level, box, new TrapPlanner.Options(floor, true, head, top));
+        lastPlan = TrapPlanner.plan(mc.level, box, new TrapPlanner.Options(floor && !targetSelf, true, head, top));
         if (lastPlan.isEmpty()) return;
         if (cooldown > 0) { cooldown--; return; }
 

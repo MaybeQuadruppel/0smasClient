@@ -1,6 +1,5 @@
 package com.OsamaClient.newbridge.mixin.Connection;
 
-import com.OsamaClient.newbridge.Hacks.Misc.FakeLag;
 import com.OsamaClient.newbridge.Hacks.Misc.Freecam;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ModuleManager;
@@ -30,16 +29,6 @@ public class ClientConnectionMixin {
             if (ModuleManager.modules == null || ModuleManager.modules.isEmpty()) return;
 
 
-            Module baseModule = ModuleManager.getModuleByName("FakeLag");
-            if (baseModule != null && baseModule.enabled) {
-                if (baseModule instanceof FakeLag fakeLag) {
-                    if (packet instanceof ServerboundMovePlayerPacket) {
-                        fakeLag.packetQueue.add(packet);
-                        ci.cancel();
-                        return;
-                    }
-                }
-            }
         } catch (Exception e) {
             e.printStackTrace();
         }
