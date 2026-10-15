@@ -26,8 +26,9 @@ public final class HudOverlayItemLayer {
     public static void register() {
         if (registered) return;
         registered = true;
-        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("newbridge", "hud_overlay_items"),
-                HudOverlayItemLayer::render);
+        // before the chat, so the chat background / text covers the icons instead of the icons shining through it
+        HudElementRegistry.attachElementBefore(net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.CHAT,
+                Identifier.fromNamespaceAndPath("newbridge", "hud_overlay_items"), HudOverlayItemLayer::render);
     }
 
     private static void render(GuiGraphicsExtractor g, DeltaTracker deltaTracker) {

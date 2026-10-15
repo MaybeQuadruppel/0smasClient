@@ -60,6 +60,11 @@ public class EntryPoint implements ClientModInitializer {
                 "Found stashes: value, contents, distance; add waypoint / go", com.OsamaClient.newbridge.Hacks.Misc.stash.StashesWindow::new);
         com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Macros",
                 "Macros: keys that send messages, commands and client commands", com.OsamaClient.newbridge.Hacks.Client.macro.MacrosWindow::new);
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Friends",
+                "Friends: who is online or nearby, last seen, add / remove, message, go to", com.OsamaClient.newbridge.Hacks.Client.FriendsWindow::new);
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Keybinds",
+                "Keybind overview: a real keyboard showing module and vanilla binds and any conflicts", com.OsamaClient.newbridge.UI.gui.window.KeyboardWindow::new);
+        com.OsamaClient.newbridge.Utils.ChatSuggest.register();
         com.OsamaClient.newbridge.UI.gui.Keybinds.register();
         // Alles speichern/laden (Module, Keybinds, Einstellungen, Panels, GUI-Theme)
         com.OsamaClient.newbridge.config.Config.init();

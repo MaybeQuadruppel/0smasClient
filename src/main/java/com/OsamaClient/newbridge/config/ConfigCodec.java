@@ -69,6 +69,8 @@ public final class ConfigCodec {
             JsonObject o = new JsonObject();
             o.addProperty("enabled", m.enabled);
             o.addProperty("key", m.key);
+            if (m.favorite) o.addProperty("favorite", true);
+            if (m.holdToActivate) o.addProperty("hold", true);
             JsonObject settings = new JsonObject();
             Map<String, Integer> seen = new HashMap<>();
             for (Component c : m.settings) {
@@ -180,6 +182,8 @@ public final class ConfigCodec {
                 }
                 Integer key = integer(o.get("key"));
                 if (key != null) m.key = legacyKeys ? com.OsamaClient.newbridge.UI.gui.input.Keys.fromGlfw(key) : key;
+                m.favorite = Boolean.TRUE.equals(bool(o.get("favorite")));
+                if (o.has("hold")) m.holdToActivate = Boolean.TRUE.equals(bool(o.get("hold")));
                 Boolean enabled = bool(o.get("enabled"));
                 if (Boolean.TRUE.equals(enabled) && !m.enabled) {
                     try {

@@ -57,6 +57,12 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
+    public boolean keyReleased(KeyEvent event) {
+        ClickGui.INSTANCE.keyReleased(event.key());
+        return true;
+    }
+
+    @Override
     public boolean charTyped(CharacterEvent event) {
         ClickGui.INSTANCE.charTyped(event.codepoint());
         return true;

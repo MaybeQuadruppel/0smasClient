@@ -23,7 +23,7 @@ public class NoRender extends Module {
     public boolean fire = true;
 
     public NoRender() {
-        super("NoRender", "Deactivates mutiple Renderfeatures.", Category.VISUAL);
+        super("NoRender", "Turns off annoying render effects and overlays.", Category.VISUAL);
         INSTANCE = this;
 
         // ToggleButtons für die ClickGUI über 'this.settings.add' hinzufügen
@@ -43,4 +43,4 @@ public class NoRender extends Module {
         this.settings.add(new ToggleButton("Darkness", darkness, val -> darkness = val).withDescription("Disables the Warden's darkness effect overlay."));
         this.settings.add(new ToggleButton("Fire", fire, val -> fire = val).withDescription("Disables the fire overlay on your screen when you are burning."));
     }
-}
+}

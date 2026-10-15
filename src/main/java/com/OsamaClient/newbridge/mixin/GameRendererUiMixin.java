@@ -45,8 +45,14 @@ public abstract class GameRendererUiMixin {
             )
     )
     private void newbridge$drawClickGui(CallbackInfo ci) {
+        {
+            var scr = net.minecraft.client.Minecraft.getInstance().gui.screen();
+            com.OsamaClient.newbridge.Utils.TextInputGate.want(scr instanceof com.OsamaClient.newbridge.UI.gui.ClickGuiScreen
+                    || com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.isOpen());
+        }
         ClickGui.INSTANCE.frame();
         EmoteWheel.INSTANCE.frame();
+        if (com.OsamaClient.newbridge.Hacks.Client.quick.QuickMenu.INSTANCE != null) com.OsamaClient.newbridge.Hacks.Client.quick.QuickMenu.INSTANCE.frame();
         EmoteEditor.INSTANCE.frame();
         com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.frame();
         com.OsamaClient.newbridge.Hacks.Visual.minimap.Minimap.draw();
@@ -56,6 +62,9 @@ public abstract class GameRendererUiMixin {
             TeammateList.draw();
         }
         Nametags.draw();
+        com.OsamaClient.newbridge.Hacks.Visual.DamageIndicator.draw();
+        com.OsamaClient.newbridge.Hacks.Visual.SplitChat.draw();
+        com.OsamaClient.newbridge.Hacks.Client.CheckMeter.draw();
         com.OsamaClient.newbridge.Hacks.Misc.Waypoints.draw();
     }
 }

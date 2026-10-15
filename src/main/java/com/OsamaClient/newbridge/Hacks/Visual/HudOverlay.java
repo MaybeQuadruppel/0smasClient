@@ -44,32 +44,34 @@ public class HudOverlay extends Module {
 
     // ── Style ────────────────────────────────────────────────────────────────
     public final Slider scale = new Slider("Text Scale", 0.5, 1.5, 1.0, 0.05, null)
-            .withDescription("Größe von Text und Icons");
+            .withDescription("Size of text and icons");
     public final ToggleButton background = new ToggleButton("Background", true, null)
-            .withDescription("Zeichnet eine Panel-Box hinter jeder Zeilen-Gruppe");
+            .withDescription("Draws a panel box behind every group of lines");
     public final ToggleButton icons = new ToggleButton("Icons", true, null)
-            .withDescription("Zeigt vor jeder Zeile ein kleines Icon-Badge");
+            .withDescription("Shows a small icon badge in front of every line");
     public final ToggleButton editLayout = new ToggleButton("Edit Layout", false,
             val -> { if (val) openEditor(); else closeEditor(); })
-            .withDescription("Öffnet einen Screen, in dem du jede HUD-Box einzeln mit der Maus verschieben kannst (Esc zum Beenden)");
+            .withDescription("Opens a screen where you can drag every HUD box with the mouse (Esc to finish)");
 
     // ── Which rows ───────────────────────────────────────────────────────────
     public final ToggleButton showCoords = new ToggleButton("Coordinates", true, null)
             .withDescription("X / Y / Z");
     public final ToggleButton showFacing = new ToggleButton("Pitch/Yaw", true, null)
-            .withDescription("Pitch, Yaw und die grobe Blickrichtung (N/NO/O/...)");
+            .withDescription("Pitch, yaw and the rough facing direction (N/NE/E/...)");
     public final ToggleButton showHealth = new ToggleButton("Health", true, null)
-            .withDescription("Aktuelle / maximale Leben, Farbe läuft von Rot nach Grün");
+            .withDescription("Current / max health, colour goes from red to green");
     public final ToggleButton showArmor = new ToggleButton("Armor", true, null)
-            .withDescription("Haltbarkeit jedes getragenen Rüstungsteils");
+            .withDescription("Durability of every armour piece you wear");
     public final ToggleButton showSpeed = new ToggleButton("Speed", false, null)
-            .withDescription("Horizontale Bewegungsgeschwindigkeit in Blöcken/Sekunde");
+            .withDescription("Horizontal movement speed in blocks/second");
     public final ToggleButton showFps = new ToggleButton("FPS", false, null)
-            .withDescription("Aktuelle Framerate");
+            .withDescription("Current frame rate");
     public final ToggleButton showPing = new ToggleButton("Ping", false, null)
-            .withDescription("Ping zum Server in ms");
+            .withDescription("Ping to the server in ms");
+    public final ToggleButton showTps = new ToggleButton("TPS", false, null)
+            .withDescription("Estimated server TPS (from the time packets), turns red when the server lags");
     public final ToggleButton showBiome = new ToggleButton("Biome", false, null)
-            .withDescription("Aktuelles Biom");
+            .withDescription("The biome you are standing in");
 
     public final ToggleButton showHeld = new ToggleButton("Held Item", true, null)
             .withDescription("The item in your main hand with its durability");
@@ -117,6 +119,7 @@ public class HudOverlay extends Module {
         settings.add(showSpeed);
         settings.add(showFps);
         settings.add(showPing);
+        settings.add(showTps);
         settings.add(showBiome);
         settings.add(showHeld);
         settings.add(showItems);
@@ -189,7 +192,10 @@ public class HudOverlay extends Module {
             if ((buttonsDown & 1) != 0) HudLayout.dragTo(mx, my, fbW, fbH);
             else HudLayout.stopDrag();
         } else if (pendingClick && !widgetGrabbed && noWidgetDragging()) {
-            HudLayout.beginDrag(mx, my);
+            boolean b = HudLayout.beginDrag(mx, my);
+            dbg = "begin=" + b + " mx=" + mx + " my=" + my;
+        } else if (pendingClick) {
+            dbg = "click ignored grabbed=" + widgetGrabbed + " noDrag=" + noWidgetDragging();
         }
         if (pendingRight) HudLayout.resetAt(mx, my);
         float sc = ui.scale;
@@ -206,14 +212,29 @@ public class HudOverlay extends Module {
         }
     }
 
+    /** Input counters (tests). */
+    public static int dbgClicks, dbgReleases;
+    public static String dbg = "", dbg2 = "", dbg3 = "";
+    public static int dbgDraws;
+
+    /** Button bit: 1 = left, 2 = right, 4 = middle. 26.x numbers mouse buttons from 1 (SDL), so 1 << button is wrong. */
+    private static int bit(int button) {
+        if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_LEFT) return 1;
+        if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_RIGHT) return 2;
+        if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_MIDDLE) return 4;
+        return 0;
+    }
+
     void mouseClicked(int button) {
-        buttonsDown |= 1 << button;
+        dbgClicks++;
+        buttonsDown |= bit(button);
         if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_LEFT) pendingClick = true;
         if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_RIGHT) pendingRight = true;
     }
 
     void mouseReleased(int button) {
-        buttonsDown &= ~(1 << button);
+        dbgReleases++;
+        buttonsDown &= ~bit(button);
         for (Widget w : widgets.values()) w.dragging = false;
         HudLayout.stopDrag();
     }
@@ -229,6 +250,8 @@ public class HudOverlay extends Module {
         if (instance == null || mc.player == null) return;
 
         boolean editing = instance.editMode && mc.gui.screen() instanceof HudOverlayScreen;
+        dbgDraws++;
+        if (instance.pendingClick) dbg3 = "draws=" + dbgDraws + " editing=" + editing + " buttons=" + instance.buttonsDown;
         if (!editing && (!instance.enabled || mc.gui.hud.isHidden() || mc.getDebugOverlay().showDebugScreen()
                 || ClickGui.INSTANCE.isOpen() || mc.gui.screen() != null)) {
             return;
@@ -317,7 +340,8 @@ public class HudOverlay extends Module {
             }
 
             boolean hovered = editing && ui.hovered(wRef.x, wRef.y, wRef.w, wRef.h);
-            if (editing && pendingClick && hovered && noWidgetDragging()) {
+            // elements drawn on top (Split Chat, Check Meter, ...) win over an overlapping overlay widget
+            if (editing && pendingClick && hovered && noWidgetDragging() && !HudLayout.hitsElement(UiInput.mouseFbX(), UiInput.mouseFbY())) {
                 wRef.dragging = true;
                 widgetGrabbed = true;
                 wRef.grabDX = ui.mouseX - wRef.x;
@@ -571,7 +595,16 @@ public class HudOverlay extends Module {
                 if (showPing.enabled && mc.getConnection() != null) {
                     var info = mc.getConnection().getPlayerInfo(p.getUUID());
                     int ping = info != null ? info.getLatency() : -1;
-                    if (ping >= 0) rows.add(new Row(ping + " ms", Theme.TEXT, "PN"));
+                    int pc = ping < 80 ? 0xFF52E084 : ping < 160 ? 0xFFF0C040 : 0xFFE0525A;
+                    if (ping >= 0) rows.add(new Row(ping + " ms", pc, "PN"));
+                }
+                if (showTps.enabled) {
+                    double tps = com.OsamaClient.newbridge.Utils.TpsTracker.tps();
+                    boolean stalled = com.OsamaClient.newbridge.Utils.TpsTracker.secondsSinceUpdate() > 4.0;
+                    String txt = tps < 0 ? "-- TPS" : String.format(java.util.Locale.ROOT, "%.1f TPS", tps);
+                    if (stalled && tps >= 0) txt = "no data";
+                    int tc = tps < 0 ? Theme.TEXT_DIM : stalled ? 0xFFE0525A : tps >= 18 ? 0xFF52E084 : tps >= 14 ? 0xFFF0C040 : 0xFFE0525A;
+                    rows.add(new Row(txt, tc, "TP"));
                 }
             }
             case "biome" -> {

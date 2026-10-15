@@ -55,6 +55,15 @@ public final class ClickGui {
 
     /** Search filter: show only enabled modules. */
     static boolean onlyEnabled;
+    public static boolean onlyFavorites;
+    public static boolean onlyRecent;
+    /** Names of the most recently toggled modules, newest first. */
+    public static final java.util.ArrayList<String> RECENT = new java.util.ArrayList<>();
+    public static void noteUsed(String name) {
+        RECENT.remove(name);
+        RECENT.add(0, name);
+        while (RECENT.size() > 8) RECENT.remove(RECENT.size() - 1);
+    }
 
     private ClickGui() {}
 
@@ -137,6 +146,8 @@ public final class ClickGui {
 
     /** Starts the close animation; the screen is closed when it finishes. */
     public void close() {
+        altDown = false;
+        ctrlDown = false;
         if (focused != null) focused.blur();
         focused = null;
         bindingRow = null;
@@ -220,6 +231,8 @@ public final class ClickGui {
         Panel top = topPanelAtMouse();
 
         hint = null;
+        detailModule = null;
+        detailSetting = null;
         String query = searchBar.query();
         for (int i = 0; i < ps.size(); i++) {
             Panel p = ps.get(i);
@@ -233,6 +246,7 @@ public final class ClickGui {
 
         searchBar.draw(ui, matchCount());
         drawTabs();
+        drawToast(dt);
         drawTooltip(dt);
     }
 
@@ -360,12 +374,42 @@ public final class ClickGui {
         return null;
     }
 
+    /** What the Alt detail card describes (set by the hovered row / setting every frame). */
+    private com.OsamaClient.newbridge.UI.components.Module detailModule;
+    private com.OsamaClient.newbridge.UI.components.Component detailSetting;
+    /** Last detail card drawn (tests). */
+    public static String lastDetailTitle = "";
+    public static java.util.List<String> lastDetailLines = java.util.List.of();
+
+    void detail(com.OsamaClient.newbridge.UI.components.Module m, com.OsamaClient.newbridge.UI.components.Component setting) {
+        detailModule = m;
+        detailSetting = setting;
+    }
+
+    /** true while Alt is held (shows the long description card instead of the short tooltip). */
+    public static boolean altHeld() {
+        return altDown || UiInput.keyDown(Keys.KEY_LEFT_ALT) || UiInput.keyDown(Keys.KEY_RIGHT_ALT) || forceDetail;
+    }
+
+    /** Tests: show the detail card without a real Alt key. */
+    public static boolean forceDetail;
+    private static boolean altDown, ctrlDown;
+
+    public void keyReleased(int key) {
+        if (key == Keys.KEY_LEFT_ALT || key == Keys.KEY_RIGHT_ALT) altDown = false;
+        if (key == Keys.KEY_LEFT_CONTROL || key == Keys.KEY_RIGHT_CONTROL) ctrlDown = false;
+    }
+
     /** Called by rows/widgets while they are hovered. */
     void hint(String text) {
         if (text != null && !text.isEmpty()) hint = text;
     }
 
     private void drawTooltip(float dt) {
+        if (detailModule != null && altHeld() && bindingRow == null) {
+            drawDetail();
+            return;
+        }
         boolean show = hint != null && Theme.descriptions() && bindingRow == null;
         if (show && !hint.equals(shownHint)) {
             shownHint = hint;
@@ -391,10 +435,57 @@ public final class ClickGui {
         ui.alpha = old;
     }
 
+    private void drawDetail() {
+        DetailCard.Card card = DetailCard.build(detailModule, detailSetting);
+        float maxW = 190f, pad = 4f, titleSize = Theme.FONT, size = Theme.FONT_SMALL, lh = size * 1.45f;
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        java.util.List<Integer> colors = new java.util.ArrayList<>();
+        for (DetailCard.Line l : card.lines()) {
+            if (l.text().isEmpty()) { lines.add(""); colors.add(0); continue; }
+            for (String w : wrap(l.text(), maxW - 2 * pad, size)) { lines.add(w); colors.add(l.color()); }
+        }
+        lastDetailTitle = card.title();
+        lastDetailLines = lines;
+        float th = titleSize * 1.5f;
+        float h = pad + th + lines.size() * lh + pad;
+        float w = maxW;
+        float x = ui.mouseX + 9f, y = ui.mouseY + 6f;
+        if (x + w > ui.width() - 2) x = ui.mouseX - w - 5f;
+        if (x < 2) x = 2;
+        if (y + h > ui.height() - 2) y = Math.max(2, ui.height() - h - 2);
+        ui.glow(x, y, w, h, 3f, 7f, 0x88000000);
+        ui.round(x, y, w, h, 3f, 0xF60E0E12);
+        ui.outline(x, y, w, h, 3f, 1f, Theme.accent(0.6f));
+        ui.rect(x + 2f, y + pad, 1.5f, th - 1f, Theme.accent());
+        ui.text(card.title(), x + pad + 3f, y + pad, th, titleSize, Theme.TEXT);
+        float yy = y + pad + th;
+        for (int i = 0; i < lines.size(); i++) {
+            if (!lines.get(i).isEmpty()) ui.text(lines.get(i), x + pad, yy, lh, size, colors.get(i));
+            yy += lh;
+        }
+    }
+
+    /** Word wrap for the detail card. */
+    private java.util.List<String> wrap(String text, float maxW, float size) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (String word : text.split(" ")) {
+            String probe = line.length() == 0 ? word : line + " " + word;
+            if (line.length() > 0 && ui.textWidth(probe, size) > maxW) {
+                out.add(line.toString());
+                line = new StringBuilder(word);
+            } else {
+                line = new StringBuilder(probe);
+            }
+        }
+        if (line.length() > 0) out.add(line.toString());
+        return out;
+    }
+
     private void drawHelp() {
         String[] lines = {
                 "LMB toggle  ·  RMB settings  ·  MMB bind  ·  Ctrl+F search",
-                "Drag header to move  ·  RMB header to collapse  ·  Shift+LMB slider to type"};
+                "Drag header to move  ·  RMB header to collapse  ·  Shift+LMB slider to type  ·  MMB setting = reset  ·  Ctrl+Z undo  ·  Hold Alt for details"};
         float lh = 7.5f;
         float y = ui.height() - lines.length * lh - 3f;
         for (String l : lines) {
@@ -405,8 +496,12 @@ public final class ClickGui {
 
     // ------------------------------------------------------------------ input (from ClickGuiScreen)
 
+    public static String dbgClick = "", dbgRows = "";
+
     public void mouseClicked(int button, int mods) {
-        buttonsDown |= 1 << button;
+        dbgRows = "";
+        dbgClick = "btn=" + button + " mouse=" + ui.mouseX + "," + ui.mouseY + " scale=" + ui.scale + " fb=" + UiInput.mouseFbX() + "," + UiInput.mouseFbY();
+        buttonsDown |= 1 << Math.max(0, Math.min(button, 30));
         if (!openP.forward()) return;
         if (bindingRow != null) {
             bindingRow.binding = false;
@@ -432,10 +527,11 @@ public final class ClickGui {
         }
         if (wasFocused != null && wasFocused != focused) wasFocused.blur();
         if (!consumed) focused = null;
+        dbgClick += " | rows=" + dbgRows + " | top=" + (top != null ? top.getClass().getSimpleName() : "null") + " consumed=" + consumed + " focused=" + (focused == null ? "null" : focused.getClass().getSimpleName());
     }
 
     public void mouseReleased(int button) {
-        buttonsDown &= ~(1 << button);
+        buttonsDown &= ~(1 << Math.max(0, Math.min(button, 30)));
         for (Panel p : panels) p.mouseReleased(ui, button);
         for (Panel p : hudPanels) p.mouseReleased(ui, button);
     }
@@ -446,11 +542,47 @@ public final class ClickGui {
         if (top != null) top.mouseScrolled(ui, amount);
     }
 
+    /** Short message shown at the bottom of the GUI for a moment (reset, undo). */
+    private String toastText;
+    private float toastTime;
+    public static String lastToast = "";
+
+    public void toast(String text) {
+        toastText = text;
+        toastTime = 2.5f;
+        lastToast = text;
+    }
+
+    private void drawToast(float dt) {
+        if (toastText == null || toastTime <= 0) return;
+        toastTime -= dt;
+        float a = Math.min(1f, toastTime * 3f);
+        float size = Theme.FONT_SMALL, h = 10f, w = ui.textWidth(toastText, size) + 2 * Theme.PAD;
+        float x = (ui.width() - w) / 2f, y = ui.height() - 34f;
+        float old = ui.alpha;
+        ui.alpha = old * a;
+        ui.round(x, y, w, h, 3f, 0xF2101014);
+        ui.outline(x, y, w, h, 3f, 1f, Theme.accent(0.6f));
+        ui.text(toastText, x + Theme.PAD, y, h, size, Theme.TEXT);
+        ui.alpha = old;
+    }
+
     public void keyPressed(int key, int mods) {
+        if (key == Keys.KEY_LEFT_ALT || key == Keys.KEY_RIGHT_ALT) { altDown = true; return; }
+        if (key == Keys.KEY_LEFT_CONTROL || key == Keys.KEY_RIGHT_CONTROL) { ctrlDown = true; return; }
+        // Ctrl+Z (Y too: QWERTZ keyboards) undoes the last setting change, unless a text field is being edited
+        if ((key == Keys.KEY_Z || key == Keys.KEY_Y) && (UiInput.ctrl(mods) || ctrlDown) && (focused == null || !focused.wantsKeyboard())) {
+            String what = com.OsamaClient.newbridge.UI.components.SettingHistory.undo();
+            toast(what == null ? "Nothing to undo" : "Undone: " + what);
+            if (what != null) GuiEvents.fireChanged();
+            return;
+        }
         if (!openP.forward()) return;
+        if (focused == null) focused = editingWidget();
         if (bindingRow != null) {
             boolean unbind = key == Keys.KEY_ESCAPE || key == Keys.KEY_DELETE || key == Keys.KEY_BACKSPACE;
             bindingRow.module.key = unbind ? -1 : key;
+            if (!unbind) com.OsamaClient.newbridge.UI.gui.window.KeyboardWindow.warnIfConflict(bindingRow.module);
             bindingRow.binding = false;
             bindingRow = null;
             GuiEvents.fireChanged();
@@ -480,10 +612,14 @@ public final class ClickGui {
         for (int i = act.size() - 1; i >= 0; i--) if (act.get(i).hoverKey(key, mods)) return;
     }
 
+    /** Number of chars received (tests). */
+    public static int dbgChars;
+
     public void charTyped(int codepoint) {
-        // type-to-search: letters / digits typed while nothing else has the keyboard start the search
-        if (!searchBar.editing() && focused == null && bindingRow == null && openP.forward()
-                && Character.isLetterOrDigit(codepoint)) searchBar.open();
+        if (focused == null) focused = editingWidget();
+        dbgChars++;
+        // the search only takes text after it was clicked (or opened with Ctrl+F) - no type-to-search,
+        // otherwise the character of a key you just bound would start a search
         if (searchBar.charTyped(codepoint)) return;
         if (focused != null) focused.charTyped(codepoint);
     }
@@ -515,6 +651,8 @@ public final class ClickGui {
         return n;
     }
 
+    public void toggleOnlyRecent() { onlyRecent = !onlyRecent; com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick(); }
+    public void toggleOnlyFavorites() { onlyFavorites = !onlyFavorites; com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick(); }
     public void toggleOnlyEnabled() { onlyEnabled = !onlyEnabled; com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick(); }
 
     public boolean allCollapsed() {
@@ -544,6 +682,13 @@ public final class ClickGui {
         row.binding = true;
     }
 
+    /** A setting widget that is currently being edited (text field), found even if the click did not register it as focused. */
+    private SettingWidget editingWidget() {
+        for (Panel p : panels) for (ModuleRow r : p.rows()) for (SettingWidget sw : r.widgets()) if (sw.wantsKeyboard()) return sw;
+        for (Panel p : hudPanels) for (ModuleRow r : p.rows()) for (SettingWidget sw : r.widgets()) if (sw.wantsKeyboard()) return sw;
+        return null;
+    }
+
     public void focus(SettingWidget w) {
         if (focused != null && focused != w) focused.blur();
         focused = w;
@@ -551,6 +696,7 @@ public final class ClickGui {
 
     /** Toggles a module; a module that throws (e.g. no world yet) never breaks the GUI. */
     public void safeToggle(Module m) {
+        noteUsed(m.name);
         try {
             m.toggle();
         } catch (RuntimeException e) {

@@ -44,11 +44,11 @@ public final class Panel {
     public List<ModuleRow> rows() { return rows; }
 
     private static boolean matches(ModuleRow r, String search) {
-        return (search.isEmpty() || r.searchName.contains(search)) && (!ClickGui.onlyEnabled || r.module.enabled);
+        return (search.isEmpty() || r.searchName.contains(search) || (search.length() >= 3 && (r.searchDesc.contains(search) || r.searchSettings.contains(search)))) && (!ClickGui.onlyEnabled || r.module.enabled) && (!ClickGui.onlyFavorites || r.module.favorite) && (!ClickGui.onlyRecent || ClickGui.RECENT.contains(r.module.name));
     }
 
     /** Number of rows that pass the current search / "enabled only" filter. */
-    int matchCount(String search) {
+    public int matchCount(String search) {
         int n = 0;
         for (ModuleRow r : rows) if (matches(r, search)) n++;
         return n;

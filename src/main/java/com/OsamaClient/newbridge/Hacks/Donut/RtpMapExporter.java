@@ -53,7 +53,7 @@ public final class RtpMapExporter {
 
     private static final String TEMPLATE = """
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -126,76 +126,76 @@ public final class RtpMapExporter {
 <div id="app">
   <aside id="side">
     <h1><span id="liveDot"></span>RTP Map</h1>
-    <div id="sub">Quadratische Weltkarte, 9&times;9 Regionsfelder</div>
+    <div id="sub">Square world map, 9&times;9 region cells</div>
 
     <section class="card" id="targetCard">
-      <h2>Ziel markieren</h2>
-      <p class="hint" id="targetHint">Klick auf die Karte, um einen Punkt zu setzen. Rechtsklick entfernt ihn wieder.</p>
+      <h2>Mark target</h2>
+      <p class="hint" id="targetHint">Click the map to set a point. Right-click removes it again.</p>
       <div id="targetBody" hidden>
         <div class="grid2">
           <div><label class="f" for="mX">X</label><input type="number" id="mX" step="100"></div>
           <div><label class="f" for="mZ">Z</label><input type="number" id="mZ" step="100"></div>
         </div>
-        <label class="f" for="mRange" style="margin-top:10px">Radius: <b id="mRLabel"></b> Bl&ouml;cke</label>
+        <label class="f" for="mRange" style="margin-top:10px">Radius: <b id="mRLabel"></b> blocks</label>
         <input type="range" id="mRange" min="0" max="1000" value="500">
         <input type="number" id="mR" min="50" step="100">
 
-        <div class="row" style="margin-top:10px"><span class="k">Region am Punkt</span><span id="mRegion"></span></div>
-        <div class="row"><span class="k">Feld</span><span id="mCell"></span></div>
-        <div class="k" style="color:var(--muted);font-size:11px;margin-top:6px">Kreis liegt in:</div>
+        <div class="row" style="margin-top:10px"><span class="k">Region at point</span><span id="mRegion"></span></div>
+        <div class="row"><span class="k">Cell</span><span id="mCell"></span></div>
+        <div class="k" style="color:var(--muted);font-size:11px;margin-top:6px">Circle lies in:</div>
         <div id="overlapBar"></div>
         <div id="overlapText" class="hint"></div>
         <div class="row" style="margin-top:8px"><span class="k">RTP-Region</span><span id="mBest"></span></div>
-        <div class="row"><span class="k">Erwartete Versuche</span><span id="mExpected"></span></div>
-        <p class="hint" style="margin-top:4px">Sch&auml;tzung: RTP landet gleichverteilt in der Region.</p>
+        <div class="row"><span class="k">Expected attempts</span><span id="mExpected"></span></div>
+        <p class="hint" style="margin-top:4px">Estimate: RTP lands uniformly inside the region.</p>
 
         <div class="btns">
-          <button class="primary" id="btnSend">An RtpFinder senden</button>
-          <button id="btnClear">L&ouml;schen</button>
+          <button class="primary" id="btnSend">Send to RtpFinder</button>
+          <button id="btnClear">Clear</button>
         </div>
-        <div id="sendHint" class="hint" style="margin-top:6px" hidden>Nur im Live-Modus m&ouml;glich (Live Server im Modul einschalten).</div>
+        <div id="sendHint" class="hint" style="margin-top:6px" hidden>Only available in live mode (enable Live Server in the module).</div>
         <div id="botStatus" hidden></div>
       </div>
     </section>
 
     <section class="card">
-      <h2>Ansicht</h2>
-      <label class="f" for="mode">Darstellung der Punkte</label>
+      <h2>View</h2>
+      <label class="f" for="mode">Point display</label>
       <select id="mode">
-        <option value="region">Punkte</option>
-        <option value="heatmap">Heatmap (Dichte)</option>
-        <option value="height">H&ouml;he (Y)</option>
+        <option value="region">Points</option>
+        <option value="heatmap">Heatmap (density)</option>
+        <option value="height">Height (Y)</option>
         <option value="biome">Biome</option>
       </select>
-      <label class="f" for="cellSize" style="margin-top:8px">Rasterweite f&uuml;r Heatmap / ruhige Felder (Bl&ouml;cke)</label>
+      <label class="f" for="cellSize" style="margin-top:8px">Grid size for heatmap / quiet cells (blocks)</label>
       <input type="number" id="cellSize" value="5000" min="100" step="500">
     </section>
 
     <section class="card">
-      <h2>Regionen</h2>
+      <h2>Regions</h2>
       <div id="regionLegend"></div>
     </section>
 
     <section class="card">
-      <h2>Erfolgsrate</h2>
+      <h2>Success rate</h2>
       <div id="successStats"></div>
     </section>
 
     <section class="card">
-      <h2>Ruhigste Felder (Base-Kandidaten)</h2>
-      <div id="quietList" class="hint">warte auf Daten...</div>
+      <h2>Quietest cells (base candidates)</h2>
+      <div id="quietList" class="hint">waiting for data...</div>
     </section>
   </aside>
 
   <main id="mapwrap">
     <div id="topbar">
-      <div id="readout"><span class="dim">Maus &uuml;ber die Karte bewegen &hellip;</span></div>
-      <label class="chk"><input type="checkbox" id="optGrid" checked>Raster</label>
-      <label class="chk"><input type="checkbox" id="optNames" checked>Namen</label>
-      <label class="chk"><input type="checkbox" id="optIds">Feldnummern</label>
-      <button id="zoomIn" title="Reinzoomen">+</button>
-      <button id="zoomOut" title="Rauszoomen">&minus;</button>
-      <button id="zoomReset" title="Ganze Karte">Alles</button>
+      <div id="readout"><span class="dim">Move the mouse over the map &hellip;</span></div>
+      <label class="chk"><input type="checkbox" id="optGrid" checked>Grid</label>
+      <label class="chk"><input type="checkbox" id="optNames" checked>Names</label>
+      <label class="chk"><input type="checkbox" id="optIds">Cell numbers</label>
+      <button id="zoomIn" title="Zoom in">+</button>
+      <button id="zoomOut" title="Zoom out">&minus;</button>
+      <button id="zoomReset" title="Whole map">All</button>
     </div>
     <div id="stage"><canvas id="c"></canvas></div>
   </main>
@@ -509,9 +509,9 @@ function drawAxes() {
   // Achsentitel
   ctx.fillStyle = '#c9cede'; ctx.font = 'bold 12px system-ui, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.fillText('X   West \\u25C4  \\u25BA Ost', MAPX + MAPA / 2, S - 10);
+  ctx.fillText('X   West \\u25C4  \\u25BA East', MAPX + MAPA / 2, S - 10);
   ctx.save(); ctx.translate(14, MAPY + MAPA / 2); ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Z   Nord \\u25C4  \\u25BA S\\u00FCd', 0, 0); ctx.restore();
+  ctx.fillText('Z   North \\u25C4  \\u25BA South', 0, 0); ctx.restore();
 
   // Werte der Mausposition direkt an den Achsen
   if (hover && hover.inside) {
@@ -534,10 +534,10 @@ function updateHover(sx, sy, ev) {
   const inside = insideMap(sx, sy);
   const w = s2w(sx, sy);
   hover = { sx, sy, wx: w[0], wz: w[1], inside };
-  if (!inside) { readout.innerHTML = '<span class="dim">Maus &uuml;ber die Karte bewegen &hellip;</span>'; tooltip.style.display = 'none'; return; }
+  if (!inside) { readout.innerHTML = '<span class="dim">Move the mouse over the map &hellip;</span>'; tooltip.style.display = 'none'; return; }
   const c = cellOf(w[0], w[1]), reg = REG[GRID.rows[c[1]][c[0]]];
   readout.innerHTML = 'X <b>' + Math.round(w[0]) + '</b> &nbsp; Z <b>' + Math.round(w[1]) + '</b> &nbsp;<span class="dim">|</span>&nbsp; '
-    + '<span class="swatch" style="background:' + reg.color + '"></span>' + reg.name + ' <span class="dim">(Feld ' + GRID.ids[c[1]][c[0]] + ')</span>';
+    + '<span class="swatch" style="background:' + reg.color + '"></span>' + reg.name + ' <span class="dim">(cell ' + GRID.ids[c[1]][c[0]] + ')</span>';
 
   let nearest = null, nd = 11;
   for (const d of successPoints) {
@@ -617,7 +617,7 @@ function loadMarker() { try { const m = JSON.parse(localStorage.getItem('rtpMark
 
 function fmtCount(n) {
   if (!isFinite(n)) return '&infin;';
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + ' Mio';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + ' M';
   if (n >= 1e4) return Math.round(n / 1000) + 'k';
   if (n >= 100) return String(Math.round(n));
   return n.toFixed(1);
@@ -643,7 +643,7 @@ function updatePanel(force) {
   if (st.length) {
     const b = st[0];
     $('mBest').innerHTML = '<span class="pill good">' + REG[b.idx].token + '</span>';
-    $('mExpected').textContent = '~' + fmtCount(1 / b.p).replace('&infin;', 'unendlich');
+    $('mExpected').textContent = '~' + fmtCount(1 / b.p).replace('&infin;', 'infinite');
   } else {
     $('mBest').textContent = '-'; $('mExpected').textContent = '-';
   }
@@ -664,7 +664,7 @@ $('btnSend').onclick = () => {
   if (!marker) return;
   $('btnSend').disabled = true;
   api('POST', '/target', { x: marker.x, z: marker.z, r: marker.r }).then(pollStatus)
-    .catch(() => { $('botStatus').textContent = 'Senden fehlgeschlagen.'; })
+    .catch(() => { $('botStatus').textContent = 'Sending failed.'; })
     .finally(() => { $('btnSend').disabled = !LIVE; });
 };
 
@@ -679,14 +679,14 @@ function api(method, path, body) {
 function renderBotStatus() {
   const el = $('botStatus');
   if (!LIVE || !marker) return;
-  if (!botState || !botState.hasTarget) { el.innerHTML = '<span class="pill">Kein Ziel aktiv</span><br>Der RtpFinder w&uuml;rfelt aktuell frei durch alle Regionen.'; return; }
+  if (!botState || !botState.hasTarget) { el.innerHTML = '<span class="pill">No target set</span><br>The RtpFinder is currently rolling freely through all regions.'; return; }
   const same = marker.x === botState.x && marker.z === botState.z && marker.r === botState.r;
   let html = botState.reached
-    ? '<span class="pill good">Ziel erreicht</span>'
-    : '<span class="pill warn">' + (botState.enabled ? 'Bot sucht &hellip;' : 'Ziel gesetzt (Modul aus)') + '</span>';
-  html += '<br>Ziel: ' + botState.x + ', ' + botState.z + ' (r ' + botState.r + ')' + (same ? '' : ' <span class="pill">anders als Marker</span>');
-  html += '<br>Region: <b>' + botState.region + '</b> &middot; Versuche: <b>' + botState.attempts + '</b>';
-  if (botState.lastDist >= 0) html += '<br>Letzte Landung: ' + botState.lastX + ', ' + botState.lastZ + ' (Distanz ' + Math.round(botState.lastDist) + ')';
+    ? '<span class="pill good">Target reached</span>'
+    : '<span class="pill warn">' + (botState.enabled ? 'Bot searching &hellip;' : 'Target set (module off)') + '</span>';
+  html += '<br>Target: ' + botState.x + ', ' + botState.z + ' (r ' + botState.r + ')' + (same ? '' : ' <span class="pill">differs from marker</span>');
+  html += '<br>Region: <b>' + botState.region + '</b> &middot; Attempts: <b>' + botState.attempts + '</b>';
+  if (botState.lastDist >= 0) html += '<br>Last landing: ' + botState.lastX + ', ' + botState.lastZ + ' (distance ' + Math.round(botState.lastDist) + ')';
   el.innerHTML = html;
 }
 
@@ -703,7 +703,7 @@ function pollStatus() {
 function computeData() {
   successPoints = DATA.filter(d => d.success);
   const ok = successPoints.length, total = DATA.length;
-  $('successStats').innerHTML = '<div class="row"><span class="k">Erfolgreich</span><span>' + ok + ' / ' + total + ' (' + (total ? (ok / total * 100).toFixed(1) : '0.0') + '%)</span></div>';
+  $('successStats').innerHTML = '<div class="row"><span class="k">Successful</span><span>' + ok + ' / ' + total + ' (' + (total ? (ok / total * 100).toFixed(1) : '0.0') + '%)</span></div>';
 
   const counts = {};
   for (const d of successPoints) counts[d.region] = (counts[d.region] || 0) + 1;
@@ -722,13 +722,13 @@ function renderQuietList() {
     }
     return false;
   }).sort((a, b) => a.count - b.count).slice(0, 10);
-  if (!cells.length) { el.textContent = 'noch nicht genug Daten'; return; }
+  if (!cells.length) { el.textContent = 'not enough data yet'; return; }
   el.innerHTML = '';
   for (const c of cells) {
     const cx = Math.round((c.gx + 0.5) * cs), cz = Math.round((c.gz + 0.5) * cs);
     const div = document.createElement('div');
     div.className = 'quiet';
-    div.innerHTML = '<span>' + cx + ', ' + cz + '</span><span>' + c.count + 'x besucht</span>';
+    div.innerHTML = '<span>' + cx + ', ' + cz + '</span><span>' + c.count + 'x visited</span>';
     div.onclick = () => {
       focusPoint = [cx, cz]; view.cx = cx; view.cz = cz; view.half = Math.min(view.half, Math.max(cs * 4, 2000)); clampView();
       setMarker(cx, cz, Math.max(200, Math.round(cs / 2)));
@@ -754,11 +754,11 @@ if (LIVE) {
   setInterval(poll, 3000);
   setInterval(pollStatus, 2000);
 } else {
-  $('sub').textContent = 'Statischer Export (Snapshot)';
+  $('sub').textContent = 'Static export (snapshot)';
 }
 })();
 </script>
 </body>
 </html>
 """;
-}
+}

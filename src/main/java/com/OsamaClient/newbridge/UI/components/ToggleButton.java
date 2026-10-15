@@ -13,6 +13,7 @@ public class ToggleButton extends Component {
         super(0, 0, 100, 16);
         this.label = label;
         this.enabled = startValue;
+        this.defaultValue = startValue;
         this.callback = callback;
     }
 
@@ -22,6 +23,9 @@ public class ToggleButton extends Component {
     }
 
     public String getLabel() { return label; }
+
+    /** Value the setting had when the module was created. */
+    public final boolean defaultValue;
 
     public void setValue(boolean v) {
         this.enabled = v;

@@ -42,6 +42,19 @@ public class ClientConnectionMixin {
         }
         if (Freecam.isActive && packet instanceof ServerboundMovePlayerPacket) {
             ci.cancel();
+            return;
+        }
+        // last step: what really goes out is measured by the CheckMeter and cleaned by the sanitizer
+        if (com.OsamaClient.newbridge.Hacks.Client.PacketSanitizer.resending) return;
+        com.OsamaClient.newbridge.Hacks.Client.CheckMeter.observe(packet);
+        Packet<?> fixed = com.OsamaClient.newbridge.Hacks.Client.PacketSanitizer.fix(packet);
+        if (fixed != packet) {
+            ci.cancel();
+            if (fixed != null) {
+                com.OsamaClient.newbridge.Hacks.Client.PacketSanitizer.resending = true;
+                try { ((Connection) (Object) this).send(fixed); }
+                finally { com.OsamaClient.newbridge.Hacks.Client.PacketSanitizer.resending = false; }
+            }
         }
     }
 }

@@ -43,17 +43,27 @@ public class Nametags extends Module {
 
     // Neue Einstellungen für Farben, Rainbow und Sichtbarkeit
     public final ColorPicker nameColor = new ColorPicker("Name Color", 0xFFFFFFFF, null)
-            .withDescription("Eigene Farbe für den Nametag-Text auswählen.");
+            .withDescription("Pick your own colour for the nametag text.");
     public final ToggleButton useThemeColor = new ToggleButton("Use Theme Accent", false, null)
-            .withDescription("Nutzt die globale GUI-Akzentfarbe (unterstützt auch deren Rainbow).");
+            .withDescription("Uses the global GUI accent colour (including its rainbow mode).");
     public final ToggleButton rainbowText = new ToggleButton("Rainbow Text", false, null)
-            .withDescription("Lässt die Textfarbe durch den Regenbogen wechseln.");
+            .withDescription("Cycles the text colour through the rainbow.");
     public final Slider rainbowSpeed = new Slider("Rainbow Speed", 0.1, 5.0, 1.0, 0.1, null)
-            .withDescription("Geschwindigkeit des Regenbogeneffekts.");
+            .withDescription("Speed of the rainbow effect.");
     public final ToggleButton healthBar = new ToggleButton("Health Bar", true, null)
             .withDescription("Shows a health bar and the health value in the tag");
     public final ToggleButton dropShadow = new ToggleButton("Drop Shadow", true, null)
-            .withDescription("Fügt einen Textschatten hinzu, um 'Weiß auf Hell' perfekt lesbar zu machen.");
+            .withDescription("Adds a text shadow so white text stays readable on bright backgrounds.");
+
+    public final ToggleButton armorIcons = new ToggleButton("Armor Icons", true, null)
+            .withDescription("Shows the armor pieces (and the held item) above the tag with a durability bar under each.");
+    public final ToggleButton heldItem = new ToggleButton("Held Item", true, null)
+            .withDescription("Also show the item in the main hand next to the armor.");
+    public final ToggleButton durabilityText = new ToggleButton("Durability %", false, null)
+            .withDescription("Write the remaining durability in percent above every icon.");
+
+    /** Items drawn in the last frame per entity name (tests read this). */
+    public static final java.util.Map<String, java.util.List<String>> lastIcons = new java.util.HashMap<>();
 
     private static final UiRenderer renderer = new UiRenderer();
     private static final Ui ui = new Ui(renderer);
@@ -80,6 +90,28 @@ public class Nametags extends Module {
         this.settings.add(this.rainbowSpeed);
         this.settings.add(this.healthBar);
         this.settings.add(this.dropShadow);
+        this.settings.add(this.armorIcons);
+        this.settings.add(this.heldItem);
+        this.settings.add(this.durabilityText);
+    }
+
+    /** Equipment shown above a tag: head, chest, legs, feet, then the main hand (empty slots are skipped). */
+    public java.util.List<net.minecraft.world.item.ItemStack> iconItems(LivingEntity e) {
+        java.util.List<net.minecraft.world.item.ItemStack> out = new java.util.ArrayList<>();
+        if (!armorIcons.enabled) return out;
+        for (var slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+                net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+            var st = e.getItemBySlot(slot);
+            if (!st.isEmpty()) out.add(st);
+        }
+        if (heldItem.enabled && !e.getMainHandItem().isEmpty()) out.add(e.getMainHandItem());
+        return out;
+    }
+
+    /** Remaining durability 0..1, or -1 for items without durability. */
+    public static float durability(net.minecraft.world.item.ItemStack st) {
+        if (!st.isDamageableItem() || st.getMaxDamage() <= 0) return -1f;
+        return Mth.clamp(1f - st.getDamageValue() / (float) st.getMaxDamage(), 0f, 1f);
     }
 
     /**
@@ -99,6 +131,7 @@ public class Nametags extends Module {
 
     public static void draw() {
         if (instance == null || !instance.enabled) return;
+        lastIcons.clear();
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.gui.hud.isHidden() || mc.gameRenderer.mainCamera() == null) return;
@@ -198,7 +231,34 @@ public class Nametags extends Module {
         } else {
             ui.textCentered(distText, x, sy, subH, sub, Theme.TEXT_DIM);
         }
+        drawIcons(living, x, boxY, fade);
         ui.alpha = 1f;
+    }
+
+    /** Armor / held item icons in a row above the tag; icons are drawn by the vanilla item layer (HudIcons). */
+    private static void drawIcons(LivingEntity living, float cx, float boxY, float fade) {
+        var items = instance.iconItems(living);
+        if (items.isEmpty()) return;
+        float icon = 9f, gap = 1f;
+        float rowW = items.size() * icon + (items.size() - 1) * gap;
+        float ix = cx - rowW / 2f;
+        float iy = boxY - icon - 3f;
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (var st : items) {
+            HudIcons.item(st, ix * ui.scale, iy * ui.scale, icon * ui.scale);
+            float d = durability(st);
+            names.add(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath() + (d >= 0 ? "@" + Math.round(d * 100) : ""));
+            if (d >= 0) {
+                int c = d > 0.6f ? 0xFF52E084 : d > 0.3f ? 0xFFF0C040 : 0xFFE0525A;
+                ui.alpha = fade;
+                ui.rect(ix + 0.5f, iy + icon + 0.3f, icon - 1f, 1.1f, 0xC0000000);
+                ui.rect(ix + 0.5f, iy + icon + 0.3f, Math.max(0.4f, (icon - 1f) * d), 1.1f, c);
+                if (instance.durabilityText.enabled)
+                    ui.textCentered(Math.round(d * 100) + "", ix + icon / 2f, iy - 4.6f, 4.5f, 3.8f, c);
+            }
+            ix += icon + gap;
+        }
+        lastIcons.put(living.getName().getString(), names);
     }
 
     private String getFilterKey(Entity entity) {

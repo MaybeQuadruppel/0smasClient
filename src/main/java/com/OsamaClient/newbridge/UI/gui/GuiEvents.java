@@ -18,5 +18,7 @@ public final class GuiEvents {
 
     static void fireClosed() { for (Runnable r : CLOSED) r.run(); }
 
+    public static void fireChangedPublic() { fireChanged(); }
+
     static void fireChanged() { for (Runnable r : CHANGED) r.run(); }
 }

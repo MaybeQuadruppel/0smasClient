@@ -16,6 +16,7 @@ public class ModeButton extends Component {
         this.label = label;
         this.modes = modes;
         this.index = startIndex;
+        this.defaultIndex = startIndex;
         this.onChange = onChange;
     }
 
@@ -28,6 +29,9 @@ public class ModeButton extends Component {
     public int getIndex() { return index; }
     public List<String> getModes() { return modes; }
     public String getMode() { return modes.get(index); }
+
+    /** Index the setting had when the module was created. */
+    public final int defaultIndex;
 
     public void setIndex(int i) {
         this.index = Math.min(modes.size() - 1, Math.max(0, i));

@@ -51,7 +51,9 @@
     "camera.CameraNoClipMixin",
     "combat.LocalPlayerRotationAccessor",
     "combat.MinecraftHandleKeybindsMixin",
-    "FirstPersonHandsMixin"
+    "FirstPersonHandsMixin",
+    "ChatComponentMixin",
+    "FontCensorMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -8,7 +8,7 @@ import com.OsamaClient.newbridge.UI.gui.input.Keys;
 import java.util.Locale;
 
 /**
- * Always visible search bar at the bottom center. Click it, press Ctrl+F or just start typing a letter.
+ * Always visible search bar at the bottom center. Click it or press Ctrl+F.
  * Filters module rows across all panels by name (case-insensitive); next to it sit the "Enabled" filter chip
  * and the collapse / expand all button, and the bar shows the number of matches.
  */
@@ -21,7 +21,7 @@ final class SearchBar {
     private float x, y;
     private boolean hovered;
     // hit rects of the chips / clear button: x, y, w, h
-    private final float[] enabledRect = new float[4], collapseRect = new float[4], clearRect = new float[4];
+    private final float[] enabledRect = new float[4], favRect = new float[4], recentRect = new float[4], collapseRect = new float[4], clearRect = new float[4];
 
     SearchBar() {
         field.maxLength = 32;
@@ -74,7 +74,9 @@ final class SearchBar {
         String collapseLabel = gui.allCollapsed() ? "Expand all" : "Collapse all";
         float enW = ui.textWidth("Enabled", Theme.FONT_SMALL) + 8f;
         float coW = ui.textWidth(collapseLabel, Theme.FONT_SMALL) + 8f;
-        float total = W + CHIP_GAP + enW + CHIP_GAP + coW;
+        float favW = ui.textWidth("Favorites", Theme.FONT_SMALL) + 8f;
+        float reW = ui.textWidth("Recent", Theme.FONT_SMALL) + 8f;
+        float total = W + CHIP_GAP + enW + CHIP_GAP + favW + CHIP_GAP + reW + CHIP_GAP + coW;
         x = (ui.width() - total) * 0.5f;
         y = ui.height() - H - 26f;
         hovered = ui.hovered(x, y, W, H);
@@ -105,13 +107,19 @@ final class SearchBar {
             ui.textRight(cnt, right, y, H, 5.5f, matches == 0 ? 0xFFFF7A7A : Theme.TEXT_DIM);
             right -= cw + 2f;
         }
-        field.draw(ui, x + 11f, y + 1.5f, Math.max(10f, right - (x + 11f)), H - 3f, Theme.FONT_SMALL, "Search modules…  (just start typing)", false);
+        field.draw(ui, x + 11f, y + 1.5f, Math.max(10f, right - (x + 11f)), H - 3f, Theme.FONT_SMALL, "Search modules…  (click or Ctrl+F)", false);
 
         float cx = x + W + CHIP_GAP;
         cx += chip(ui, "Enabled", cx, ClickGui.onlyEnabled, enabledRect) + CHIP_GAP;
+        cx += chip(ui, "Favorites", cx, ClickGui.onlyFavorites, favRect) + CHIP_GAP;
+        cx += chip(ui, "Recent", cx, ClickGui.onlyRecent, recentRect) + CHIP_GAP;
         chip(ui, collapseLabel, cx, false, collapseRect);
         if (ui.hovered(enabledRect[0], enabledRect[1], enabledRect[2], enabledRect[3]))
             gui.hint("Show only enabled modules");
+        else if (ui.hovered(favRect[0], favRect[1], favRect[2], favRect[3]))
+            gui.hint("Show only favorite modules (Ctrl+click a module to favorite it)");
+        else if (ui.hovered(recentRect[0], recentRect[1], recentRect[2], recentRect[3]))
+            gui.hint("Show only the modules you toggled recently");
         else if (ui.hovered(collapseRect[0], collapseRect[1], collapseRect[2], collapseRect[3]))
             gui.hint("Collapse or expand all panels");
         else if (hovered) gui.hint("Search modules by name");
@@ -123,6 +131,8 @@ final class SearchBar {
         float mx = gui.mouseUnitsX(), my = gui.mouseUnitsY();
         if (button == Keys.MOUSE_BUTTON_LEFT) {
             if (in(enabledRect, mx, my)) { gui.toggleOnlyEnabled(); return true; }
+            if (in(favRect, mx, my)) { gui.toggleOnlyFavorites(); return true; }
+            if (in(recentRect, mx, my)) { gui.toggleOnlyRecent(); return true; }
             if (in(collapseRect, mx, my)) { gui.toggleCollapseAll(); return true; }
             if (!field.text.isEmpty() && in(clearRect, mx, my)) { close(); return true; }
         }

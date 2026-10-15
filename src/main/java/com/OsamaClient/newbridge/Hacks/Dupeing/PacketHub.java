@@ -207,6 +207,7 @@ public final class PacketHub {
     public static void onClientTick() {
         tickNo++;
         drainPaced();
+        com.OsamaClient.newbridge.Hacks.Client.CheckMeter.tick();
     }
 
     public static synchronized int pacedCount() { return PACED.size(); }

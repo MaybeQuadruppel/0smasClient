@@ -31,7 +31,7 @@ public final class HudLayout {
 
     private HudLayout() {}
 
-    public static void nextFrame() { frame++; }
+    public static void nextFrame() { frame++; HudIcons.clear(); }
 
     public static boolean has(String id) { return custom.containsKey(id); }
 
@@ -90,6 +90,12 @@ public final class HudLayout {
     public static String draggingId() { return dragging; }
 
     public static void stopDrag() { dragging = null; }
+
+    /** true if a reported element (Split Chat, Check Meter, minimap, ...) is under the point (fb px). */
+    public static boolean hitsElement(float mx, float my) {
+        for (Elem e : visible()) if (mx >= e.x && mx <= e.x + e.w && my >= e.y && my <= e.y + e.h) return true;
+        return false;
+    }
 
     /** Starts dragging the topmost element under the mouse (fb px). */
     public static boolean beginDrag(float mx, float my) {

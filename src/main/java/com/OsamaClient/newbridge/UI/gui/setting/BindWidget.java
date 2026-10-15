@@ -25,7 +25,7 @@ public class BindWidget extends SettingWidget {
     }
 
     @Override
-    public String description() { return "Click, then press a key (Esc / Delete = unbind)"; }
+    public String description() { return "Click, then press a key (Esc / Delete = unbind). Right-click: switch between Toggle and Hold (only on while the key is held)."; }
 
     @Override
     protected void draw(Ui ui) {
@@ -39,7 +39,7 @@ public class BindWidget extends SettingWidget {
             value = "Press a key…";
             color = ColorUtil.alpha(Theme.accent(), 0.55f + 0.45f * (float) Math.sin(time * 6.0));
         } else {
-            value = module.key < 0 ? "None" : KeyNames.name(module.key);
+            value = module.key < 0 ? "None" : KeyNames.name(module.key) + (module.holdToActivate ? "  (hold)" : "");
             color = module.key < 0 ? Theme.TEXT_DIM : Theme.TEXT;
         }
         ui.textRight(value, x + w - Theme.PAD, y, h, Theme.FONT_SMALL, color);
@@ -47,6 +47,11 @@ public class BindWidget extends SettingWidget {
 
     @Override
     public boolean mouseClicked(Ui ui, int button, int mods) {
+        if (button == Keys.MOUSE_BUTTON_RIGHT) {
+            module.holdToActivate = !module.holdToActivate;
+            com.OsamaClient.newbridge.UI.gui.GuiEvents.fireChangedPublic();
+            return true;
+        }
         if (button != Keys.MOUSE_BUTTON_LEFT) return false;
         startBinding.run();
         return true;

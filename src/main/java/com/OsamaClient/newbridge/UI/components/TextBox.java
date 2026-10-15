@@ -15,8 +15,12 @@ public class TextBox extends Component {
         super(0, 0, 92, 28);
         this.label = label;
         this.text = defaultText != null ? defaultText : "";
+        this.defaultText = this.text;
         this.onResponder = onResponder;
     }
+
+    /** Text the setting had when the module was created. */
+    public final String defaultText;
 
     public String getText() { return text; }
 

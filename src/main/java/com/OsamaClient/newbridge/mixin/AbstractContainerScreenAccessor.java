@@ -10,4 +10,13 @@ public interface AbstractContainerScreenAccessor {
 
     @Accessor("hoveredSlot")
     Slot getHoveredSlot();
-}
+
+    @Accessor("leftPos")
+    int newbridge$leftPos();
+
+    @Accessor("topPos")
+    int newbridge$topPos();
+
+    @Accessor("imageWidth")
+    int newbridge$imageWidth();
+}

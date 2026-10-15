@@ -14,6 +14,7 @@ public abstract class Module {
     public int key = -1;
     /** true = the key does not toggle the module but keeps it enabled only while it is held down. */
     public boolean holdToActivate = false;
+    public boolean favorite;
     public String description;
     public Category category;
 
@@ -30,6 +31,7 @@ public abstract class Module {
     }
 
     public void toggle() {
+        if (!enabled && com.OsamaClient.newbridge.Hacks.Client.LegitMode.refuse(this)) return;
         enabled = !enabled;
         if (enabled) onEnable();
         else onDisable();

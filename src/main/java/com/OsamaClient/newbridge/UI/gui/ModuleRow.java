@@ -22,6 +22,10 @@ public final class ModuleRow {
     final Module module;
     /** Lower-case name for the search filter (computed once, not per frame). */
     final String searchName;
+    /** Lower-case description, searched when the name does not match. */
+    final String searchDesc;
+    /** Lower-case labels of all settings, so the search also finds modules by a setting name. */
+    final String searchSettings;
     final List<SettingWidget> widgets = new ArrayList<>();
     private final Anim toggleA, hoverA = new Anim(0f, 18f), expandA = new Anim(0f, 14f), flashA = new Anim(0f, 9f);
     private boolean expanded;
@@ -32,6 +36,10 @@ public final class ModuleRow {
     ModuleRow(Module module) {
         this.module = module;
         this.searchName = module.name.toLowerCase(java.util.Locale.ROOT);
+        this.searchDesc = module.description == null ? "" : module.description.toLowerCase(java.util.Locale.ROOT);
+        StringBuilder sb = new StringBuilder();
+        for (var c : module.settings) sb.append(DetailCard.label(c).toLowerCase(java.util.Locale.ROOT)).append('|');
+        this.searchSettings = sb.toString();
         this.toggleA = new Anim(module.enabled ? 1f : 0f, 14f);
         for (Component c : module.settings) widgets.add(SettingWidgets.create(c));
         widgets.add(new BindWidget(module, () -> binding, () -> ClickGui.INSTANCE.startBinding(this)));
@@ -69,7 +77,10 @@ public final class ModuleRow {
         toggleA.update(ui.dt, speed);
         expandA.update(ui.dt, speed);
         flashA.update(ui.dt, speed);
-        if (hovered) ClickGui.INSTANCE.hint(module.description);
+        if (hovered) {
+            ClickGui.INSTANCE.hint(module.description);
+            ClickGui.INSTANCE.detail(module, null);
+        }
 
         float t = toggleA.value(), hv = hoverA.value();
         float h = Theme.rowH();
@@ -102,6 +113,10 @@ public final class ModuleRow {
                         ColorUtil.lerp(Theme.TEXT_DIM, Theme.TEXT, hv));
                 rightEdge -= 5f;
             }
+            if (module.favorite) {
+                ui.round(rightEdge - 3f, y + h * 0.5f - 1.5f, 3f, 3f, 1.5f, 0xFFFFC94D);
+                rightEdge -= 6f;
+            }
             float rightW = right.isEmpty() ? 0 : ui.textWidth(right, Theme.FONT_SMALL) + 3f;
             String name = ui.ellipsize(module.name, rightEdge - rightW - textX, Theme.FONT);
             ui.text(name, textX, y, h, Theme.FONT, textColor);
@@ -123,9 +138,18 @@ public final class ModuleRow {
             float yy = y + h;
             for (SettingWidget sw : widgets) {
                 float wh = sw.height();
-                if (ui.visible(x, yy, w, wh) || sw.wantsKeyboard()) sw.render(ui, x + indent, yy, w - indent);
+                if (ui.visible(x, yy, w, wh) || sw.wantsKeyboard()) {
+                    sw.render(ui, x + indent, yy, w - indent);
+                    var st = sw.setting();
+                    // small accent dot: this setting is not at its default value (MMB resets it)
+                    if (st != null && com.OsamaClient.newbridge.UI.components.SettingHistory.changed(st) && com.OsamaClient.newbridge.UI.components.SettingHistory.supported(st))
+                        ui.round(x + indent + 0.6f, yy + wh * 0.5f - 0.8f, 1.6f, 1.6f, 0.8f, Theme.accent(0.9f));
+                }
                 else sw.clearHover();
-                if (sw.isHovered()) ClickGui.INSTANCE.hint(sw.description());
+                if (sw.isHovered()) {
+                    ClickGui.INSTANCE.hint(sw.description());
+                    ClickGui.INSTANCE.detail(module, sw.setting());
+                }
                 yy += wh;
             }
             // accent bar on the left edge of the settings block; brighter/thicker when highlighted so it
@@ -136,6 +160,12 @@ public final class ModuleRow {
         }
     }
 
+    public void toggleFavorite() {
+        module.favorite = !module.favorite;
+        com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
+        GuiEvents.fireChanged();
+    }
+
     /** Not drawn this frame (hidden by search, collapsed panel): forget hover state. */
     void clearHover() {
         hovered = false;
@@ -143,9 +173,18 @@ public final class ModuleRow {
     }
 
     boolean mouseClicked(Ui ui, int button, int mods) {
+        {
+            StringBuilder sb = new StringBuilder();
+            for (SettingWidget sw : widgets) if (sw.isHovered()) sb.append(sw.getClass().getSimpleName()).append(',');
+            if (hovered || sb.length() > 0) ClickGui.dbgRows += module.name + "(h=" + hovered + ",exp=" + expanded + "/" + expandA.value() + ",w=" + sb + ");";
+        }
         if (hovered) {
             switch (button) {
                 case Keys.MOUSE_BUTTON_LEFT -> {
+                    if ((mods & Keys.MOD_CONTROL) != 0) {
+                        toggleFavorite();
+                        return true;
+                    }
                     flashA.snap(1f);
                     flashA.setTarget(0f);
                     ClickGui.INSTANCE.safeToggle(module);
@@ -156,6 +195,12 @@ public final class ModuleRow {
                     com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
                 }
                 case Keys.MOUSE_BUTTON_MIDDLE -> {
+                    if ((mods & Keys.MOD_SHIFT) != 0) {
+                        int n = com.OsamaClient.newbridge.UI.components.SettingHistory.resetAll(module);
+                        ClickGui.INSTANCE.toast(n == 0 ? module.name + ": already default" : module.name + ": " + n + " setting(s) reset (Ctrl+Z to undo)");
+                        if (n > 0) GuiEvents.fireChanged();
+                        return true;
+                    }
                     ClickGui.INSTANCE.startBinding(this);
                     com.OsamaClient.newbridge.UI.gui.util.UiSounds.click();
                 }
@@ -165,7 +210,17 @@ public final class ModuleRow {
         }
         if (expanded && expandA.value() > 0.5f) {
             for (SettingWidget sw : widgets) {
-                if (sw.isHovered() && sw.mouseClicked(ui, button, mods)) {
+                if (!sw.isHovered()) continue;
+                var st = sw.setting();
+                boolean undoable = st != null && com.OsamaClient.newbridge.UI.components.SettingHistory.supported(st);
+                if (button == Keys.MOUSE_BUTTON_MIDDLE && undoable) {
+                    boolean ok = com.OsamaClient.newbridge.UI.components.SettingHistory.reset(st);
+                    ClickGui.INSTANCE.toast(ok ? DetailCard.label(st) + " reset to default (Ctrl+Z to undo)" : DetailCard.label(st) + " is already default");
+                    if (ok) GuiEvents.fireChanged();
+                    return true;
+                }
+                if (undoable) com.OsamaClient.newbridge.UI.components.SettingHistory.snapshot(st);
+                if (sw.mouseClicked(ui, button, mods)) {
                     ClickGui.INSTANCE.focus(sw.wantsKeyboard() ? sw : null);
                     return true;
                 }
@@ -180,7 +235,12 @@ public final class ModuleRow {
 
     boolean mouseScrolled(Ui ui, double amount) {
         if (!expanded) return false;
-        for (SettingWidget sw : widgets) if (sw.isHovered() && sw.mouseScrolled(ui, amount)) return true;
+        for (SettingWidget sw : widgets) {
+            if (!sw.isHovered()) continue;
+            var st = sw.setting();
+            if (st != null && com.OsamaClient.newbridge.UI.components.SettingHistory.supported(st)) com.OsamaClient.newbridge.UI.components.SettingHistory.snapshot(st);
+            if (sw.mouseScrolled(ui, amount)) return true;
+        }
         return false;
     }
 

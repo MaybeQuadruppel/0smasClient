@@ -61,10 +61,69 @@ public final class Config {
 
     /** Loads the config (call after ModuleManager.init()) and hooks up saving. */
     public static void init() {
+        backupNow(); // safety copy of whatever the last session left behind
         load();
         GuiEvents.onClosed(Config::save);
         GuiEvents.onChanged(Config::save);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> save());
+    }
+
+    // ------------------------------------------------------------------ backups
+
+    /** Tests redirect this. */
+    public static Path testBackupDir;
+    private static final int KEEP_BACKUPS = 10;
+
+    public static Path backupDir() {
+        return testBackupDir != null ? testBackupDir : FabricLoader.getInstance().getConfigDir().resolve("0smasclient-backups");
+    }
+
+    /** Copies the current config file to a timestamped backup (keeps the newest 10). @return the backup name or null */
+    public static String backupNow() {
+        Path f = file();
+        if (!Files.isRegularFile(f)) return null;
+        try {
+            Files.createDirectories(backupDir());
+            String name = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS"));
+            Files.copy(f, backupDir().resolve(name + ".json"), StandardCopyOption.REPLACE_EXISTING);
+            java.util.List<String> all = listBackups();
+            for (int i = KEEP_BACKUPS; i < all.size(); i++) Files.deleteIfExists(backupDir().resolve(all.get(i) + ".json"));
+            return name;
+        } catch (IOException e) {
+            LOG.warn("Config backup failed", e);
+            return null;
+        }
+    }
+
+    /** Backup names, newest first. */
+    public static java.util.List<String> listBackups() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (!Files.isDirectory(backupDir())) return out;
+        try (var s = Files.list(backupDir())) {
+            s.filter(p -> p.getFileName().toString().endsWith(".json")).forEach(p -> {
+                String n = p.getFileName().toString();
+                out.add(n.substring(0, n.length() - 5));
+            });
+        } catch (IOException ignored) {
+        }
+        out.sort(java.util.Comparator.reverseOrder());
+        return out;
+    }
+
+    /** Restores a backup (null / "latest" = newest) over the live config and applies it. */
+    public static boolean restoreBackup(String name) {
+        java.util.List<String> all = listBackups();
+        if (all.isEmpty()) return false;
+        String pick = name == null || name.equalsIgnoreCase("latest") ? all.get(0) : name;
+        Path b = backupDir().resolve(pick + ".json");
+        if (!Files.isRegularFile(b)) return false;
+        try {
+            Files.copy(b, file(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            return false;
+        }
+        load();
+        return true;
     }
 
     public static void load() {
@@ -178,12 +237,58 @@ public final class Config {
         }
     }
 
+    public static final String SHARE_PREFIX = "NBCFG1:";
+
+    /** Modules, binds and settings as one line of text to share (prefix + base64 of gzipped JSON). */
+    public static String exportString() {
+        try {
+            ConfigCodec.Data data = ConfigCodec.encode(ModuleManager.modules, Map.of(), Map.of(), REGISTRY_IDS);
+            String json = new com.google.gson.Gson().toJson(data.root());
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            try (java.util.zip.GZIPOutputStream gz = new java.util.zip.GZIPOutputStream(bos)) {
+                gz.write(json.getBytes(StandardCharsets.UTF_8));
+            }
+            return SHARE_PREFIX + java.util.Base64.getEncoder().encodeToString(bos.toByteArray());
+        } catch (IOException | RuntimeException e) {
+            LOG.error("Could not export config", e);
+            return null;
+        }
+    }
+
+    /** Applies a string made by {@link #exportString()}; backs the current config up first. */
+    public static boolean importString(String text) {
+        if (text == null) return false;
+        text = text.trim();
+        if (!text.startsWith(SHARE_PREFIX)) return false;
+        try {
+            byte[] raw = java.util.Base64.getDecoder().decode(text.substring(SHARE_PREFIX.length()));
+            String json;
+            try (java.util.zip.GZIPInputStream gz = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(raw))) {
+                json = new String(gz.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            save();
+            backupNow();
+            return applyProfileJson(json);
+        } catch (IOException | RuntimeException e) {
+            LOG.error("Could not import config", e);
+            return false;
+        }
+    }
+
     /** Lädt ein Profil (Module werden passend an/aus geschaltet). GUI-Layout bleibt unverändert. */
     public static boolean loadProfile(String name) {
         Path f = profileFile(name);
         if (f == null || !Files.isRegularFile(f)) return false;
         try {
-            String json = Files.readString(f, StandardCharsets.UTF_8);
+            return applyProfileJson(Files.readString(f, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            LOG.error("Could not load profile {}", f, e);
+            return false;
+        }
+    }
+
+    private static boolean applyProfileJson(String json) {
+        try {
             com.google.gson.JsonObject root = JsonParser.parseString(json).getAsJsonObject();
             ConfigCodec.Data data = new ConfigCodec.Data(root);
 
@@ -213,7 +318,7 @@ public final class Config {
             save(); // aktiver Zustand landet auch in der Hauptconfig
             return true;
         } catch (Exception e) {
-            LOG.error("Could not load profile {}", f, e);
+            LOG.error("Could not apply profile json", e);
             return false;
         }
     }

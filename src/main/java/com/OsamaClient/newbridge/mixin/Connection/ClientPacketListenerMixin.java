@@ -41,6 +41,11 @@ public class ClientPacketListenerMixin {
         }
     }
 
+    @Inject(method = "handleSetTime", at = @At("HEAD"))
+    private void onSetTime(net.minecraft.network.protocol.game.ClientboundSetTimePacket packet, CallbackInfo ci) {
+        com.OsamaClient.newbridge.Utils.TpsTracker.onTimePacket(packet.gameTime());
+    }
+
     @Inject(method = "handleEntityEvent", at = @At("HEAD"))
     private void onEntityEvent(ClientboundEntityEventPacket packet, CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
@@ -53,4 +58,4 @@ public class ClientPacketListenerMixin {
             }
         }
     }
-}
+}

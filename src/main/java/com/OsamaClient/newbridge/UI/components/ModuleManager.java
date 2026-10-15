@@ -97,6 +97,15 @@ public class ModuleManager {
         modules.add(new com.OsamaClient.newbridge.Hacks.Player.AirPlace());
         modules.add(new com.OsamaClient.newbridge.Hacks.Combat.AntiBot());
         modules.add(new com.OsamaClient.newbridge.Hacks.Visual.Viewmodel());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.DamageIndicator());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.SplitChat());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.CheckMeter());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.LegitMode());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.PacketSanitizer());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.quick.QuickMenu());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Misc.NameCensor());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Misc.QuickWaypoint());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Player.InvTweaks());
         modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.PacketBurst());
         modules.add(new com.OsamaClient.newbridge.Hacks.Dupeing.BundleDupe());
 //        modules.add(new TestEnderChestESP());

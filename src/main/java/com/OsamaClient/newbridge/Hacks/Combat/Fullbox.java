@@ -55,6 +55,7 @@ public class Fullbox extends Module {
 
     private double range = 4.5;
     public double range() { return range; }
+    public void clampRange(double max) { if (range > max) range = max; }
     private double blocksPerTick = 2;
     private double delay = 1;
     private String blockMode = "Obsidian";
