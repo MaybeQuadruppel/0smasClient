@@ -736,6 +736,15 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         ctx.runOnClient(mc -> {
             var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
             gui.open();
+            var miner = (com.OsamaClient.newbridge.Hacks.Misc.AutoMiner) ModuleManager.getModuleByName("AutoMiner");
+            for (var b : new net.minecraft.world.level.block.Block[]{Blocks.DIAMOND_ORE, Blocks.ANCIENT_DEBRIS, Blocks.COBBLESTONE})
+                if (!miner.blockPicker().isSelected(b)) miner.blockPicker().toggle(b);
+            var u = com.OsamaClient.newbridge.UI.gui.util.UiSounds.class;
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.click();
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.toggle(true);
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.toggle(false);
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.select(true);
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
             var panel = gui.panel(Module.Category.MISC);
             panel.setCollapsed(false);
             for (var row : panel.rows()) {

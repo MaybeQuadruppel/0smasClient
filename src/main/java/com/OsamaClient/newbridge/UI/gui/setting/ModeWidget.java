@@ -72,15 +72,18 @@ public class ModeWidget extends SettingWidget {
     public boolean mouseClicked(Ui ui, int button, int mods) {
         if (hoveredOption >= 0 && open) {
             mode.setIndex(hoveredOption);
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.select(true);
             setOpen(false);
             return true;
         }
         if (button == Keys.MOUSE_BUTTON_LEFT) {
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
             setOpen(!open);
             return true;
         }
         if (button == Keys.MOUSE_BUTTON_RIGHT) {
             mode.setIndex((mode.getIndex() + 1) % mode.getModes().size());
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.select(true);
             return true;
         }
         return false;

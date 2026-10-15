@@ -43,6 +43,11 @@ public class ClickGuiModule extends Module {
     public final ToggleButton settingHighlight = new ToggleButton("Setting Highlight", true, null)
             .withDescription("Give an expanded module's settings a distinct background so they stand out from the row list");
 
+    public final ToggleButton sounds = new ToggleButton("Sounds", true, null)
+            .withDescription("Small click sounds when using the GUI");
+    public final Slider soundVolume = new Slider("Sound Volume", 0.1, 2.0, 1.0, 0.1, null)
+            .withDescription("Volume of the GUI sounds");
+
     public ClickGuiModule() {
         super("ClickGui", "Opens this GUI", Category.CLIENT);
         INSTANCE = this;
@@ -61,6 +66,8 @@ public class ClickGuiModule extends Module {
         settings.add(outline);
         settings.add(descriptions);
         settings.add(settingHighlight);
+        settings.add(sounds);
+        settings.add(soundVolume);
     }
 
     @Override

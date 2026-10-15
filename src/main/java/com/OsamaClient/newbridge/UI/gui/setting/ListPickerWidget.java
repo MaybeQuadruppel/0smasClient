@@ -97,7 +97,11 @@ public class ListPickerWidget extends SettingWidget {
         float right = x + w - Theme.PAD;
         ui.chevron(right - 1.3f, y + h * 0.5f, 1.3f, openA.value(), Theme.TEXT_DIM);
         int n = source.selectedCount();
-        ui.textRight(n == 0 ? "None" : n + " selected", right - 4f, y, h, Theme.FONT_SMALL, n == 0 ? Theme.TEXT_DIM : Theme.accent());
+        String badge = n == 0 ? "None" : String.valueOf(n);
+        float bw = Math.max(8f, ui.textWidth(badge, 5.8f) + 4f);
+        float bx = right - 4f - bw;
+        ui.round(bx, y + (h - 6f) * 0.5f, bw, 6f, 3f, n == 0 ? 0x22FFFFFF : Theme.accent(0.2f));
+        ui.textCentered(badge, bx + bw * 0.5f, y, h, 5.8f, n == 0 ? Theme.TEXT_DIM : Theme.accent());
 
         float e = openA.value();
         hoveredIndex = -1;
@@ -137,11 +141,12 @@ public class ListPickerWidget extends SettingWidget {
                 if (icon != null) ui.sprite(icon, tx, iy + (ITEM_H - ICON) * 0.5f, ICON, ICON);
                 tx += ICON + 2f;
             }
+            if (sel) ui.check(left + iw - (source.dot(en.key()) != 0 ? 12.5f : 7.5f), iy + (ITEM_H - 4f) * 0.5f, 4f, 1f, Theme.accent());
             int dot = sel ? source.dot(en.key()) : 0;
             if (dot != 0) {
                 ui.round(left + iw - 5.5f, iy + ITEM_H * 0.5f - 1.25f, 2.5f, 2.5f, 1.25f, dot | 0xFF000000);
             }
-            ui.text(ui.ellipsize(en.name(), left + iw - tx - 8f, 6f), tx, iy, ITEM_H, 6f,
+            ui.text(ui.ellipsize(en.name(), left + iw - tx - 14f, 6f), tx, iy, ITEM_H, 6f,
                     sel ? Theme.accent() : hov ? Theme.TEXT : Theme.TEXT_DIM);
         }
         if (filtered.isEmpty()) ui.textCentered("No matches", left + iw * 0.5f, ly, ITEM_H * 2, 6f, Theme.TEXT_DIM);
@@ -157,7 +162,18 @@ public class ListPickerWidget extends SettingWidget {
 
     @Override
     public boolean mouseClicked(Ui ui, int button, int mods) {
+        if (headerHovered && button == Keys.MOUSE_BUTTON_RIGHT) {
+            // right click on the header clears the selection
+            int cleared = 0;
+            for (Entry en : source.entries()) {
+                if (source.selected(en.key())) { source.toggle(en.key()); cleared++; }
+            }
+            closeEditor();
+            if (cleared > 0) com.OsamaClient.newbridge.UI.gui.util.UiSounds.select(false);
+            return true;
+        }
         if (headerHovered) {
+            com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
             open = !open;
             openA.setTarget(open ? 1f : 0f);
             if (!open) search.end();
@@ -174,6 +190,7 @@ public class ListPickerWidget extends SettingWidget {
             Entry en = filtered.get(hoveredIndex);
             if (button == Keys.MOUSE_BUTTON_LEFT) {
                 source.toggle(en.key());
+                com.OsamaClient.newbridge.UI.gui.util.UiSounds.select(source.selected(en.key()));
                 if (editorEntry != null && editorEntry.key().equals(en.key()) && !source.selected(en.key())) closeEditor();
                 // keep the list stable while clicking; re-sort on the next search change / reopen
             } else if (button == Keys.MOUSE_BUTTON_RIGHT && source.selected(en.key())) {

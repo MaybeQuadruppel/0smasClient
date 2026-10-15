@@ -115,6 +115,7 @@ public final class ClickGui {
         Minecraft mc = Minecraft.getInstance();
         panels();
         if (!(mc.gui.screen() instanceof ClickGuiScreen)) mc.gui.setScreen(new ClickGuiScreen());
+        if (!openP.forward()) com.OsamaClient.newbridge.UI.gui.util.UiSounds.open();
         openP.setForward(true);
         buttonsDown = 0;
         lastNanos = 0;
@@ -127,6 +128,7 @@ public final class ClickGui {
         bindingRow = null;
         for (Panel p : panels) p.dragging = false;
         searchBar.close();
+        if (openP.forward()) com.OsamaClient.newbridge.UI.gui.util.UiSounds.close();
         openP.setForward(false);
         onClosed();
     }

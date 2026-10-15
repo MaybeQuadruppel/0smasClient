@@ -45,6 +45,7 @@ public class BoolWidget extends SettingWidget {
     public boolean mouseClicked(Ui ui, int button, int mods) {
         if (button != Keys.MOUSE_BUTTON_LEFT) return false;
         toggle.setValue(!toggle.enabled);
+        com.OsamaClient.newbridge.UI.gui.util.UiSounds.toggle(toggle.enabled);
         return true;
     }
 }

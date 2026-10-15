@@ -172,6 +172,7 @@ public final class Panel {
                 dragDY = ui.mouseY - y;
             } else if (button == Keys.MOUSE_BUTTON_RIGHT) {
                 setCollapsed(!collapsed);
+                com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
             }
             return true;
         }

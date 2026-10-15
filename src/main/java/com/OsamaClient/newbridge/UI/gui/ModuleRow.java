@@ -140,9 +140,18 @@ public final class ModuleRow {
     boolean mouseClicked(Ui ui, int button, int mods) {
         if (hovered) {
             switch (button) {
-                case Keys.MOUSE_BUTTON_LEFT -> ClickGui.INSTANCE.safeToggle(module);
-                case Keys.MOUSE_BUTTON_RIGHT -> setExpanded(!expanded);
-                case Keys.MOUSE_BUTTON_MIDDLE -> ClickGui.INSTANCE.startBinding(this);
+                case Keys.MOUSE_BUTTON_LEFT -> {
+                    ClickGui.INSTANCE.safeToggle(module);
+                    com.OsamaClient.newbridge.UI.gui.util.UiSounds.toggle(module.enabled);
+                }
+                case Keys.MOUSE_BUTTON_RIGHT -> {
+                    setExpanded(!expanded);
+                    com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
+                }
+                case Keys.MOUSE_BUTTON_MIDDLE -> {
+                    ClickGui.INSTANCE.startBinding(this);
+                    com.OsamaClient.newbridge.UI.gui.util.UiSounds.click();
+                }
                 default -> { return false; }
             }
             return true;
