@@ -127,6 +127,7 @@ public final class ClickGui {
         focused = null;
         bindingRow = null;
         for (Panel p : panels) p.dragging = false;
+        for (Panel p : hudPanels) p.dragging = false;
         searchBar.close();
         if (openP.forward()) com.OsamaClient.newbridge.UI.gui.util.UiSounds.close();
         openP.setForward(false);
@@ -200,7 +201,7 @@ public final class ClickGui {
         ui.alpha = open;
         drawHelp(); // under the panels
 
-        List<Panel> ps = panels();
+        List<Panel> ps = active();
         for (Panel p : ps) p.drag(ui);
         Panel top = topPanelAtMouse();
 
@@ -217,43 +218,107 @@ public final class ClickGui {
         ui.alpha = open;
 
         searchBar.draw(ui);
-        drawDock();
+        drawTabs();
         drawTooltip(dt);
     }
 
-    // ------------------------------------------------------------------ dock (Waypoints, Profiles, ...)
+    // ------------------------------------------------------------------ tabs (Modules, HUD, windows ...)
 
-    private final java.util.List<float[]> dockRects = new java.util.ArrayList<>();
+    private int tab; // 0 = Modules, 1 = HUD
+    private final List<Panel> hudPanels = new ArrayList<>();
+    private final Anim tabA = new Anim(0f, 16f);
 
-    /** Kleine Leiste unten rechts mit Buttons für die eigenen Fenster. */
-    private void drawDock() {
-        var entries = com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.dock();
-        dockRects.clear();
-        if (entries.isEmpty()) return;
-        float h = 12f, gap = 3f, pad = 6f;
-        float total = 0;
-        for (var e : entries) total += ui.textWidth(e.label(), Theme.FONT_SMALL) + 2 * pad + gap;
-        float x = ui.width() - total - 4f, y = ui.height() - h - 4f;
-        for (var e : entries) {
-            float w = ui.textWidth(e.label(), Theme.FONT_SMALL) + 2 * pad;
+    private static final String[] HUD_MAIN = {"HudOverlay"};
+    private static final String[] HUD_MORE = {"Minimap", "ArrayList", "TeammateList", "HealthIndicator", "Nametags", "Breadcrumbs"};
+
+    public int tab() { return tab; }
+
+    public void setTab(int t) {
+        if (t == tab) return;
+        tab = t;
+        for (Panel p : panels) p.dragging = false;
+        for (Panel p : hudPanels()) p.dragging = false;
+        com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
+    }
+
+    private List<Panel> hudPanels() {
+        if (hudPanels.isEmpty()) {
+            addHudPanel("HUD", HUD_MAIN, 8f);
+            addHudPanel("Overlays", HUD_MORE, 8f + Theme.panelW() + Theme.GAP);
+        }
+        return hudPanels;
+    }
+
+    private void addHudPanel(String title, String[] names, float x) {
+        List<Module> mods = new ArrayList<>();
+        for (String n : names) {
+            Module m = ModuleManager.getModuleByName(n);
+            if (m != null) mods.add(m);
+        }
+        if (mods.isEmpty()) return;
+        Panel p = new Panel(Module.Category.VISUAL, title, mods);
+        p.x = x;
+        p.y = 8f;
+        hudPanels.add(p);
+    }
+
+    /** Panels of the current tab. */
+    private List<Panel> active() {
+        panels();
+        return tab == 1 ? hudPanels() : panels;
+    }
+
+    private record Tab(String label, String description, boolean selected, Runnable action) {}
+
+    private final java.util.List<float[]> tabRects = new java.util.ArrayList<>();
+    private final java.util.List<Tab> tabList = new java.util.ArrayList<>();
+
+    private void buildTabs() {
+        tabList.clear();
+        tabList.add(new Tab("Modules", "All modules by category", tab == 0, () -> setTab(0)));
+        tabList.add(new Tab("HUD", "HUD overlay, keystrokes, minimap, module list and other on-screen elements", tab == 1, () -> setTab(1)));
+        for (var e : com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.dock()) {
+            tabList.add(new Tab(e.label(), e.description(), false,
+                    () -> com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(e.factory().get())));
+        }
+    }
+
+    /** Tab bar at the bottom center: view tabs (Modules / HUD) and buttons for the own windows. */
+    private void drawTabs() {
+        buildTabs();
+        tabRects.clear();
+        float h = 12f, gap = 2f, pad = 6f;
+        float total = -gap;
+        for (Tab t : tabList) total += ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad + gap;
+        float x = (ui.width() - total) * 0.5f, y = ui.height() - h - 4f;
+        float barPad = 2.5f;
+        ui.glow(x - barPad, y - barPad, total + 2 * barPad, h + 2 * barPad, Theme.radius() + 1f, 6f, Theme.accent(0.1f * Theme.glow()));
+        ui.round(x - barPad, y - barPad, total + 2 * barPad, h + 2 * barPad, Theme.radius() + 1f, Theme.panelBg());
+        ui.outline(x - barPad, y - barPad, total + 2 * barPad, h + 2 * barPad, Theme.radius() + 1f, 1f, Theme.OUTLINE);
+        for (int i = 0; i < tabList.size(); i++) {
+            Tab t = tabList.get(i);
+            float w = ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad;
             boolean hover = ui.hovered(x, y, w, h);
-            float g = Theme.glow();
-            if (g > 0) ui.glow(x, y, w, h, Theme.radius(), 5f, Theme.accent((hover ? 0.3f : 0.12f) * g));
-            ui.round(x, y, w, h, Theme.radius(), hover ? Theme.ROW_HOVER : Theme.panelBg());
-            ui.outline(x, y, w, h, Theme.radius(), 1f, hover ? Theme.accent(0.9f) : Theme.OUTLINE);
-            ui.textCentered(e.label(), x + w / 2f, y, h, Theme.FONT_SMALL, hover ? Theme.TEXT : Theme.TEXT_DIM);
-            if (hover) hint(e.description());
-            dockRects.add(new float[]{x, y, w, h});
+            if (t.selected()) {
+                ui.round(x, y, w, h, Theme.radius(), Theme.accent(0.28f));
+                ui.round(x + 3f, y + h - 1.6f, w - 6f, 1.1f, 0.55f, Theme.accent());
+            } else if (hover) {
+                ui.round(x, y, w, h, Theme.radius(), Theme.ROW_HOVER);
+            }
+            ui.textCentered(t.label(), x + w / 2f, y, h, Theme.FONT_SMALL,
+                    t.selected() ? Theme.TEXT : hover ? Theme.TEXT : Theme.TEXT_DIM);
+            if (hover) hint(t.description());
+            tabRects.add(new float[]{x, y, w, h});
             x += w + gap;
         }
     }
 
-    private boolean dockClicked() {
-        var entries = com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.dock();
-        for (int i = 0; i < dockRects.size() && i < entries.size(); i++) {
-            float[] r = dockRects.get(i);
+    private boolean tabClicked() {
+        for (int i = 0; i < tabRects.size() && i < tabList.size(); i++) {
+            float[] r = tabRects.get(i);
             if (ui.mouseX >= r[0] && ui.mouseX < r[0] + r[2] && ui.mouseY >= r[1] && ui.mouseY < r[1] + r[3]) {
-                com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(entries.get(i).factory().get());
+                com.OsamaClient.newbridge.UI.gui.util.UiSounds.click();
+                tabList.get(i).action().run();
                 return true;
             }
         }
@@ -261,7 +326,7 @@ public final class ClickGui {
     }
 
     private Panel topPanelAtMouse() {
-        List<Panel> ps = panels();
+        List<Panel> ps = active();
         for (int i = ps.size() - 1; i >= 0; i--) if (ps.get(i).contains(ui.mouseX, ui.mouseY)) return ps.get(i);
         return null;
     }
@@ -318,7 +383,7 @@ public final class ClickGui {
             bindingRow.binding = false;
             bindingRow = null;
         }
-        if (button == Keys.MOUSE_BUTTON_LEFT && dockClicked()) return;
+        if (button == Keys.MOUSE_BUTTON_LEFT && tabClicked()) return;
         if (searchBar.mouseClicked(button)) {
             if (focused != null) focused.blur();
             focused = null;
@@ -332,8 +397,9 @@ public final class ClickGui {
         if (top != null) {
             consumed = top.mouseClicked(ui, button, mods);
             // bring to front
-            panels.remove(top);
-            panels.add(top);
+            List<Panel> act = active();
+            act.remove(top);
+            act.add(top);
         }
         if (wasFocused != null && wasFocused != focused) wasFocused.blur();
         if (!consumed) focused = null;
@@ -342,6 +408,7 @@ public final class ClickGui {
     public void mouseReleased(int button) {
         buttonsDown &= ~(1 << button);
         for (Panel p : panels) p.mouseReleased(ui, button);
+        for (Panel p : hudPanels) p.mouseReleased(ui, button);
     }
 
     public void mouseScrolled(double amount) {
@@ -380,7 +447,8 @@ public final class ClickGui {
             close();
             return;
         }
-        for (int i = panels.size() - 1; i >= 0; i--) if (panels.get(i).hoverKey(key, mods)) return;
+        List<Panel> act = active();
+        for (int i = act.size() - 1; i >= 0; i--) if (act.get(i).hoverKey(key, mods)) return;
     }
 
     public void charTyped(int codepoint) {

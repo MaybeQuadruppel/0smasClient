@@ -30,6 +30,8 @@ public class ListPickerWidget extends SettingWidget {
         default int dot(Object key) { return 0; }
         /** Small icon (e.g. the block texture) shown in front of the entry name, or null. */
         default net.minecraft.client.renderer.texture.TextureAtlasSprite icon(Object key) { return null; }
+        /** Small dim text at the right of an entry (e.g. a price), or null. */
+        default String detail(Object key) { return null; }
         /** true = reserve the icon column for every row so names stay aligned. */
         default boolean hasIcons() { return false; }
         /** Editor for a selected entry (RMB), or null. */
@@ -141,6 +143,8 @@ public class ListPickerWidget extends SettingWidget {
                 if (icon != null) ui.sprite(icon, tx, iy + (ITEM_H - ICON) * 0.5f, ICON, ICON);
                 tx += ICON + 2f;
             }
+            String detail = source.detail(en.key());
+            if (detail != null) ui.textRight(detail, left + iw - (source.dot(en.key()) != 0 ? 14f : 9f), iy, ITEM_H, 5.6f, Theme.accent(0.85f));
             if (sel) ui.check(left + iw - (source.dot(en.key()) != 0 ? 12.5f : 7.5f), iy + (ITEM_H - 4f) * 0.5f, 4f, 1f, Theme.accent());
             int dot = sel ? source.dot(en.key()) : 0;
             if (dot != 0) {

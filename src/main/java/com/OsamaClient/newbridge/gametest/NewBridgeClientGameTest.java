@@ -86,6 +86,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("glide: limits the fall speed", () -> testGlide(ctx, srv));
             run("fastladder: climbs faster than vanilla", () -> testFastLadder(ctx, srv));
             run("antiafk: acts after the interval", () -> testAntiAfk(ctx, srv));
+            run("ui tabs + hud keystrokes + enchantment picker (screenshots)", () -> testUiTabsAndHud(ctx, srv));
             run("block picker: block icons render next to the names (screenshot)", () -> testBlockPickerIcons(ctx));
             run("clickburst: one click fires N clicks", () -> testClickBurst(ctx, srv));
             run("spawnerfinder: finds a spawner in loaded chunks", () -> testSpawnerFinder(ctx, srv));
@@ -873,6 +874,79 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         double x3 = ctx.computeOnClient(mc -> mc.player.getX());
         assertTrue(x1 - x0 > 3.0, "did not walk: " + (x1 - x0));
         assertTrue(Math.abs(x3 - x2) < 0.05, "kept walking after disable: " + (x3 - x2));
+    }
+
+    private void testUiTabsAndHud(ClientGameTestContext ctx, TestServerContext srv) {
+        try {
+            uiTabsAndHud(ctx, srv);
+        } finally {
+            ctx.runOnClient(mc -> {
+                mc.options.keyUp.setDown(false);
+                mc.options.keyAttack.setDown(false);
+                var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+                gui.setTab(0);
+                if (gui.isOpen()) gui.close();
+                var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+                if (h.enabled) h.toggle();
+            });
+            ctx.waitTicks(20);
+        }
+    }
+
+    private void uiTabsAndHud(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -2, Y - 1, -2, 16, Y - 1, 2, "stone");
+        teleport(ctx, srv, 0, Y, 0);
+        // HUD with keystrokes (keys held)
+        ctx.runOnClient(mc -> {
+            var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+            if (!h.enabled) h.toggle();
+            h.showKeys.enabled = true;
+            h.showCps.enabled = true;
+            mc.options.keyUp.setDown(true);
+            mc.options.keyAttack.setDown(true);
+        });
+        ctx.waitTicks(20);
+        Path hud = ctx.takeScreenshot("newbridge_hud_keystrokes");
+        log("HUD screenshot: " + hud);
+        ctx.runOnClient(mc -> { mc.options.keyUp.setDown(false); mc.options.keyAttack.setDown(false); });
+        ctx.waitTicks(5);
+        // Tabs: HUD tab and enchantment picker
+        ctx.runOnClient(mc -> {
+            var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+            gui.open();
+            gui.setTab(1);
+        });
+        ctx.waitTicks(30);
+        Path hudTab = ctx.takeScreenshot("newbridge_clickgui_hud_tab");
+        log("HUD tab screenshot: " + hudTab);
+        int tab = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.tab());
+        assertTrue(tab == 1, "HUD tab not active");
+        ctx.runOnClient(mc -> {
+            var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+            gui.setTab(0);
+            var trade = ModuleManager.getModuleByName("AutoLibrarian");
+            try {
+                Field f = trade.getClass().getDeclaredField("enchantPicker");
+                f.setAccessible(true);
+                var ep = (com.OsamaClient.newbridge.UI.components.EnchantmentPicker) f.get(trade);
+                ep.selectedEnchantments.put("Mending", 12);
+                ep.selectedEnchantments.put("Sharpness", 20);
+            } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+            var panel = gui.panel(trade.category);
+            for (var row : panel.rows()) {
+                if (row.module() != trade) continue;
+                row.setExpanded(true);
+                panel.scrollToRow(row);
+                for (var w : row.widgets()) if (w instanceof com.OsamaClient.newbridge.UI.gui.setting.ListPickerWidget lp) lp.setOpen(true);
+            }
+        });
+        ctx.waitTicks(40);
+        Path ench = ctx.takeScreenshot("newbridge_enchant_picker");
+        log("Enchant screenshot: " + ench);
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.close());
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> { var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance; if (h.enabled) h.toggle(); });
     }
 
     // ------------------------------------------------------------------ helpers

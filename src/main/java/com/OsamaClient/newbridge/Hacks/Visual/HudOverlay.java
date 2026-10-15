@@ -71,15 +71,20 @@ public class HudOverlay extends Module {
     public final ToggleButton showBiome = new ToggleButton("Biome", false, null)
             .withDescription("Aktuelles Biom");
 
+    public final ToggleButton showKeys = new ToggleButton("Keystrokes", true, null)
+            .withDescription("WASD, Space and mouse buttons as little keys that light up while pressed");
+    public final ToggleButton showCps = new ToggleButton("Keystroke CPS", true, null)
+            .withDescription("Shows clicks per second on the mouse keys");
+
     // eigene Pipeline, unabhängig von ClickGui - zeichnet jeden Frame, egal ob die ClickGUI offen ist
     private static final UiRenderer renderer = new UiRenderer();
     private static final Ui ui = new Ui(renderer);
 
     private static final float ROW_H = 11f, ICON = 8f, PAD = 4f, GAP = 3f, WIDGET_GAP = 4f;
     private static final float CAPTION_H = 9f, ANIM_SPEED = 0.16f;
-    private static final String[] WIDGET_IDS = {"coords", "facing", "health", "armor", "speed", "fps", "ping", "biome"};
+    private static final String[] WIDGET_IDS = {"coords", "facing", "health", "armor", "speed", "fps", "ping", "biome", "keys"};
     private static final String[] WIDGET_TITLES =
-            {"Coordinates", "Facing", "Health", "Armor", "Speed", "FPS", "Ping", "Biome"};
+            {"Coordinates", "Facing", "Health", "Armor", "Speed", "FPS", "Ping", "Biome", "Keys"};
 
     private final Map<String, Widget> widgets = new LinkedHashMap<>();
     private boolean editMode;
@@ -101,6 +106,8 @@ public class HudOverlay extends Module {
         settings.add(showFps);
         settings.add(showPing);
         settings.add(showBiome);
+        settings.add(showKeys);
+        settings.add(showCps);
 
         HudOverlayItemLayer.register();
     }
@@ -222,7 +229,8 @@ public class HudOverlay extends Module {
         for (int idx = 0; idx < WIDGET_IDS.length; idx++) {
             String id = WIDGET_IDS[idx];
             String title = WIDGET_TITLES[idx];
-            List<Row> rows = rowsFor(id, mc);
+            boolean special = id.equals("keys");
+            List<Row> rows = special ? (showKeys.enabled ? KEYS_MARKER : List.of()) : rowsFor(id, mc);
             boolean active = !rows.isEmpty();
 
             Widget w = widgets.computeIfAbsent(id, k -> new Widget());
@@ -239,6 +247,10 @@ public class HudOverlay extends Module {
             float contentW = (showIcons ? ICON + GAP : 0f) + maxTextW;
             float boxW = Math.max(contentW, captionW) + PAD * 2;
             float boxH = CAPTION_H + drawRows.size() * ROW_H + PAD * 2;
+            if (special) {
+                boxW = Math.max(KEY_AREA_W, captionW) + PAD * 2;
+                boxH = CAPTION_H + KEY_AREA_H + PAD * 2;
+            }
 
             Widget wRef = w;
             wRef.w = boxW;
@@ -281,12 +293,13 @@ public class HudOverlay extends Module {
                 ui.round(wRef.x, wRef.y + 1.5f, 1.3f, wRef.h - 3f, 0.65f, Theme.accent(0.6f));
             }
 
-            float captionX = wRef.x + PAD + (showIcons ? ICON + GAP : 0f);
+            float captionX = wRef.x + PAD + (showIcons && !special ? ICON + GAP : 0f);
             ui.text(title.toUpperCase(java.util.Locale.ROOT), captionX, wRef.y + PAD - 1f, CAPTION_H, Theme.FONT_SMALL,
                     ColorUtil.alpha(Theme.TEXT_DIM, 0.9f));
 
             float rowY = wRef.y + PAD + CAPTION_H;
-            for (Row r : drawRows) {
+            if (special) drawKeystrokes(mc, wRef.x + PAD, rowY);
+            else for (Row r : drawRows) {
                 float rowX = wRef.x + PAD;
                 if (showIcons) {
                     float iconY = rowY + (ROW_H - ICON) * 0.5f;
@@ -311,6 +324,56 @@ public class HudOverlay extends Module {
 
             ui.alpha = oldAlpha;
         }
+    }
+
+    // ── Keystrokes ───────────────────────────────────────────────────────────
+
+    private static final List<Row> KEYS_MARKER = List.of(new Row("", 0, ""));
+    private static final float KEY = 10f, KEY_GAP = 1.5f;
+    private static final float KEY_AREA_W = KEY * 3 + KEY_GAP * 2, KEY_AREA_H = KEY * 4 + KEY_GAP * 3;
+    private final float[] keyA = new float[7];
+    private boolean prevLeft, prevRight;
+    private final java.util.ArrayDeque<Long> leftClicks = new java.util.ArrayDeque<>(), rightClicks = new java.util.ArrayDeque<>();
+
+    private static int cps(java.util.ArrayDeque<Long> q, long now) {
+        while (!q.isEmpty() && now - q.peekFirst() > 1000L) q.pollFirst();
+        return q.size();
+    }
+
+    private void drawKeystrokes(Minecraft mc, float x, float y) {
+        var o = mc.options;
+        boolean[] down = {o.keyUp.isDown(), o.keyLeft.isDown(), o.keyDown.isDown(), o.keyRight.isDown(),
+                o.keyAttack.isDown(), o.keyUse.isDown(), o.keyJump.isDown()};
+        long now = System.currentTimeMillis();
+        if (down[4] && !prevLeft) leftClicks.addLast(now);
+        if (down[5] && !prevRight) rightClicks.addLast(now);
+        prevLeft = down[4];
+        prevRight = down[5];
+        for (int i = 0; i < keyA.length; i++) keyA[i] = approach(keyA[i], down[i] ? 1f : 0f, 0.35f);
+        float step = KEY + KEY_GAP, half = (KEY_AREA_W - KEY_GAP) / 2f;
+        keyCell(x + step, y, KEY, "W", keyA[0]);
+        keyCell(x, y + step, KEY, "A", keyA[1]);
+        keyCell(x + step, y + step, KEY, "S", keyA[2]);
+        keyCell(x + step * 2, y + step, KEY, "D", keyA[3]);
+        String l = showCps.enabled ? "L " + cps(leftClicks, now) : "LMB";
+        String r = showCps.enabled ? "R " + cps(rightClicks, now) : "RMB";
+        keyCellWide(x, y + step * 2, half, l, keyA[4]);
+        keyCellWide(x + half + KEY_GAP, y + step * 2, half, r, keyA[5]);
+        keyCellWide(x, y + step * 3, KEY_AREA_W, "", keyA[6]);
+        float a = keyA[6];
+        ui.round(x + KEY_AREA_W * 0.3f, y + step * 3 + KEY * 0.5f - 0.5f, KEY_AREA_W * 0.4f, 1f, 0.5f,
+                ColorUtil.lerp(Theme.TEXT_DIM, 0xFFFFFFFF, a));
+    }
+
+    private void keyCell(float x, float y, float size, String label, float a) { keyCellWide(x, y, size, label, a); }
+
+    private void keyCellWide(float x, float y, float w, String label, float a) {
+        float r = Math.max(1.2f, Theme.radius() * 0.8f);
+        int accent = Theme.accent();
+        ui.round(x, y, w, KEY, r, ColorUtil.lerp(0xFF1B1B21, ColorUtil.alpha(accent, 0.9f), a * 0.85f));
+        ui.outline(x, y, w, KEY, r, 1f, ColorUtil.lerp(Theme.OUTLINE, accent, a));
+        if (!label.isEmpty())
+            ui.textCentered(label, x + w * 0.5f, y, KEY, Theme.FONT_SMALL, ColorUtil.lerp(Theme.TEXT_DIM, 0xFFFFFFFF, a));
     }
 
     private boolean noWidgetDragging() {

@@ -281,6 +281,11 @@ public final class SettingWidgets {
 
             public int selectedCount() { return picker.selectedEnchantments.size(); }
 
+            public String detail(Object key) {
+                Integer price = picker.selectedEnchantments.get(key);
+                return price == null ? null : "max " + price;
+            }
+
             public SettingWidget editor(ListPickerWidget.Entry e) {
                 String name = (String) e.key();
                 Slider price = new Slider("Max price: " + name, 1, 64,
