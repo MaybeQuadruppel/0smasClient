@@ -43,6 +43,20 @@ public final class Panel {
 
     public List<ModuleRow> rows() { return rows; }
 
+    /** Small identity colour per category, shown as the dot in front of the panel title. */
+    private static int categoryColor(Module.Category c) {
+        return switch (c) {
+            case COMBAT -> 0xFFFF5C6C;
+            case MOVEMENT -> 0xFF5CE1A0;
+            case VISUAL -> 0xFFB48CFF;
+            case MISC -> 0xFFFFC857;
+            case Donut -> 0xFF58D0FF;
+            case CLIENT -> 0xFF8A9BFF;
+            case PLAYER -> 0xFFFF9A5C;
+            case TROLL -> 0xFFFF7ACB;
+        };
+    }
+
     /** Scrolls the list so that the row is at the top (also used by tests). */
     public void scrollToRow(ModuleRow row) {
         float off = 0;
@@ -111,11 +125,16 @@ public final class Panel {
 
         // glow + body
         float g = Theme.glow();
+        ui.glow(x, yy + 2f, w, totalH, radius, 9f, 0x55000000); // soft drop shadow for depth
         if (g > 0) ui.glow(x, yy, w, totalH, radius, 7f, Theme.accent(0.16f * g));
         ui.round(x, yy, w, totalH, radius, Theme.panelBg());
+        ui.gradientV(x, yy, w, headerH, radius, Theme.accent(0.14f + 0.06f * headerHoverA.value()), Theme.accent(0f));
 
         // header
-        ui.text(title, x + Theme.PAD + 2f, yy, headerH, Theme.FONT, Theme.TEXT);
+        int dot = categoryColor(category);
+        ui.glow(x + Theme.PAD + 0.5f, yy + headerH * 0.5f - 1.5f, 3f, 3f, 1.5f, 3f, ColorUtil.alpha(dot, 0.5f));
+        ui.round(x + Theme.PAD + 0.5f, yy + headerH * 0.5f - 1.5f, 3f, 3f, 1.5f, dot);
+        ui.text(title, x + Theme.PAD + 6f, yy, headerH, Theme.FONT, Theme.TEXT);
         int enabled = 0;
         for (ModuleRow r : rows) if (r.module.enabled) enabled++;
         String count = enabled + "/" + rows.size();

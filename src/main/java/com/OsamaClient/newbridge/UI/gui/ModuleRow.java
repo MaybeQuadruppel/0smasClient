@@ -23,7 +23,7 @@ public final class ModuleRow {
     /** Lower-case name for the search filter (computed once, not per frame). */
     final String searchName;
     final List<SettingWidget> widgets = new ArrayList<>();
-    private final Anim toggleA, hoverA = new Anim(0f, 18f), expandA = new Anim(0f, 14f);
+    private final Anim toggleA, hoverA = new Anim(0f, 18f), expandA = new Anim(0f, 14f), flashA = new Anim(0f, 9f);
     private boolean expanded;
     boolean binding;
     private boolean hovered;
@@ -68,6 +68,7 @@ public final class ModuleRow {
         hoverA.update(ui.dt, speed);
         toggleA.update(ui.dt, speed);
         expandA.update(ui.dt, speed);
+        flashA.update(ui.dt, speed);
         if (hovered) ClickGui.INSTANCE.hint(module.description);
 
         float t = toggleA.value(), hv = hoverA.value();
@@ -75,11 +76,15 @@ public final class ModuleRow {
         if (ui.visible(x, y, w, h)) {
             ui.rect(x, y, w, h, ColorUtil.lerp(Theme.ROW, Theme.ROW_HOVER, hv));
             if (t > 0.001f) {
-                ui.rect(x, y, w, h, Theme.accent(0.20f * t));
+                // accent sweeps in from the left when the module turns on (and retracts when it turns off)
+                ui.rect(x, y, w, h, Theme.accent(0.06f * t));
+                ui.gradientH(x, y, w * Anim.easeOutCubic(t), h, 0, Theme.accent(0.30f * Math.min(1f, t * 1.5f)), Theme.accent(0.07f));
                 float bar = 1.5f * t;
                 ui.glow(x, y + 1.5f, bar, h - 3f, 0.75f, 4f, Theme.accent(0.55f * t * Theme.glow()));
                 ui.round(x, y + 1.5f, bar, h - 3f, 0.75f, Theme.accent());
             }
+            if (flashA.value() > 0.002f) ui.rect(x, y, w, h, ColorUtil.alpha(0xFFFFFFFF, 0.14f * flashA.value()));
+            ui.rect(x, y + h - 1f / ui.scale, w, 1f / ui.scale, 0x0DFFFFFF); // hairline between rows
             int textColor = ColorUtil.lerp(TEXT_OFF, 0xFFFFFFFF, t);
             float textX = x + Theme.PAD + 1.5f * t + 1f;
             String right;
@@ -141,6 +146,8 @@ public final class ModuleRow {
         if (hovered) {
             switch (button) {
                 case Keys.MOUSE_BUTTON_LEFT -> {
+                    flashA.snap(1f);
+                    flashA.setTarget(0f);
                     ClickGui.INSTANCE.safeToggle(module);
                     com.OsamaClient.newbridge.UI.gui.util.UiSounds.toggle(module.enabled);
                 }

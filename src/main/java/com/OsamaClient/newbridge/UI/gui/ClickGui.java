@@ -227,6 +227,7 @@ public final class ClickGui {
     private int tab; // 0 = Modules, 1 = HUD
     private final List<Panel> hudPanels = new ArrayList<>();
     private final Anim tabA = new Anim(0f, 16f);
+    private final Anim pillX = new Anim(0f, 20f), pillW = new Anim(0f, 20f);
 
     private static final String[] HUD_MAIN = {"HudOverlay"};
     private static final String[] HUD_MORE = {"Minimap", "ArrayList", "TeammateList", "HealthIndicator", "Nametags", "Breadcrumbs"};
@@ -295,14 +296,28 @@ public final class ClickGui {
         ui.glow(x - barPad, y - barPad, total + 2 * barPad, h + 2 * barPad, Theme.radius() + 1f, 6f, Theme.accent(0.1f * Theme.glow()));
         ui.round(x - barPad, y - barPad, total + 2 * barPad, h + 2 * barPad, Theme.radius() + 1f, Theme.panelBg());
         ui.outline(x - barPad, y - barPad, total + 2 * barPad, h + 2 * barPad, Theme.radius() + 1f, 1f, Theme.OUTLINE);
+        // the selection pill glides between the view tabs instead of jumping
+        float px = x;
+        for (Tab t : tabList) {
+            float tw = ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad;
+            if (t.selected()) {
+                pillX.setTarget(px);
+                pillW.setTarget(tw);
+                if (pillW.value() == 0f) { pillX.snap(px); pillW.snap(tw); }
+            }
+            px += tw + gap;
+        }
+        pillX.update(ui.dt, Theme.animSpeed());
+        pillW.update(ui.dt, Theme.animSpeed());
+        if (pillW.value() > 0.5f) {
+            ui.round(pillX.value(), y, pillW.value(), h, Theme.radius(), Theme.accent(0.28f));
+            ui.round(pillX.value() + 3f, y + h - 1.6f, pillW.value() - 6f, 1.1f, 0.55f, Theme.accent());
+        }
         for (int i = 0; i < tabList.size(); i++) {
             Tab t = tabList.get(i);
             float w = ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad;
             boolean hover = ui.hovered(x, y, w, h);
-            if (t.selected()) {
-                ui.round(x, y, w, h, Theme.radius(), Theme.accent(0.28f));
-                ui.round(x + 3f, y + h - 1.6f, w - 6f, 1.1f, 0.55f, Theme.accent());
-            } else if (hover) {
+            if (!t.selected() && hover) {
                 ui.round(x, y, w, h, Theme.radius(), Theme.ROW_HOVER);
             }
             ui.textCentered(t.label(), x + w / 2f, y, h, Theme.FONT_SMALL,

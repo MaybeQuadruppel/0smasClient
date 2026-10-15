@@ -142,6 +142,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("macros: macro runs a .client command (creates waypoint)", () -> testMacros(ctx));
             run("autolog: triggers on low health (dry run) and disables itself", () -> testAutoLog(ctx));
             run("waypoints: death waypoint on death", () -> testDeathWaypoint(ctx, srv));
+            run("fuzz: every module on/off with all settings at min/max/cycled, no exceptions", () -> guarded(ctx, srv, () -> testFuzzModules(ctx, srv)));
         } finally {
             writeReport(ctx);
         }
@@ -1783,5 +1784,94 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void testFuzzModules(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        // the fuzz flips many settings; a profile snapshot restores them so neither later tests nor the saved config are polluted
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.config.Config.saveProfile("fuzzbackup"));
+        try {
+            fuzzBody(ctx, srv);
+        } finally {
+            ctx.runOnClient(mc -> {
+                com.OsamaClient.newbridge.config.Config.loadProfile("fuzzbackup");
+                com.OsamaClient.newbridge.config.Config.deleteProfile("fuzzbackup");
+            });
+        }
+    }
+
+    private void fuzzBody(ClientGameTestContext ctx, TestServerContext srv) {
+        java.nio.file.Path logFile = java.nio.file.Path.of("logs", "latest.log");
+        long before;
+        try { before = java.nio.file.Files.size(logFile); } catch (java.io.IOException e) { before = 0; }
+        java.util.Set<String> skip = java.util.Set.of("AutoLog", "Spam", "AutoSell", "ClickGui", "RtpFinder", "Freecam", "AutoMiner");
+        java.util.List<String> names = ctx.computeOnClient(mc -> {
+            java.util.List<String> l = new java.util.ArrayList<>();
+            for (var m : ModuleManager.modules) l.add(m.name);
+            return l;
+        });
+        int tested = 0;
+        StringBuilder thrown = new StringBuilder();
+        for (String n : names) {
+            if (skip.contains(n)) continue;
+            try {
+            ctx.runOnClient(mc -> {
+                var m = ModuleManager.getModuleByName(n);
+                if (m != null && !m.enabled) m.toggle();
+            });
+            ctx.waitTicks(2);
+            ctx.runOnClient(mc -> {
+                var m = ModuleManager.getModuleByName(n);
+                if (m == null) return;
+                for (var c : m.settings) {
+                    if (c instanceof com.OsamaClient.newbridge.UI.components.Slider sl) {
+                        double old = sl.getValue();
+                        sl.setValue(sl.getMin());
+                        sl.setValue(sl.getMax());
+                        sl.setValue(old);
+                    } else if (c instanceof com.OsamaClient.newbridge.UI.components.ToggleButton tb) {
+                        boolean old = tb.enabled;
+                        tb.setValue(!old);
+                        tb.setValue(old);
+                    } else if (c instanceof com.OsamaClient.newbridge.UI.components.ModeButton mb) {
+                        int old = mb.getIndex();
+                        for (int i = 0; i < mb.getModes().size(); i++) mb.setIndex(i);
+                        mb.setIndex(old);
+                    }
+                }
+            });
+            ctx.waitTicks(3);
+            ctx.runOnClient(mc -> {
+                var m = ModuleManager.getModuleByName(n);
+                if (m != null && m.enabled) m.toggle();
+                if (mc.player != null) mc.player.getInventory().setSelectedSlot(0);
+                mc.options.keyUp.setDown(false);
+                mc.options.keyShift.setDown(false);
+                mc.options.keyUse.setDown(false);
+            });
+            } catch (RuntimeException ex) {
+                thrown.append(n).append(": ").append(ex).append('\n');
+                ctx.runOnClient(mc -> { var m = ModuleManager.getModuleByName(n); if (m != null) m.enabled = false; });
+            }
+            ctx.waitTicks(1);
+            com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.discard();
+            tested++;
+        }
+        StringBuilder bad = new StringBuilder(thrown);
+        try {
+            byte[] all = java.nio.file.Files.readAllBytes(logFile);
+            String added = new String(all, (int) Math.min(before, all.length), (int) (all.length - Math.min(before, all.length)), java.nio.charset.StandardCharsets.UTF_8);
+            for (String line : added.split("\n")) {
+                if (line.contains("Exception") || line.contains("/ERROR]")) {
+                    if (line.contains("FAIL ")) continue;
+                    if (bad.length() < 1500) bad.append(line.strip(), 0, Math.min(line.strip().length(), 200)).append('\n');
+                }
+            }
+        } catch (java.io.IOException e) {
+            log("fuzz: log not readable: " + e);
+        }
+        log("fuzz tested " + tested + " modules");
+        assertTrue(bad.length() == 0, "exceptions logged while fuzzing:\n" + bad);
+        assertTrue(tested > 80, "only " + tested + " modules fuzzed");
     }
 }

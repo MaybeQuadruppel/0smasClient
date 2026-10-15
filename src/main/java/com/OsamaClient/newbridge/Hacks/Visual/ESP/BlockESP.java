@@ -305,7 +305,7 @@ public class BlockESP extends Module {
 
     @Override
     public void onDisable() {
-        renderBoxes.clear();
+        renderBoxes = List.of();
         super.onDisable();
     }
 
