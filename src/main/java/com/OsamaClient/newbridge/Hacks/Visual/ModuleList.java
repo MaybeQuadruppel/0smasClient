@@ -102,7 +102,7 @@ public class ModuleList extends Module {
                 || mc.gui.hud.isHidden()
                 || mc.getDebugOverlay().showDebugScreen()
                 || ClickGui.INSTANCE.isOpen()
-                || mc.gui.screen() != null) {
+                || (mc.gui.screen() != null && !HudOverlay.editing())) {
             // Drain all animations to 0 so they fade out cleanly on hide
             for (float[] s : anim.values()) { s[0] = 0f; s[1] = 0f; }
             return;
@@ -157,10 +157,14 @@ public class ModuleList extends Module {
         FontAtlas atlas = ui.font(textSize);
         float lineH = atlas.lineHeight / ui.scale;
         float rowH = lineH + ROW_GAP;
-        float rightEdge = ui.width() - RIGHT_MARGIN;
+        float[] org = HudLayout.origin("modulelist", (ui.width() - RIGHT_MARGIN) * ui.scale, START_Y * ui.scale,
+                mc.getWindow().getWidth(), mc.getWindow().getHeight());
+        float rightEdge = org[0] / ui.scale;
+        float baseY = org[1] / ui.scale;
         float radius = Theme.radius();
+        float maxW = 0f;
 
-        float targetY = START_Y;
+        float targetY = baseY;
         for (int i = 0; i < order.size(); i++) {
             String name = order.get(i);
             float[] s = anim.get(name);
@@ -194,6 +198,7 @@ public class ModuleList extends Module {
 
             // Akzent-Leiste am Bildschirmrand: liest Theme.accent(), läuft also automatisch im
             // Regenbogen mit, wenn "Rainbow Accent" in der ClickGUI aktiv ist - ohne Extra-Code hier.
+            maxW = Math.max(maxW, lw + 6f);
             ui.rect(rightEdge + RIGHT_MARGIN - ACCENT_W, renderY - 1, ACCENT_W, lineH + 2, Theme.accent());
 
             if (instance.letterFade) {
@@ -226,6 +231,11 @@ public class ModuleList extends Module {
 
             targetY += rowH;
         }
+
+        float boxW = Math.max(maxW, 40f) + 2f;
+        float boxH = Math.max(targetY - baseY, rowH);
+        HudLayout.report("modulelist", "ArrayList", true, (rightEdge + 2f - boxW) * ui.scale + 0f, (baseY - 1f) * ui.scale,
+                boxW * ui.scale, boxH * ui.scale);
 
         renderer.flush();
         UiFont.collect(600);

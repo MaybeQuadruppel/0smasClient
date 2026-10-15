@@ -16,6 +16,26 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GameRenderer.class)
 public abstract class GameRendererUiMixin {
 
+    /**
+     * HudOverlay and TeammateList are drawn BEFORE the vanilla GUI render, so the real item icons and player faces
+     * that HudOverlayItemLayer extracted for them land on top of their panels. While the layout editor is open they
+     * are drawn after instead (the editor screen's blur would otherwise smear them).
+     */
+    @Inject(
+            method = "render()V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/render/GuiRenderer;render()V"
+            )
+    )
+    private void newbridge$drawHudBefore(CallbackInfo ci) {
+        com.OsamaClient.newbridge.Hacks.Visual.HudLayout.nextFrame();
+        if (!HudOverlay.editing()) {
+            HudOverlay.draw();
+            TeammateList.draw();
+        }
+    }
+
     @Inject(
             method = "render()V",
             at = @At(
@@ -31,8 +51,10 @@ public abstract class GameRendererUiMixin {
         com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.frame();
         com.OsamaClient.newbridge.Hacks.Visual.minimap.Minimap.draw();
         ModuleList.draw();
-        HudOverlay.draw();
-        TeammateList.draw();
+        if (HudOverlay.editing()) {
+            HudOverlay.draw();
+            TeammateList.draw();
+        }
         Nametags.draw();
         com.OsamaClient.newbridge.Hacks.Misc.Waypoints.draw();
     }

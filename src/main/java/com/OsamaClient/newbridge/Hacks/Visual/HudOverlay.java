@@ -36,7 +36,7 @@ import java.util.Map;
  * Item-Icon im Badge-Rahmen: das läuft NICHT über diese Pipeline, sondern über {@link HudOverlayItemLayer}
  * (Fabric {@code HudElementRegistry}, läuft vor {@code GuiRenderer#render()} und bekommt dadurch noch einen
  * echten {@code GuiGraphicsExtractor} - der einzige Weg in 26.2, ein Item tatsächlich zu zeichnen, siehe
- * dort für Details). Diese Klasse liefert dem Layer nur die Positionen/Stacks über {@link #pendingIcons}.
+ * dort für Details). Diese Klasse liefert dem Layer nur die Positionen/Stacks über {@link HudIcons}.
  */
 public class HudOverlay extends Module {
 
@@ -71,6 +71,18 @@ public class HudOverlay extends Module {
     public final ToggleButton showBiome = new ToggleButton("Biome", false, null)
             .withDescription("Aktuelles Biom");
 
+    public final ToggleButton showHeld = new ToggleButton("Held Item", true, null)
+            .withDescription("The item in your main hand with its durability");
+    public final ToggleButton showItems = new ToggleButton("Item Counts", true, null)
+            .withDescription("Totems, pearls, golden apples, crystals, XP bottles, fireworks and arrows in your inventory (with item icons)");
+    public final ToggleButton showEffects = new ToggleButton("Effects", true, null)
+            .withDescription("Active potion effects with level and remaining time");
+    public final ToggleButton showTime = new ToggleButton("Clock", true, null)
+            .withDescription("Real time of day");
+    public final ToggleButton showServer = new ToggleButton("Server", true, null)
+            .withDescription("Address of the server you are on");
+    public final ToggleButton showPlayers = new ToggleButton("Players", true, null)
+            .withDescription("Number of players around you");
     public final ToggleButton showKeys = new ToggleButton("Keystrokes", true, null)
             .withDescription("WASD, Space and mouse buttons as little keys that light up while pressed");
     public final ToggleButton showCps = new ToggleButton("Keystroke CPS", true, null)
@@ -82,14 +94,14 @@ public class HudOverlay extends Module {
 
     private static final float ROW_H = 11f, ICON = 8f, PAD = 4f, GAP = 3f, WIDGET_GAP = 4f;
     private static final float CAPTION_H = 9f, ANIM_SPEED = 0.16f;
-    private static final String[] WIDGET_IDS = {"coords", "facing", "health", "armor", "speed", "fps", "ping", "biome", "keys"};
+    private static final String[] WIDGET_IDS = {"coords", "facing", "health", "armor", "speed", "fps", "ping", "biome", "held", "items", "effects", "info", "keys"};
     private static final String[] WIDGET_TITLES =
-            {"Coordinates", "Facing", "Health", "Armor", "Speed", "FPS", "Ping", "Biome", "Keys"};
+            {"Coordinates", "Facing", "Health", "Armor", "Speed", "FPS", "Ping", "Biome", "Held Item", "Items", "Effects", "Info", "Keys"};
 
     private final Map<String, Widget> widgets = new LinkedHashMap<>();
     private boolean editMode;
     private int buttonsDown;
-    private boolean pendingClick;
+    private boolean pendingClick, pendingRight, widgetGrabbed;
 
     public HudOverlay() {
         super("HudOverlay", "Draggable info panel: coordinates, pitch/yaw, health, armor and more", Category.VISUAL);
@@ -106,6 +118,12 @@ public class HudOverlay extends Module {
         settings.add(showFps);
         settings.add(showPing);
         settings.add(showBiome);
+        settings.add(showHeld);
+        settings.add(showItems);
+        settings.add(showEffects);
+        settings.add(showTime);
+        settings.add(showServer);
+        settings.add(showPlayers);
         settings.add(showKeys);
         settings.add(showCps);
 
@@ -114,13 +132,14 @@ public class HudOverlay extends Module {
 
     /** Custom (dragged) widget positions for saving; a box the user never moved keeps flowing automatically. */
     public Map<String, ConfigCodec.WidgetPos> widgetPositions() {
-        Map<String, ConfigCodec.WidgetPos> out = new LinkedHashMap<>();
+        Map<String, ConfigCodec.WidgetPos> out = new LinkedHashMap<>(HudLayout.positions());
         widgets.forEach((id, w) -> { if (w.customPos) out.put(id, new ConfigCodec.WidgetPos(w.x, w.y)); });
         return out;
     }
 
     /** Restores previously saved widget positions (applied lazily as each box is first drawn). */
-    public void applyWidgetPositions(Map<String, ConfigCodec.WidgetPos> saved) {
+    public void applyWidgetPositions(Map<String, ConfigCodec.WidgetPos> savedAll) {
+        Map<String, ConfigCodec.WidgetPos> saved = HudLayout.apply(savedAll);
         saved.forEach((id, p) -> {
             Widget w = widgets.computeIfAbsent(id, k -> new Widget());
             w.x = p.x();
@@ -142,6 +161,8 @@ public class HudOverlay extends Module {
         editMode = false;
         buttonsDown = 0;
         pendingClick = false;
+        pendingRight = false;
+        HudLayout.stopDrag();
         for (Widget w : widgets.values()) w.dragging = false;
         editLayout.enabled = false;
         if (Minecraft.getInstance().gui.screen() instanceof HudOverlayScreen) Minecraft.getInstance().gui.setScreen(null);
@@ -151,17 +172,50 @@ public class HudOverlay extends Module {
     void screenClosed() {
         editMode = false;
         editLayout.enabled = false;
+        HudLayout.stopDrag();
         for (Widget w : widgets.values()) w.dragging = false;
+    }
+
+    /** true while the layout editor is open (other HUD elements draw a sample and report their rectangle). */
+    public static boolean editing() {
+        return instance != null && instance.editMode && Minecraft.getInstance().gui.screen() instanceof HudOverlayScreen;
+    }
+
+    private void layoutEditor() {
+        Minecraft mc = Minecraft.getInstance();
+        float mx = UiInput.mouseFbX(), my = UiInput.mouseFbY();
+        int fbW = mc.getWindow().getWidth(), fbH = mc.getWindow().getHeight();
+        if (HudLayout.dragging()) {
+            if ((buttonsDown & 1) != 0) HudLayout.dragTo(mx, my, fbW, fbH);
+            else HudLayout.stopDrag();
+        } else if (pendingClick && !widgetGrabbed && noWidgetDragging()) {
+            HudLayout.beginDrag(mx, my);
+        }
+        if (pendingRight) HudLayout.resetAt(mx, my);
+        float sc = ui.scale;
+        for (HudLayout.Elem e : HudLayout.visible()) {
+            float x = e.x / sc, y = e.y / sc, w = e.w / sc, h = e.h / sc;
+            boolean hov = mx >= e.x && mx <= e.x + e.w && my >= e.y && my <= e.y + e.h;
+            boolean drag = e.id.equals(HudLayout.draggingId());
+            ui.round(x, y, w, h, Theme.radius(), Theme.accent(drag ? 0.14f : hov ? 0.08f : 0.03f));
+            ui.outline(x, y, w, h, Theme.radius(), 1f, Theme.accent(drag || hov ? 0.95f : 0.5f));
+            float cw = ui.textWidth(e.label, 5.6f) + 5f;
+            float cy = y - 8f < 0 ? y + h + 1f : y - 8f;
+            ui.round(x, cy, cw, 7f, 2f, Theme.accent(0.85f));
+            ui.text(e.label, x + 2.5f, cy, 7f, 5.6f, 0xFF0B0B10);
+        }
     }
 
     void mouseClicked(int button) {
         buttonsDown |= 1 << button;
         if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_LEFT) pendingClick = true;
+        if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_RIGHT) pendingRight = true;
     }
 
     void mouseReleased(int button) {
         buttonsDown &= ~(1 << button);
         for (Widget w : widgets.values()) w.dragging = false;
+        HudLayout.stopDrag();
     }
 
     void keyPressed(int key, int mods) {
@@ -177,7 +231,6 @@ public class HudOverlay extends Module {
         boolean editing = instance.editMode && mc.gui.screen() instanceof HudOverlayScreen;
         if (!editing && (!instance.enabled || mc.gui.hud.isHidden() || mc.getDebugOverlay().showDebugScreen()
                 || ClickGui.INSTANCE.isOpen() || mc.gui.screen() != null)) {
-            pendingIcons.clear();
             return;
         }
 
@@ -190,10 +243,12 @@ public class HudOverlay extends Module {
             ui.mouseY = UiInput.mouseFbY() / ui.scale;
         }
 
+        instance.widgetGrabbed = false;
         instance.drawWidgets(mc, editing);
+        if (editing) instance.layoutEditor();
 
         if (editing) {
-            String hint = "Drag boxes to move them  ·  Esc to finish editing";
+            String hint = "Drag any box to move it  ·  Right-click a box to reset it  ·  Esc to finish";
             float hs = 6.5f, hh = 9f;
             float hw = ui.textWidth(hint, hs) + Theme.PAD * 2;
             float hx = 6f, hy = ui.height() - hh - 4f;
@@ -205,6 +260,7 @@ public class HudOverlay extends Module {
         renderer.flush();
         UiFont.collect(600);
         instance.pendingClick = false;
+        instance.pendingRight = false;
     }
 
     /**
@@ -215,16 +271,12 @@ public class HudOverlay extends Module {
      * Zeile weiter unten aus und rechnet selbst auf GUI-skalierte Pixel um. Ein Frame Verzögerung zwischen
      * Badge-Position (hier) und echtem Icon (im nächsten Extract-Pass) ist bei normaler Framerate unsichtbar.
      */
-    static final List<PendingIcon> pendingIcons = new ArrayList<>();
-
-    record PendingIcon(ItemStack stack, float fbX, float fbY, float fbSize) {}
 
     private void drawWidgets(Minecraft mc, boolean editing) {
         float textSize = Theme.FONT;
         boolean showIcons = icons.enabled;
         float flowY = 8f;
         float glow = Theme.glow();
-        pendingIcons.clear();
 
         for (int idx = 0; idx < WIDGET_IDS.length; idx++) {
             String id = WIDGET_IDS[idx];
@@ -267,6 +319,7 @@ public class HudOverlay extends Module {
             boolean hovered = editing && ui.hovered(wRef.x, wRef.y, wRef.w, wRef.h);
             if (editing && pendingClick && hovered && noWidgetDragging()) {
                 wRef.dragging = true;
+                widgetGrabbed = true;
                 wRef.grabDX = ui.mouseX - wRef.x;
                 wRef.grabDY = ui.mouseY - wRef.y;
             }
@@ -306,8 +359,8 @@ public class HudOverlay extends Module {
                     boolean realItem = r.item() != null && !r.item().isEmpty();
                     drawBadge(rowX, iconY, r.badgeColor(), r.icon(), !realItem);
                     if (realItem) {
-                        pendingIcons.add(new PendingIcon(r.item(), (rowX + 0.5f) * ui.scale,
-                                (iconY + 0.5f) * ui.scale, (ICON - 1f) * ui.scale));
+                        HudIcons.item(r.item(), (rowX + 0.5f) * ui.scale,
+                                (iconY + 0.5f) * ui.scale, (ICON - 1f) * ui.scale);
                     }
                     rowX += ICON + GAP;
                 }
@@ -387,7 +440,7 @@ public class HudOverlay extends Module {
         return current + diff * Math.min(1f, speed);
     }
 
-    /** Kleines abgerundetes Icon-Badge; bei einem echten Item (siehe {@link PendingIcon}) nur Rahmen +
+    /** Kleines abgerundetes Icon-Badge; bei einem echten Item (siehe {@link HudIcons}) nur Rahmen +
      *  Hintergrund als Fassung ums Icon, ohne Monogramm-Buchstaben (sonst läge Text auf dem Icon). */
     private static void drawBadge(float x, float y, int color, String label, boolean drawLabel) {
         float r = ICON * 0.28f;
@@ -468,6 +521,47 @@ public class HudOverlay extends Module {
                     rows.add(new Row(String.format("%.2f b/s", blocksPerSec), accent, "SP"));
                 }
             }
+            case "held" -> {
+                if (showHeld.enabled) {
+                    ItemStack st = p.getMainHandItem();
+                    if (!st.isEmpty()) {
+                        boolean damageable = st.isDamageableItem();
+                        String name = st.getHoverName().getString();
+                        if (st.getCount() > 1) name += " x" + st.getCount();
+                        if (damageable) name += "  " + (st.getMaxDamage() - st.getDamageValue());
+                        float ratio = damageable ? 1f - (float) st.getDamageValue() / st.getMaxDamage() : -1f;
+                        rows.add(new Row(name, damageable ? durabilityColor(st) : Theme.TEXT, "I", ratio, materialTierColor(st), st));
+                    }
+                }
+            }
+            case "items" -> {
+                if (showItems.enabled) {
+                    for (var tracked : TRACKED) {
+                        int n = countItems(p, tracked);
+                        if (n > 0) rows.add(new Row("x" + n, n <= tracked.low() ? 0xFFE0525A : Theme.TEXT, "I", -1f, accent, new ItemStack(tracked.item())));
+                    }
+                }
+            }
+            case "effects" -> {
+                if (showEffects.enabled) {
+                    for (var fx : p.getActiveEffects()) {
+                        var eff = fx.getEffect().value();
+                        String lvl = fx.getAmplifier() > 0 ? " " + (fx.getAmplifier() + 1) : "";
+                        String time = fx.isInfiniteDuration() ? "inf" : String.format("%d:%02d", fx.getDuration() / 1200, (fx.getDuration() / 20) % 60);
+                        int col = eff.isBeneficial() ? 0xFF52E084 : 0xFFE0525A;
+                        String nm = eff.getDisplayName().getString();
+                        rows.add(new Row(nm + lvl + "  " + time, col, nm.isEmpty() ? "E" : nm.substring(0, 1).toUpperCase(java.util.Locale.ROOT)));
+                    }
+                }
+            }
+            case "info" -> {
+                if (showTime.enabled) rows.add(new Row(java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")), Theme.TEXT, "T"));
+                if (showServer.enabled) {
+                    var sd = mc.getCurrentServer();
+                    rows.add(new Row(sd != null ? sd.ip : "Singleplayer", Theme.TEXT, "S"));
+                }
+                if (showPlayers.enabled && mc.level != null) rows.add(new Row(mc.level.players().size() + " players", Theme.TEXT, "PL"));
+            }
             // Die folgenden drei nutzen APIs, die je nach Mapping/MC-Version anders heißen können
             // (fps-Zähler, PlayerInfo/Ping, Biome-Registry-Key) - Methodennamen ggf. anpassen.
             case "fps" -> {
@@ -492,6 +586,27 @@ public class HudOverlay extends Module {
             }
         }
         return rows;
+    }
+
+    private record Tracked(net.minecraft.world.item.Item item, int low, net.minecraft.world.item.Item alt) {}
+
+    private static final List<Tracked> TRACKED = List.of(
+            new Tracked(net.minecraft.world.item.Items.TOTEM_OF_UNDYING, 1, null),
+            new Tracked(net.minecraft.world.item.Items.ENDER_PEARL, 0, null),
+            new Tracked(net.minecraft.world.item.Items.GOLDEN_APPLE, 0, net.minecraft.world.item.Items.ENCHANTED_GOLDEN_APPLE),
+            new Tracked(net.minecraft.world.item.Items.END_CRYSTAL, 0, null),
+            new Tracked(net.minecraft.world.item.Items.EXPERIENCE_BOTTLE, 0, null),
+            new Tracked(net.minecraft.world.item.Items.FIREWORK_ROCKET, 0, null),
+            new Tracked(net.minecraft.world.item.Items.ARROW, 0, null));
+
+    private static int countItems(LocalPlayer p, Tracked t) {
+        int n = 0;
+        var inv = p.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack st = inv.getItem(i);
+            if (st.is(t.item()) || (t.alt() != null && st.is(t.alt()))) n += st.getCount();
+        }
+        return n;
     }
 
     /** Grobe 8-Wege-Himmelsrichtung aus dem Yaw (0 = Süden in Minecraft). */

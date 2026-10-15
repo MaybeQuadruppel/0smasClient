@@ -167,7 +167,7 @@ public class Minimap extends Module {
         if (self == null || !self.enabled) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.gui.hud.isHidden()) return;
-        if (ClickGui.INSTANCE.isOpen() || mc.gui.screen() != null && !(mc.gui.screen() instanceof net.minecraft.client.gui.screens.ChatScreen)) return;
+        if (ClickGui.INSTANCE.isOpen() || mc.gui.screen() != null && !(mc.gui.screen() instanceof net.minecraft.client.gui.screens.ChatScreen) && !com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.editing()) return;
         if (renderer == null) {
             renderer = new UiRenderer();
             ui = new Ui(renderer);
@@ -188,6 +188,12 @@ public class Minimap extends Module {
         float textH = coords ? 10f : 0f;
         float mx = right ? ui.width() - s - margin : margin;
         float my = bottom ? ui.height() - s - margin - textH : margin;
+        float[] org = com.OsamaClient.newbridge.Hacks.Visual.HudLayout.origin("minimap", mx * ui.scale, my * ui.scale,
+                mc.getWindow().getWidth(), mc.getWindow().getHeight());
+        mx = org[0] / ui.scale;
+        my = org[1] / ui.scale;
+        com.OsamaClient.newbridge.Hacks.Visual.HudLayout.report("minimap", "Minimap", false, mx * ui.scale, my * ui.scale,
+                s * ui.scale, (s + textH) * ui.scale);
         boolean circle = "Circle".equals(shape);
         float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
         double px = Mth.lerp(partial, mc.player.xo, mc.player.getX());

@@ -13,6 +13,7 @@ import com.OsamaClient.newbridge.UI.gui.util.ColorUtil;
 import com.OsamaClient.newbridge.Utils.TeamUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.PlayerSkin;
 
 import java.util.*;
 
@@ -45,17 +46,27 @@ public class TeammateList extends Module {
     public final ToggleButton background = new ToggleButton("Background", true, null)
             .withDescription("Draws a small backing box behind each entry");
 
+    public final ToggleButton showFaces = new ToggleButton("Show Faces", true, null)
+            .withDescription("Draws each teammate's skin face next to the name");
+    public final ToggleButton showHealth = new ToggleButton("Show Health", true, null)
+            .withDescription("Thin health bar under each teammate");
+
     public TeammateList() {
         super("TeammateList", "HUD list of active teammates in the top left corner", Category.VISUAL);
         this.enabled = false;
         instance = this;
         settings.add(showDistance);
         settings.add(textScale);
+        settings.add(showFaces);
+        settings.add(showHealth);
         settings.add(background);
     }
 
+    private record Entry(String key, String name, int color, String dist, float health, PlayerSkin skin) {}
+
     public static void draw() {
         Minecraft mc = Minecraft.getInstance();
+        boolean editing = HudOverlay.editing();
         if (instance == null
                 || !instance.enabled
                 || mc.player == null
@@ -63,7 +74,7 @@ public class TeammateList extends Module {
                 || mc.gui.hud.isHidden()
                 || mc.getDebugOverlay().showDebugScreen()
                 || ClickGui.INSTANCE.isOpen()
-                || mc.gui.screen() != null) {
+                || (mc.gui.screen() != null && !editing)) {
             for (float[] s : anim.values()) { s[0] = 0f; s[1] = 0f; }
             return;
         }
@@ -71,7 +82,7 @@ public class TeammateList extends Module {
         renderer.begin();
         ui.scale = Theme.scale() * (float) instance.textScale.getValue();
         ui.alpha = 1f;
-        ui.hoverBlocked = true; // reines HUD-Overlay, nimmt nie Maus-Hover entgegen
+        ui.hoverBlocked = true;
 
         // ── Teammates sammeln ──────────────────────────────────────────────────
         List<Player> teammates = new ArrayList<>();
@@ -81,21 +92,27 @@ public class TeammateList extends Module {
         }
         teammates.sort(Comparator.comparingDouble(p -> mc.player.distanceToSqr(p)));
 
-        Set<String> activeNames = new HashSet<>();
-        Map<String, String> displayNameMap = new HashMap<>();
+        List<Entry> entries = new ArrayList<>();
         for (Player p : teammates) {
+            var info = mc.getConnection() == null ? null : mc.getConnection().getPlayerInfo(p.getUUID());
+            // Name: Profilname (Custom-Nametag-Server ueberschreiben getDisplayName oft mit Dekoration)
             String name = p.getGameProfile().name();
-            activeNames.add(name);
-            String text = p.getDisplayName().getString();
-            if (instance.showDistance.enabled) {
-                int dist = (int) mc.player.distanceTo(p);
-                text += "  " + dist + "m";
-            }
-            displayNameMap.put(name, text);
+            Integer col = TeamUtils.teamColorOf(p.getDisplayName());
+            if (col == null && info != null) col = TeamUtils.teamColorOf(info.getTabListDisplayName());
+            if (col == null && info != null && info.getTeam() != null)
+                col = TeamUtils.teamColorOf(info.getTeam().getFormattedName(net.minecraft.network.chat.Component.literal(name)));
+            String dist = instance.showDistance.enabled ? (int) mc.player.distanceTo(p) + "m" : "";
+            float hp = Math.max(0f, Math.min(1f, p.getHealth() / Math.max(1f, p.getMaxHealth())));
+            entries.add(new Entry(name, name, col == null ? C_TEAM : (0xFF000000 | col), dist, hp, info == null ? null : info.getSkin()));
+        }
+        if (entries.isEmpty() && editing) {
+            entries.add(new Entry("Steve", "Steve", C_TEAM, instance.showDistance.enabled ? "12m" : "", 1f, null));
+            entries.add(new Entry("Alex", "Alex", C_TEAM, instance.showDistance.enabled ? "27m" : "", 0.6f, null));
         }
 
-        // ── Animationen verwalten ──────────────────────────────────────────────
-        for (String name : activeNames) anim.putIfAbsent(name, new float[]{0f, 0f, START_Y});
+        Set<String> activeNames = new HashSet<>();
+        for (Entry e : entries) activeNames.add(e.key());
+        for (String name : activeNames) anim.putIfAbsent(name, new float[]{0f, 0f, 0f});
         for (Map.Entry<String, float[]> e : anim.entrySet()) {
             boolean present = activeNames.contains(e.getKey());
             float[] s = e.getValue();
@@ -104,46 +121,72 @@ public class TeammateList extends Module {
         }
         anim.entrySet().removeIf(e -> !activeNames.contains(e.getKey()) && e.getValue()[0] < 0.01f);
 
-        List<String> order = new ArrayList<>(activeNames);
-        for (String name : anim.keySet()) if (!activeNames.contains(name)) order.add(name);
-
         float textSize = Theme.FONT;
         FontAtlas atlas = ui.font(textSize);
         float lineH = atlas.lineHeight / ui.scale;
-        float rowH = lineH + ROW_GAP;
+        boolean faces = instance.showFaces.enabled, hp = instance.showHealth.enabled;
+        float face = Math.max(lineH + 2f, 10f);
+        float rowH = face + 2f + (hp ? 2f : 0f);
         float radius = Theme.radius();
+        float pad = 4f, headH = lineH + 4f;
 
-        float targetY = START_Y;
-        for (String name : order) {
-            float[] s = anim.get(name);
-            if (s == null) continue;
+        // Kartenbreite
+        float w = ui.textWidth("TEAM", textSize * 0.85f) + 30f;
+        for (Entry e : entries) {
+            float rw = (faces ? face + 3f : 0f) + ui.textWidth(e.name(), textSize) + (e.dist().isEmpty() ? 0f : 8f + ui.textWidth(e.dist(), textSize));
+            w = Math.max(w, rw);
+        }
+        w += pad * 2;
+        float h = headH + entries.size() * rowH + pad;
 
-            if (s[2] <= 0f) s[2] = targetY;
-            s[2] = approach(s[2], targetY, 0.18f);
+        float[] org = HudLayout.origin("teammates", LEFT_MARGIN * ui.scale, START_Y * ui.scale,
+                mc.getWindow().getWidth(), mc.getWindow().getHeight());
+        float x0 = org[0] / ui.scale, y0 = org[1] / ui.scale;
+        HudLayout.report("teammates", "Teammates", false, x0 * ui.scale, y0 * ui.scale, w * ui.scale, (entries.isEmpty() ? headH + pad : h) * ui.scale);
 
-            if (s[0] < 0.01f) { targetY += rowH; continue; }
-
-            String label = displayNameMap.getOrDefault(name, name);
-            float lw = ui.textWidth(label, textSize);
-            float slideOffset = (1f - s[1]) * -SLIDE_RANGE; // von links reinsliden beim Einblenden
-            float textX = LEFT_MARGIN + slideOffset;
-            float renderY = s[2];
-
+        if (!entries.isEmpty() || editing) {
+            float cardAlpha = 1f;
+            for (Entry e : entries) cardAlpha = Math.max(cardAlpha > 1f ? 0f : 0f, anim.get(e.key())[0]);
+            ui.alpha = Math.max(cardAlpha, editing ? 1f : 0f);
             if (instance.background.enabled) {
-                float padX = 3f, padY = 1f;
-                ui.alpha = s[0] * 0.75f;
-                ui.round(textX - padX, renderY - padY, lw + padX * 2, lineH + padY * 2, radius, Theme.ROW);
-                if (Theme.outline()) {
-                    ui.outline(textX - padX, renderY - padY, lw + padX * 2, lineH + padY * 2, radius, 1f, Theme.OUTLINE);
-                }
+                ui.alpha *= 0.8f;
+                ui.round(x0, y0, w, entries.isEmpty() ? headH + pad : h, radius, Theme.ROW);
+                if (Theme.outline()) ui.outline(x0, y0, w, entries.isEmpty() ? headH + pad : h, radius, 1f, Theme.OUTLINE);
+                ui.alpha = Math.max(cardAlpha, editing ? 1f : 0f);
             }
+            ui.rect(x0 + 2f, y0 + 2f, 1.5f, headH - 3f, Theme.accent());
+            ui.text("TEAM", x0 + pad + 2f, y0 + 2f, lineH, textSize * 0.85f, Theme.TEXT_DIM);
+            String cnt = String.valueOf(entries.size());
+            ui.text(cnt, x0 + w - pad - ui.textWidth(cnt, textSize * 0.85f), y0 + 2f, lineH, textSize * 0.85f, Theme.accent());
+        }
+
+        float y = y0 + headH;
+        for (Entry e : entries) {
+            float[] s = anim.get(e.key());
+            if (s == null || s[0] < 0.01f) { y += rowH; continue; }
+            float slide = (1f - s[1]) * -SLIDE_RANGE;
             ui.alpha = s[0];
-
-            // Akzent-Leiste am linken Bildschirmrand
-            ui.rect(slideOffset, renderY - 1, ACCENT_W, lineH + 2, ColorUtil.alpha(C_TEAM, s[0]));
-            ui.text(label, textX, renderY, lineH, textSize, Theme.TEXT);
-
-            targetY += rowH;
+            float x = x0 + pad + slide;
+            float tx = x;
+            if (faces) {
+                ui.round(x, y, face, face, 2f, ColorUtil.alpha(e.color(), 0.35f));
+                if (e.skin() != null && s[0] > 0.9f)
+                    HudIcons.face(e.skin(), (x + 0.5f) * ui.scale, (y + 0.5f) * ui.scale, (face - 1f) * ui.scale);
+                tx += face + 3f;
+            }
+            float ty = y + (face - lineH) * 0.5f;
+            ui.text(e.name(), tx, ty, lineH, textSize, e.color());
+            if (!e.dist().isEmpty()) {
+                float dw = ui.textWidth(e.dist(), textSize);
+                ui.text(e.dist(), x0 + w - pad - dw + slide, ty, lineH, textSize, Theme.TEXT_DIM);
+            }
+            if (hp) {
+                float bx = tx, bw = x0 + w - pad - tx + slide, by = y + face + 0.5f;
+                ui.round(bx, by, bw, 1.5f, 0.75f, ColorUtil.alpha(0xFF000000, 0.5f));
+                int hc = e.health() > 0.6f ? 0xFF52E084 : e.health() > 0.3f ? 0xFFF0C040 : 0xFFE0525A;
+                ui.round(bx, by, Math.max(1.5f, bw * e.health()), 1.5f, 0.75f, hc);
+            }
+            y += rowH;
         }
 
         renderer.flush();
@@ -155,4 +198,4 @@ public class TeammateList extends Module {
         if (Math.abs(diff) < 0.001f) return target;
         return current + diff * Math.min(1f, speed);
     }
-}
+}

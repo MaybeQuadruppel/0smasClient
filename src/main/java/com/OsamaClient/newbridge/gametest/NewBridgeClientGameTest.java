@@ -86,6 +86,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("glide: limits the fall speed", () -> testGlide(ctx, srv));
             run("fastladder: climbs faster than vanilla", () -> testFastLadder(ctx, srv));
             run("antiafk: acts after the interval", () -> testAntiAfk(ctx, srv));
+            run("hud redesign: widgets, layout editor drag, teammates, nametags (screenshots)", () -> testHudRedesign(ctx, srv));
             run("ui tabs + hud keystrokes + enchantment picker (screenshots)", () -> testUiTabsAndHud(ctx, srv));
             run("block picker: block icons render next to the names (screenshot)", () -> testBlockPickerIcons(ctx));
             run("clickburst: one click fires N clicks", () -> testClickBurst(ctx, srv));
@@ -874,6 +875,119 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         double x3 = ctx.computeOnClient(mc -> mc.player.getX());
         assertTrue(x1 - x0 > 3.0, "did not walk: " + (x1 - x0));
         assertTrue(Math.abs(x3 - x2) < 0.05, "kept walking after disable: " + (x3 - x2));
+    }
+
+    private void testHudRedesign(ClientGameTestContext ctx, TestServerContext srv) {
+        try {
+            hudRedesign(ctx, srv);
+        } finally {
+            ctx.runOnClient(mc -> {
+                var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+                if (h.editLayout.enabled) { h.editLayout.enabled = false; h.closeEditor(); }
+                if (h.enabled) h.toggle();
+                for (String n : new String[]{"TeammateList", "Nametags", "ArrayList", "Minimap"}) {
+                    var m = ModuleManager.getModuleByName(n);
+                    if (m != null && m.enabled) m.toggle();
+                }
+                com.OsamaClient.newbridge.Hacks.Visual.HudLayout.reset("teammates");
+                com.OsamaClient.newbridge.Hacks.Visual.HudLayout.reset("modulelist");
+                com.OsamaClient.newbridge.Hacks.Visual.HudLayout.reset("minimap");
+            });
+            srv.runCommand("kill @e[tag=gt]");
+            ctx.waitTicks(10);
+        }
+    }
+
+    private void hudRedesign(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -2, Y - 1, -2, 16, Y - 1, 2, "stone");
+        teleport(ctx, srv, 0, Y, 0);
+        srv.runCommand("clear @a");
+        srv.runCommand("give @a totem_of_undying 2");
+        srv.runCommand("give @a ender_pearl 5");
+        srv.runCommand("give @a golden_apple 3");
+        srv.runCommand("give @a diamond_sword 1");
+        srv.runCommand("effect give @a speed 120 1 true");
+        srv.runCommand("effect give @a poison 30 0 true");
+        srv.runCommand(String.format(java.util.Locale.ROOT, "summon villager %d %d %d {NoAI:1b,Tags:[\"gt\"],CustomName:'\"Gegner\"'}", ox + 6, Y, oz));
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> {
+            mc.player.getInventory().setSelectedSlot(0);
+            var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+            if (!h.enabled) h.toggle();
+            for (String n : new String[]{"TeammateList", "Nametags", "ArrayList"}) {
+                var m = ModuleManager.getModuleByName(n);
+                if (m != null && !m.enabled) m.toggle();
+            }
+            ((com.OsamaClient.newbridge.Hacks.Visual.Nametags) ModuleManager.getModuleByName("Nametags")).targetPicker.filters.replaceAll((k, v) -> true);
+        });
+        ctx.waitTicks(30);
+        Path normal = ctx.takeScreenshot("newbridge_hud_widgets");
+        log("HUD widgets screenshot: " + normal + " layer calls=" + com.OsamaClient.newbridge.Hacks.Visual.HudOverlayItemLayer.calls + " drawn=" + com.OsamaClient.newbridge.Hacks.Visual.HudOverlayItemLayer.drawn);
+        // rows exist for the new widgets
+        int[] counts = ctx.computeOnClient(mc -> {
+            var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+            int held = 0, items = 0, eff = 0, info = 0;
+            try {
+                var m = h.getClass().getDeclaredMethod("rowsFor", String.class, net.minecraft.client.Minecraft.class);
+                m.setAccessible(true);
+                held = ((java.util.List<?>) m.invoke(h, "held", mc)).size();
+                items = ((java.util.List<?>) m.invoke(h, "items", mc)).size();
+                eff = ((java.util.List<?>) m.invoke(h, "effects", mc)).size();
+                info = ((java.util.List<?>) m.invoke(h, "info", mc)).size();
+            } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+            return new int[]{held, items, eff, info};
+        });
+        log("widget rows held/items/effects/info = " + java.util.Arrays.toString(counts));
+        assertTrue(counts[0] == 1, "held widget rows " + counts[0]);
+        assertTrue(counts[1] >= 3, "item widget rows " + counts[1]);
+        assertTrue(counts[2] == 2, "effect widget rows " + counts[2]);
+        assertTrue(counts[3] >= 2, "info widget rows " + counts[3]);
+        // layout editor: open, drag the teammates card via the API, check position persists
+        ctx.runOnClient(mc -> {
+            var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+            h.editLayout.enabled = true;
+            h.openEditor();
+        });
+        ctx.waitTicks(15);
+        boolean editing = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.editing());
+        assertTrue(editing, "layout editor did not open");
+        int seen = ctx.computeOnClient(mc -> {
+            int n = 0;
+            for (var e : com.OsamaClient.newbridge.Hacks.Visual.HudLayout.visible()) n++;
+            return n;
+        });
+        assertTrue(seen >= 2, "layout editor elements: " + seen);
+        ctx.runOnClient(mc -> {
+            int w = mc.getWindow().getWidth(), hh = mc.getWindow().getHeight();
+            for (var e : com.OsamaClient.newbridge.Hacks.Visual.HudLayout.visible()) {
+                if (!e.id.equals("teammates")) continue;
+                com.OsamaClient.newbridge.Hacks.Visual.HudLayout.beginDrag(e.x + 3, e.y + 3);
+                com.OsamaClient.newbridge.Hacks.Visual.HudLayout.dragTo(w * 0.35f, hh * 0.45f, w, hh);
+                com.OsamaClient.newbridge.Hacks.Visual.HudLayout.stopDrag();
+            }
+        });
+        ctx.waitTicks(10);
+        Path edit = ctx.takeScreenshot("newbridge_hud_layout_editor");
+        log("HUD editor screenshot: " + edit);
+        boolean moved = ctx.computeOnClient(mc -> {
+            var p = com.OsamaClient.newbridge.Hacks.Visual.HudLayout.get("teammates");
+            return p != null && p.x() > 0.2f && p.y() > 0.3f
+                    && com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance.widgetPositions().containsKey("layout.teammates");
+        });
+        assertTrue(moved, "teammates card was not moved/persisted");
+        ctx.runOnClient(mc -> {
+            var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+            h.editLayout.enabled = false;
+            h.closeEditor();
+        });
+        ctx.waitTicks(10);
+        // teammates: custom-nametag fallback (tab list colour)
+        // nametag screenshot: look at the zombie
+        ctx.runOnClient(mc -> mc.player.setYRot(-90f));
+        ctx.waitTicks(10);
+        Path tags = ctx.takeScreenshot("newbridge_nametags");
+        log("Nametags screenshot: " + tags);
     }
 
     private void testUiTabsAndHud(ClientGameTestContext ctx, TestServerContext srv) {

@@ -36,6 +36,21 @@ public class TeamUtils {
             return myColor.equals(theirColor);
         }
 
+        // 2b. Server mit eigenen Nametags: der Entity-Name ist ueberschrieben, aber Tab-Liste und
+        //     PlayerInfo-Team tragen oft weiterhin die Teamfarbe.
+        if (entity instanceof net.minecraft.world.entity.player.Player && mc.getConnection() != null) {
+            var conn = mc.getConnection();
+            var myInfo = conn.getPlayerInfo(mc.player.getUUID());
+            var theirInfo = conn.getPlayerInfo(entity.getUUID());
+            if (myInfo != null && theirInfo != null) {
+                Boolean byInfoTeam = compareTeams(myInfo.getTeam(), theirInfo.getTeam());
+                if (byInfoTeam != null) return byInfoTeam;
+                Integer myTab = teamColorOf(myInfo.getTabListDisplayName());
+                Integer theirTab = teamColorOf(theirInfo.getTabListDisplayName());
+                if (myTab != null && theirTab != null) return myTab.equals(theirTab);
+            }
+        }
+
         // 3. Gefärbte Lederrüstung (Bedwars: Helm + Brustplatte bleiben in Teamfarbe, Hose/Schuhe werden getauscht)
         Integer myArmor = getLeatherArmorColor(mc.player);
         Integer theirArmor = getLeatherArmorColor(living);

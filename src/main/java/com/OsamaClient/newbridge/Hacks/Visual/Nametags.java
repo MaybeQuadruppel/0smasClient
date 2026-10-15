@@ -50,6 +50,8 @@ public class Nametags extends Module {
             .withDescription("Lässt die Textfarbe durch den Regenbogen wechseln.");
     public final Slider rainbowSpeed = new Slider("Rainbow Speed", 0.1, 5.0, 1.0, 0.1, null)
             .withDescription("Geschwindigkeit des Regenbogeneffekts.");
+    public final ToggleButton healthBar = new ToggleButton("Health Bar", true, null)
+            .withDescription("Shows a health bar and the health value in the tag");
     public final ToggleButton dropShadow = new ToggleButton("Drop Shadow", true, null)
             .withDescription("Fügt einen Textschatten hinzu, um 'Weiß auf Hell' perfekt lesbar zu machen.");
 
@@ -76,6 +78,7 @@ public class Nametags extends Module {
         this.settings.add(this.useThemeColor);
         this.settings.add(this.rainbowText);
         this.settings.add(this.rainbowSpeed);
+        this.settings.add(this.healthBar);
         this.settings.add(this.dropShadow);
     }
 
@@ -131,55 +134,70 @@ public class Nametags extends Module {
             int outlineColor = instance.targetPicker.getColor(filterKey);
             double distance = Math.sqrt(distSqr);
 
-            renderTag(text, distance, fb.x() / ui.scale, fb.y() / ui.scale, outlineColor);
+            renderTag(text, distance, living, fb.x() / ui.scale, fb.y() / ui.scale, outlineColor);
         }
 
         renderer.flush();
         UiFont.collect(600);
     }
 
-    private static void renderTag(String text, double distance, float x, float y, int outlineColor) {
+    private static void renderTag(String text, double distance, LivingEntity living, float x, float y, int outlineColor) {
         float size = Theme.FONT_SMALL;
-        String distText = String.format("%.1fm", distance);
+        String distText = String.format("%.0fm", distance);
+        boolean bar = instance.healthBar.enabled;
+        float hp = Mth.clamp(living.getHealth() / Math.max(1f, living.getMaxHealth()), 0f, 1f);
+        String hpText = String.valueOf(Math.round(living.getHealth()));
 
+        float sub = size * 0.8f;
         float tw = ui.textWidth(text, size);
-        float dw = ui.textWidth(distText, size * 0.85f);
+        float dw = ui.textWidth(distText, sub);
+        float hw = bar ? ui.textWidth(hpText, sub) : 0f;
         float lineH = size * 1.35f;
+        float subH = sub * 1.35f;
 
         float distFactor = 1f - Mth.clamp((float) (distance / instance.range), 0f, 1f);
-        float fade = 0.3f + 0.7f * distFactor;
+        float fade = 0.35f + 0.65f * distFactor;
 
         String mode = instance.renderMode;
 
-        // Die Box wurde etwas vergrößert, damit das Layout luftiger und nicht so reingequetscht aussieht
-        float boxW = Math.max(tw, dw) + 12f;
-        float boxH = lineH * 2f + 5f;
+        float boxW = Math.max(tw + 10f, bar ? 38f : dw + 10f);
+        float boxH = lineH + 2f + subH + (bar ? 3f : 0f) + 3f;
         float boxX = x - boxW * 0.5f;
-        float boxY = y - lineH - 5f;
+        float boxY = y - boxH - 2f;
         float radius = Theme.radius() * 0.8f;
 
         ui.alpha = fade;
         if (!mode.equals("None")) {
             if (mode.equals("Fill") || mode.equals("Both")) {
-                // Deckkraft des Hintergrunds etwas verstärkt für besseren Kontrast
                 ui.round(boxX, boxY, boxW, boxH, radius, ColorUtil.alpha(C_PANEL_BG, 0.85f));
             }
             if (mode.equals("Outline") || mode.equals("Both")) {
                 ui.outline(boxX, boxY, boxW, boxH, radius, 1f, ColorUtil.alpha(outlineColor, 0.85f));
             }
         }
+        // Akzent-Streifen oben in der Filterfarbe
+        ui.round(boxX + radius, boxY + 1f, boxW - radius * 2, 1.2f, 0.6f, ColorUtil.alpha(outlineColor, 0.9f));
 
         int finalTextColor = instance.getCustomTextColor();
-
-        // Schatten rendern (leicht versetzt), falls in den Settings aktiviert
+        float ty = boxY + 2.5f;
         if (instance.dropShadow.enabled) {
-            ui.textCentered(text, x + 0.5f, boxY + 2.5f, lineH, size, ColorUtil.alpha(0xFF000000, fade * 0.9f));
-            ui.textCentered(distText, x + 0.5f, boxY + lineH + 1.5f, lineH, size * 0.85f, ColorUtil.alpha(0xFF000000, fade * 0.9f));
+            ui.textCentered(text, x + 0.5f, ty + 0.5f, lineH, size, ColorUtil.alpha(0xFF000000, fade * 0.9f));
         }
+        ui.textCentered(text, x, ty, lineH, size, finalTextColor);
 
-        // Regulärer Text (obendrüber)
-        ui.textCentered(text, x, boxY + 2.0f, lineH, size, finalTextColor);
-        ui.textCentered(distText, x, boxY + lineH + 1.0f, lineH, size * 0.85f, Theme.TEXT_DIM);
+        float sy = ty + lineH + 0.5f;
+        if (bar) {
+            float bw = boxW - 8f;
+            float bx = boxX + 4f;
+            ui.round(bx, sy, bw, 2f, 1f, ColorUtil.alpha(0xFF000000, 0.55f));
+            int hc = hp > 0.6f ? 0xFF52E084 : hp > 0.3f ? 0xFFF0C040 : 0xFFE0525A;
+            ui.round(bx, sy, Math.max(2f, bw * hp), 2f, 1f, hc);
+            sy += 3f;
+            ui.text(hpText, boxX + 4f, sy, subH, sub, hc);
+            ui.text(distText, boxX + boxW - 4f - dw, sy, subH, sub, Theme.TEXT_DIM);
+        } else {
+            ui.textCentered(distText, x, sy, subH, sub, Theme.TEXT_DIM);
+        }
         ui.alpha = 1f;
     }
 
