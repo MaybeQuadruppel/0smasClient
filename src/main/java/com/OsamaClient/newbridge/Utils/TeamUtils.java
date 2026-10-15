@@ -21,6 +21,8 @@ public class TeamUtils {
             return false;
         }
 
+        if (com.OsamaClient.newbridge.Hacks.Client.Friends.isFriend(entity)) return true;
+
         // 1. Scoreboard-Teams (Hypixel Bedwars/Skywars/... nutzen pro Team ein eigenes Scoreboard-Team)
         Scoreboard scoreboard = mc.level.getScoreboard();
         PlayerTeam myTeam = scoreboard.getPlayersTeam(mc.player.getScoreboardName());

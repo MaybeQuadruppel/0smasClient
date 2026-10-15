@@ -86,6 +86,20 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("glide: limits the fall speed", () -> testGlide(ctx, srv));
             run("fastladder: climbs faster than vanilla", () -> testFastLadder(ctx, srv));
             run("antiafk: acts after the interval", () -> testAntiAfk(ctx, srv));
+            run("autogap: eats a golden apple at low health", () -> guarded(ctx, srv, () -> testAutoGap(ctx, srv)));
+            run("shieldblock: raises the shield near a zombie", () -> guarded(ctx, srv, () -> testShieldBlock(ctx, srv)));
+            run("safewalk: does not walk off the platform edge", () -> guarded(ctx, srv, () -> testSafeWalk(ctx, srv)));
+            run("bhop: jumps while holding forward", () -> guarded(ctx, srv, () -> testBHop(ctx, srv)));
+            run("zoom: changes and restores the fov", () -> guarded(ctx, srv, () -> testZoom(ctx)));
+            run("armorwarning: warns for worn boots", () -> guarded(ctx, srv, () -> testArmorWarning(ctx, srv)));
+            run("autodrop: drops the junk item only", () -> guarded(ctx, srv, () -> testAutoDrop(ctx, srv)));
+            run("autoreplenish: refills the hotbar stack", () -> guarded(ctx, srv, () -> testAutoReplenish(ctx, srv)));
+            run("toolsaver: swaps off a nearly broken tool", () -> guarded(ctx, srv, () -> testToolSaver(ctx, srv)));
+            run("antivoid: bounces up near the world bottom", () -> guarded(ctx, srv, () -> testAntiVoid(ctx, srv)));
+            run("teabag: toggles crouch near an entity", () -> guarded(ctx, srv, () -> testTeabag(ctx, srv)));
+            run("hotbardance: cycles the hotbar slot", () -> guarded(ctx, srv, () -> testHotbarDance(ctx, srv)));
+            run("totemalert + invfullalert: flags", () -> guarded(ctx, srv, () -> testAlerts(ctx, srv)));
+            run("notifications + friends", () -> guarded(ctx, srv, () -> testNotificationsFriends(ctx, srv)));
             run("hud redesign: widgets, layout editor drag, teammates, nametags (screenshots)", () -> testHudRedesign(ctx, srv));
             run("ui tabs + hud keystrokes + enchantment picker (screenshots)", () -> testUiTabsAndHud(ctx, srv));
             run("block picker: block icons render next to the names (screenshot)", () -> testBlockPickerIcons(ctx));
@@ -875,6 +889,255 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         double x3 = ctx.computeOnClient(mc -> mc.player.getX());
         assertTrue(x1 - x0 > 3.0, "did not walk: " + (x1 - x0));
         assertTrue(Math.abs(x3 - x2) < 0.05, "kept walking after disable: " + (x3 - x2));
+    }
+
+    private void guarded(ClientGameTestContext ctx, TestServerContext srv, Runnable body) {
+        try {
+            body.run();
+        } finally {
+            ctx.runOnClient(mc -> {
+                mc.options.keyUp.setDown(false);
+                mc.options.keyShift.setDown(false);
+                mc.options.keyUse.setDown(false);
+                for (String n : new String[]{"AutoGap", "ShieldBlock", "SafeWalk", "BHop", "Zoom", "ArmorWarning", "AutoDrop",
+                        "AutoReplenish", "ToolSaver", "AntiVoid", "Teabag", "HotbarDance", "TotemAlert", "InvFullAlert",
+                        "Notifications", "Friends"}) {
+                    var m = ModuleManager.getModuleByName(n);
+                    if (m != null && m.enabled) m.toggle();
+                }
+                if (mc.player != null) mc.player.getInventory().setSelectedSlot(0);
+            });
+            srv.runCommand("kill @e[tag=gt]");
+            srv.runCommand("kill @e[type=item]");
+            srv.runCommand("difficulty peaceful");
+            srv.runCommand("clear @a");
+            ctx.waitTicks(5);
+        }
+    }
+
+    private void on(ClientGameTestContext ctx, String name) {
+        ctx.runOnClient(mc -> { var m = ModuleManager.getModuleByName(name); if (!m.enabled) m.toggle(); });
+    }
+
+    private int countItem(ClientGameTestContext ctx, net.minecraft.world.item.Item item) {
+        return ctx.computeOnClient(mc -> {
+            int n = 0;
+            var inv = mc.player.getInventory();
+            for (int i = 0; i < inv.getContainerSize(); i++) if (inv.getItem(i).is(item)) n += inv.getItem(i).getCount();
+            return n;
+        });
+    }
+
+    private void flatStage(ClientGameTestContext ctx, TestServerContext srv) {
+        clearArea(srv);
+        fill(srv, -2, Y - 1, -2, 16, Y - 1, 2, "stone");
+        teleport(ctx, srv, 0, Y, 0);
+        srv.runCommand("clear @a");
+        ctx.runOnClient(mc -> { mc.gui.setScreen(null); mc.player.setYRot(-90f); mc.player.getInventory().setSelectedSlot(0); });
+        ctx.waitTicks(5);
+    }
+
+    private void testAutoGap(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("give @a golden_apple 3");
+        ctx.waitTicks(5);
+        srv.runCommand("damage @p 10");
+        ctx.waitTicks(3);
+        on(ctx, "AutoGap");
+        ctx.waitTicks(80);
+        int left = countItem(ctx, net.minecraft.world.item.Items.GOLDEN_APPLE);
+        log("autogap apples left=" + left);
+        assertTrue(left < 3, "no golden apple eaten, left " + left);
+    }
+
+    private void testShieldBlock(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @a weapon.offhand with shield");
+        srv.runCommand("difficulty normal");
+        srv.runCommand(String.format(java.util.Locale.ROOT, "summon zombie %d %d %d {NoAI:1b,Silent:1b,PersistenceRequired:1b,Tags:[\"gt\"]}", ox + 2, Y, oz));
+        ctx.waitTicks(5);
+        on(ctx, "ShieldBlock");
+        ctx.waitTicks(15);
+        boolean blocking = ctx.computeOnClient(mc -> mc.player.isBlocking());
+        assertTrue(blocking, "player is not blocking with the shield");
+        srv.runCommand("kill @e[tag=gt]");
+        ctx.waitTicks(10);
+        boolean after = ctx.computeOnClient(mc -> mc.player.isBlocking());
+        assertTrue(!after, "still blocking without an enemy");
+    }
+
+    private void testSafeWalk(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        on(ctx, "SafeWalk");
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
+        ctx.waitTicks(130);
+        double[] pos = ctx.computeOnClient(mc -> new double[]{mc.player.getX(), mc.player.getY()});
+        log("safewalk x=" + (pos[0] - ox) + " y=" + pos[1]);
+        assertTrue(pos[1] > Y - 0.5, "fell off the edge, y=" + pos[1]);
+        assertTrue(pos[0] - ox > 12, "did not walk, x=" + (pos[0] - ox));
+    }
+
+    private void testBHop(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        on(ctx, "BHop");
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(true));
+        double max = 0;
+        for (int i = 0; i < 24; i++) {
+            ctx.waitTicks(1);
+            max = Math.max(max, ctx.computeOnClient(mc -> mc.player.getY()) - Y);
+        }
+        log("bhop max height=" + max);
+        assertTrue(max > 0.3, "no hop, max height " + max);
+    }
+
+    private void testZoom(ClientGameTestContext ctx) {
+        int before = ctx.computeOnClient(mc -> mc.options.fov().get());
+        on(ctx, "Zoom");
+        ctx.waitTicks(2);
+        int zoomed = ctx.computeOnClient(mc -> mc.options.fov().get());
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("Zoom").toggle());
+        int after = ctx.computeOnClient(mc -> mc.options.fov().get());
+        log("zoom fov " + before + " -> " + zoomed + " -> " + after);
+        assertTrue(zoomed == 30, "zoom fov " + zoomed);
+        assertTrue(after == before, "fov not restored " + after);
+    }
+
+    private void testArmorWarning(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @a armor.feet with diamond_boots[damage=400]");
+        ctx.waitTicks(5);
+        on(ctx, "ArmorWarning");
+        ctx.waitTicks(5);
+        String w = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.ArmorWarning.INSTANCE.lastWarning);
+        log("armor warning: " + w);
+        assertTrue(w != null && w.contains("Boots"), "warning " + w);
+    }
+
+    private void testAutoDrop(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("give @a cobblestone 64");
+        srv.runCommand("give @a dirt 10");
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Misc.AutoDrop.INSTANCE.junk.selectedItems.put(net.minecraft.world.item.Items.COBBLESTONE, 1));
+        on(ctx, "AutoDrop");
+        ctx.waitTicks(15);
+        int cobble = countItem(ctx, net.minecraft.world.item.Items.COBBLESTONE);
+        int dirt = countItem(ctx, net.minecraft.world.item.Items.DIRT);
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Misc.AutoDrop.INSTANCE.junk.selectedItems.clear());
+        log("autodrop cobble=" + cobble + " dirt=" + dirt);
+        assertTrue(cobble == 0, "cobblestone not dropped: " + cobble);
+        assertTrue(dirt == 10, "dirt changed: " + dirt);
+    }
+
+    private void testAutoReplenish(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @a hotbar.0 with cobblestone 3");
+        srv.runCommand("item replace entity @a inventory.0 with cobblestone 64");
+        ctx.waitTicks(5);
+        on(ctx, "AutoReplenish");
+        ctx.waitTicks(15);
+        int hot = ctx.computeOnClient(mc -> mc.player.getInventory().getItem(0).getCount());
+        log("autoreplenish hotbar0=" + hot);
+        assertTrue(hot > 3, "hotbar stack not refilled: " + hot);
+    }
+
+    private void testToolSaver(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("item replace entity @a hotbar.0 with diamond_pickaxe[damage=1556]");
+        ctx.waitTicks(5);
+        on(ctx, "ToolSaver");
+        ctx.waitTicks(5);
+        int slot = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+        assertTrue(slot != 0, "still holding the almost broken tool");
+    }
+
+    private void testAntiVoid(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        int minY = ctx.computeOnClient(mc -> mc.level.getMinY());
+        on(ctx, "AntiVoid");
+        srv.runCommand("tp @a " + ox + " " + (minY + 2) + " " + oz);
+        double max = minY;
+        for (int i = 0; i < 20; i++) {
+            ctx.waitTicks(1);
+            max = Math.max(max, ctx.computeOnClient(mc -> mc.player.getY()));
+        }
+        log("antivoid minY=" + minY + " max=" + max);
+        assertTrue(max > minY + 4, "no bounce, max y " + max);
+    }
+
+    private void testTeabag(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand(String.format(java.util.Locale.ROOT, "summon villager %d %d %d {NoAI:1b,Tags:[\"gt\"]}", ox + 2, Y, oz));
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Troll.Teabag.INSTANCE.anyEntity = true);
+        on(ctx, "Teabag");
+        boolean up = false, down = false;
+        for (int i = 0; i < 16; i++) {
+            ctx.waitTicks(1);
+            if (ctx.computeOnClient(mc -> mc.options.keyShift.isDown())) down = true; else up = true;
+        }
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Troll.Teabag.INSTANCE.anyEntity = false);
+        assertTrue(up && down, "crouch did not toggle (up=" + up + " down=" + down + ")");
+    }
+
+    private void testHotbarDance(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        on(ctx, "HotbarDance");
+        java.util.Set<Integer> seen = new java.util.HashSet<>();
+        for (int i = 0; i < 20; i++) {
+            ctx.waitTicks(1);
+            seen.add(ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot()));
+        }
+        assertTrue(seen.size() >= 3, "slots seen " + seen);
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("HotbarDance").toggle());
+        ctx.waitTicks(2);
+        int back = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+        assertTrue(back == 0, "slot not restored: " + back);
+    }
+
+    private void testAlerts(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        on(ctx, "TotemAlert");
+        on(ctx, "InvFullAlert");
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.InvFullAlert.INSTANCE.freeSlots = 36);
+        ctx.waitTicks(5);
+        boolean missing = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.TotemAlert.INSTANCE.missing);
+        boolean full = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.InvFullAlert.INSTANCE.full);
+        assertTrue(missing, "totem alert should flag missing totem");
+        assertTrue(full, "inv alert should flag at threshold 36");
+        srv.runCommand("give @a totem_of_undying 1");
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.InvFullAlert.INSTANCE.freeSlots = 0);
+        ctx.waitTicks(5);
+        boolean missing2 = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.TotemAlert.INSTANCE.missing);
+        boolean full2 = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.InvFullAlert.INSTANCE.full);
+        assertTrue(!missing2, "totem alert still flags with a totem");
+        assertTrue(!full2, "inv alert flags with free slots");
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Donut.InvFullAlert.INSTANCE.freeSlots = 3);
+    }
+
+    private void testNotificationsFriends(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        on(ctx, "Notifications");
+        ctx.runOnClient(mc -> { var m = ModuleManager.getModuleByName("BHop"); m.toggle(); m.toggle(); });
+        String msg = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Client.Notifications.INSTANCE.lastMessage);
+        assertTrue("BHop disabled".equals(msg), "notification '" + msg + "'");
+        srv.runCommand(String.format(java.util.Locale.ROOT, "summon villager %d %d %d {NoAI:1b,Tags:[\"gt\"]}", ox + 3, Y, oz));
+        ctx.waitTicks(10);
+        on(ctx, "Friends");
+        boolean[] r = ctx.computeOnClient(mc -> {
+            for (var e : mc.level.entitiesForRendering()) {
+                if (e instanceof net.minecraft.world.entity.npc.villager.Villager v) {
+                    boolean before = com.OsamaClient.newbridge.Utils.TeamUtils.isTeammate(v);
+                    com.OsamaClient.newbridge.Hacks.Client.Friends.toggleFriend(v.getScoreboardName());
+                    boolean added = com.OsamaClient.newbridge.Utils.TeamUtils.isTeammate(v);
+                    com.OsamaClient.newbridge.Hacks.Client.Friends.toggleFriend(v.getScoreboardName());
+                    boolean removed = com.OsamaClient.newbridge.Utils.TeamUtils.isTeammate(v);
+                    return new boolean[]{before, added, removed};
+                }
+            }
+            return new boolean[]{true, false, true};
+        });
+        assertTrue(!r[0] && r[1] && !r[2], "friends teammate flags " + java.util.Arrays.toString(r));
     }
 
     private void testHudRedesign(ClientGameTestContext ctx, TestServerContext srv) {

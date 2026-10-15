@@ -33,6 +33,7 @@ public abstract class Module {
         enabled = !enabled;
         if (enabled) onEnable();
         else onDisable();
+        com.OsamaClient.newbridge.Hacks.Client.Notifications.moduleToggled(this);
     }
     public void onAttack(Minecraft mc, LivingEntity target) {}
     public void onEnable() {}
