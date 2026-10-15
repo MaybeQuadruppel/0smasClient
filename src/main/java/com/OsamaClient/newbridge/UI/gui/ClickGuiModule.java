@@ -26,6 +26,10 @@ public class ClickGuiModule extends Module {
             .withDescription("Height of each module row; more room for text and easier clicking at high scale");
     public final Slider panelWidth = new Slider("Panel Width", 80.0, 140.0, 92.0, 2.0, null)
             .withDescription("Width of each category panel");
+    public final ToggleButton autoScale = new ToggleButton("Auto Scale", true, null)
+            .withDescription("Shrinks the GUI automatically when there are too many category panels to fit on screen");
+    public final Slider maxPanelHeight = new Slider("Max Panel Height", 20, 100, 100, 5, null)
+            .withDescription("Maximum height of a panel in percent of the screen; longer lists scroll (mouse wheel)");
     public final Slider radius = new Slider("Radius", 0, 5, 2.5, 0.5, null)
             .withDescription("Corner radius");
     public final Slider glow = new Slider("Glow", 0, 1, 0.6, 0.05, null)
@@ -56,6 +60,8 @@ public class ClickGuiModule extends Module {
         settings.add(rainbowAccent);
         settings.add(rainbowSpeed);
         settings.add(scale);
+        settings.add(autoScale);
+        settings.add(maxPanelHeight);
         settings.add(rowHeight);
         settings.add(panelWidth);
         settings.add(radius);

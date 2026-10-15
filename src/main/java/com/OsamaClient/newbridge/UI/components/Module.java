@@ -20,7 +20,7 @@ public abstract class Module {
     public List<Component> settings = new ArrayList<>();
 
     public enum Category {
-        COMBAT, MOVEMENT, VISUAL, MISC, Donut, CLIENT, PLAYER, TROLL
+        COMBAT, MOVEMENT, VISUAL, MISC, DUPE, Donut, CLIENT, PLAYER, TROLL
     }
 
     public Module(String name, String description, Category category) {

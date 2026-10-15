@@ -47,6 +47,9 @@ public final class Theme {
     /** Accent with the given alpha (0..1). */
     public static int accent(float alpha) { return ColorUtil.alpha(accent(), alpha); }
 
+    public static boolean autoScale() { return m() == null || m().autoScale.enabled; }
+    /** Max panel height as a fraction (0.2..1) of the screen height. */
+    public static float maxPanelHeight() { return m() != null ? (float) m().maxPanelHeight.getValue() / 100f : 1f; }
     public static float scale() { return m() != null ? (float) m().scale.getValue() : 1.5f; }
     public static float radius() { return m() != null ? (float) m().radius.getValue() : 2.5f; }
     public static float glow() { return m() != null ? (float) m().glow.getValue() : 0.6f; }
@@ -69,4 +72,4 @@ public final class Theme {
         int a = Math.round(panelOpacity() * 255f) << 24;
         return a | (PANEL_BG & 0x00FFFFFF);
     }
-}
+}

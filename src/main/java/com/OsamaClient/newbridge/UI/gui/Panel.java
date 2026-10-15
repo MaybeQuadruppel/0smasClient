@@ -43,6 +43,21 @@ public final class Panel {
 
     public List<ModuleRow> rows() { return rows; }
 
+    private static boolean matches(ModuleRow r, String search) {
+        return (search.isEmpty() || r.searchName.contains(search)) && (!ClickGui.onlyEnabled || r.module.enabled);
+    }
+
+    /** Number of rows that pass the current search / "enabled only" filter. */
+    int matchCount(String search) {
+        int n = 0;
+        for (ModuleRow r : rows) if (matches(r, search)) n++;
+        return n;
+    }
+
+    /** Height drawn last frame, in GUI units (for tests). */
+    public float lastHeight() { return lastH; }
+    public boolean isCollapsed() { return collapsed; }
+
     /** Small identity colour per category, shown as the dot in front of the panel title. */
     private static int categoryColor(Module.Category c) {
         return switch (c) {
@@ -50,6 +65,7 @@ public final class Panel {
             case MOVEMENT -> 0xFF5CE1A0;
             case VISUAL -> 0xFFB48CFF;
             case MISC -> 0xFFFFC857;
+            case DUPE -> 0xFF7CFFB2;
             case Donut -> 0xFF58D0FF;
             case CLIENT -> 0xFF8A9BFF;
             case PLAYER -> 0xFFFF9A5C;
@@ -92,7 +108,7 @@ public final class Panel {
         float speed = Theme.animSpeed();
         openA.update(ui.dt, speed);
         for (int i = 0; i < rows.size(); i++) {
-            boolean match = search.isEmpty() || rows.get(i).searchName.contains(search);
+            boolean match = matches(rows.get(i), search);
             rowVisible[i].setTarget(match ? 1f : 0f);
             rowVisible[i].update(ui.dt, speed);
         }
@@ -109,6 +125,7 @@ public final class Panel {
 
         float content = contentHeight();
         float maxBody = Math.max(20f, ui.height() - yy - headerH - bottomPad - 6f);
+        maxBody = Math.min(maxBody, Math.max(20f, ui.height() * Theme.maxPanelHeight() - headerH - bottomPad));
         float bodyH = Math.min(content, maxBody) * openA.value();
         float maxScroll = Math.max(0f, content - maxBody);
         scrollTarget = Math.min(Math.max(scrollTarget, 0f), maxScroll);

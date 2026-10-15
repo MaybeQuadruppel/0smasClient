@@ -32,7 +32,7 @@ public class BundleDupe extends Module {
     private Thread worker;
 
     public BundleDupe() {
-        super("BundleDupe", "Runs the bundle dupe V2 packet loop on a bundle in your hotbar.", Category.MISC);
+        super("BundleDupe", "Runs the bundle dupe V2 packet loop on a bundle in your hotbar.", Category.DUPE);
         INSTANCE = this;
         settings.add(new Slider("Pickup Delay", 0, 200, pickupDelayMs, 5, v -> pickupDelayMs = v).withDescription("ms after picking up / selecting."));
         settings.add(new Slider("Put Back Delay", 0, 200, putBackDelayMs, 5, v -> putBackDelayMs = v).withDescription("ms after putting the stack back."));

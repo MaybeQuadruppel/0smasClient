@@ -33,9 +33,9 @@ public final class ClickGui {
 
     private static final Module.Category[] ORDER = {
             Module.Category.COMBAT, Module.Category.MOVEMENT, Module.Category.VISUAL,
-            Module.Category.MISC, Module.Category.Donut, Module.Category.CLIENT, Module.Category.PLAYER,
+            Module.Category.MISC, Module.Category.DUPE, Module.Category.Donut, Module.Category.CLIENT, Module.Category.PLAYER,
             Module.Category.TROLL};
-    private static final String[] TITLES = {"Combat", "Movement", "Visual", "Misc", "Donut", "Client", "Player", "Troll"};
+    private static final String[] TITLES = {"Combat", "Movement", "Visual", "Misc", "Dupe", "Donut", "Client", "Player", "Troll"};
 
     private final UiRenderer renderer = new UiRenderer();
     private final BlurRenderer blur = new BlurRenderer();
@@ -53,6 +53,9 @@ public final class ClickGui {
     private final SearchBar searchBar = new SearchBar();
     private int buttonsDown;
 
+    /** Search filter: show only enabled modules. */
+    static boolean onlyEnabled;
+
     private ClickGui() {}
 
     // ------------------------------------------------------------------ panels
@@ -69,6 +72,17 @@ public final class ClickGui {
             p.y = 8;
             applyPending(p);
             panels.add(p);
+        }
+        // a category without a saved position (e.g. newly added) takes the first free column instead of overlapping
+        for (Panel p : panels) {
+            if (pendingPanels.containsKey(p.category.name())) continue;
+            float w = Theme.panelW();
+            for (int slot = 0; slot < ORDER.length; slot++) {
+                float sx = 8 + slot * (w + Theme.GAP);
+                boolean free = true;
+                for (Panel q : panels) if (q != p && Math.abs(q.x - sx) < w * 0.6f && Math.abs(q.y - 8f) < 40f) free = false;
+                if (free) { p.x = sx; break; }
+            }
         }
     }
 
@@ -177,7 +191,7 @@ public final class ClickGui {
         try {
             renderer.begin();
             // never change the scale while a button is held (dragging the Scale slider would feed back)
-            if (buttonsDown == 0) ui.scale = Theme.scale();
+            if (buttonsDown == 0) ui.scale = effectiveScale();
             ui.dt = dt;
             ui.mouseX = UiInput.mouseFbX() / ui.scale;
             ui.mouseY = UiInput.mouseFbY() / ui.scale;
@@ -217,7 +231,7 @@ public final class ClickGui {
         ui.hoverBlocked = false;
         ui.alpha = open;
 
-        searchBar.draw(ui);
+        searchBar.draw(ui, matchCount());
         drawTabs();
         drawTooltip(dt);
     }
@@ -467,9 +481,60 @@ public final class ClickGui {
     }
 
     public void charTyped(int codepoint) {
+        // type-to-search: letters / digits typed while nothing else has the keyboard start the search
+        if (!searchBar.editing() && focused == null && bindingRow == null && openP.forward()
+                && Character.isLetterOrDigit(codepoint)) searchBar.open();
         if (searchBar.charTyped(codepoint)) return;
         if (focused != null) focused.charTyped(codepoint);
     }
+
+    // ------------------------------------------------------------------ scale / filters
+
+    /** GUI scale actually used: the configured one, reduced so that all category columns of the tab fit the window. */
+    public float effectiveScale() {
+        float base = Theme.scale();
+        if (!Theme.autoScale()) return base;
+        int n = active().size();
+        float need = 8f + n * (Theme.panelW() + Theme.GAP);
+        float fit = renderer.width() / need;
+        return Math.min(base, Math.max(0.6f, fit));
+    }
+
+    public float currentScale() { return ui.scale; }
+
+    float mouseUnitsX() { return ui.mouseX; }
+    float mouseUnitsY() { return ui.mouseY; }
+
+    public String searchQuery() { return searchBar.query(); }
+
+    /** Rows passing the search / enabled-only filter across the panels of the current tab. */
+    int matchCount() {
+        String q = searchBar.query();
+        int n = 0;
+        for (Panel p : active()) n += p.matchCount(q);
+        return n;
+    }
+
+    public void toggleOnlyEnabled() { onlyEnabled = !onlyEnabled; com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick(); }
+
+    public boolean allCollapsed() {
+        for (Panel p : active()) if (!p.collapsed) return false;
+        return true;
+    }
+
+    /** Collapses every panel of the tab, or expands them all again if they are all collapsed already. */
+    public void toggleCollapseAll() {
+        boolean collapse = !allCollapsed();
+        for (Panel p : active()) p.setCollapsed(collapse);
+        com.OsamaClient.newbridge.UI.gui.util.UiSounds.tick();
+    }
+
+    /** For tests: sets the search text as if typed. */
+    public void setSearch(String text) {
+        searchBar.setText(text);
+    }
+
+    public int visibleMatches() { return matchCount(); }
 
     // ------------------------------------------------------------------ helpers for rows / widgets
 

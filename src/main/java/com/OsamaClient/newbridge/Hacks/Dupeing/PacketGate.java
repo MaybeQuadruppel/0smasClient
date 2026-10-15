@@ -31,7 +31,7 @@ public class PacketGate extends Module {
     private int age;
 
     public PacketGate() {
-        super("PacketGate", "Holds or drops selected outgoing packets; releases them when you turn it off.", Category.MISC);
+        super("PacketGate", "Holds or drops selected outgoing packets; releases them when you turn it off.", Category.DUPE);
         INSTANCE = this;
         settings.add(new ModeButton("Mode", List.of("Delay", "Cancel"), 0, v -> { mode = v; rebuild(); })
                 .withDescription("Delay = hold packets until released. Cancel = drop them."));

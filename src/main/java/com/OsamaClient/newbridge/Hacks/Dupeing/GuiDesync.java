@@ -17,7 +17,7 @@ public class GuiDesync extends Module {
     public int fired;
 
     public GuiDesync() {
-        super("GuiDesync", "Sends the container close packet but keeps the screen open.", Category.MISC);
+        super("GuiDesync", "Sends the container close packet but keeps the screen open.", Category.DUPE);
         INSTANCE = this;
         settings.add(new ToggleButton("Close Screen", closeScreen, v -> closeScreen = v).withDescription("Also close the screen on your side."));
     }

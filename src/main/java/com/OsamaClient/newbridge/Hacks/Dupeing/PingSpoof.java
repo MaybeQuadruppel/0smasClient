@@ -10,7 +10,7 @@ public class PingSpoof extends Module {
     public double delayMs = 300;
 
     public PingSpoof() {
-        super("PingSpoof", "Delays keep-alive and pong replies to fake a higher ping.", Category.MISC);
+        super("PingSpoof", "Delays keep-alive and pong replies to fake a higher ping.", Category.DUPE);
         INSTANCE = this;
         settings.add(new Slider("Delay", 50, 3000, delayMs, 50, v -> { delayMs = v; if (enabled) PacketHub.pingDelayMs = (int) (double) v; })
                 .withDescription("Extra milliseconds before replies are sent (keep below the server timeout)."));

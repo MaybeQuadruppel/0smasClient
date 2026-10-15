@@ -104,6 +104,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("guidesync: sends close packet, screen stays open", () -> guarded(ctx, srv, () -> testGuiDesync(ctx, srv)));
             run("packetburst: sends N packets", () -> guarded(ctx, srv, () -> testPacketBurst(ctx, srv)));
             run("bundledupe: runs the packet loop and stops at max cycles", () -> guarded(ctx, srv, () -> testBundleDupe(ctx, srv)));
+            run("clickgui: dupe category, auto scale, max panel height, search + filters (screenshot)", () -> guarded(ctx, srv, () -> testClickGuiUpgrade(ctx, srv)));
             run("fakelag: hold mode (blink) holds movement, releases on disable", () -> guarded(ctx, srv, () -> testBlink(ctx, srv)));
             run("fakelag: interval mode releases periodically", () -> guarded(ctx, srv, () -> testFakeLagInterval(ctx, srv)));
             run("antihunger: hides onGround from the server", () -> guarded(ctx, srv, () -> testAntiHunger(ctx, srv)));
@@ -1873,5 +1874,75 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         log("fuzz tested " + tested + " modules");
         assertTrue(bad.length() == 0, "exceptions logged while fuzzing:\n" + bad);
         assertTrue(tested > 80, "only " + tested + " modules fuzzed");
+    }
+
+    private void testClickGuiUpgrade(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+        var cfg = com.OsamaClient.newbridge.UI.gui.ClickGuiModule.INSTANCE;
+        ctx.runOnClient(mc -> gui.open());
+        ctx.waitTicks(20);
+        // dupe category
+        int dupeRows = ctx.computeOnClient(mc -> gui.panel(Module.Category.DUPE) == null ? -1 : gui.panel(Module.Category.DUPE).rows().size());
+        log("clickgui dupe rows=" + dupeRows);
+        assertTrue(dupeRows == 5, "Dupe panel rows: " + dupeRows);
+        for (String n : new String[]{"PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe"}) {
+            Module m = ModuleManager.getModuleByName(n);
+            assertTrue(m.category == Module.Category.DUPE, n + " is not in Dupe");
+        }
+        // auto scale: all columns fit the window width
+        float[] sc = ctx.computeOnClient(mc -> new float[]{gui.currentScale(), (float) cfg.scale.getValue(), mc.getWindow().getWidth()});
+        float panelsW = 8f + gui.panels().size() * (92f + 6f);
+        log("clickgui scale=" + sc[0] + " base=" + sc[1] + " window=" + sc[2] + " neededUnits=" + panelsW);
+        assertTrue(sc[0] * panelsW <= sc[2] + 2f, "panels do not fit: " + sc[0] * panelsW + " > " + sc[2]);
+        assertTrue(sc[0] < sc[1], "scale was not reduced");
+        ctx.runOnClient(mc -> cfg.autoScale.setValue(false));
+        ctx.waitTicks(5);
+        float off = ctx.computeOnClient(mc -> gui.currentScale());
+        ctx.runOnClient(mc -> cfg.autoScale.setValue(true));
+        ctx.waitTicks(5);
+        assertTrue(Math.abs(off - sc[1]) < 0.01f, "auto scale off should use the configured scale: " + off);
+        // max panel height + scrolling
+        float full = ctx.computeOnClient(mc -> gui.panel(Module.Category.COMBAT).lastHeight());
+        ctx.runOnClient(mc -> cfg.maxPanelHeight.setValue(40));
+        ctx.waitTicks(15);
+        float[] capped = ctx.computeOnClient(mc -> new float[]{gui.panel(Module.Category.COMBAT).lastHeight(), mc.getWindow().getHeight() / gui.currentScale()});
+        log("clickgui combat height full=" + full + " capped=" + capped[0] + " screenUnits=" + capped[1]);
+        assertTrue(capped[0] <= capped[1] * 0.4f + 0.6f, "panel not capped: " + capped[0] + " vs " + capped[1] * 0.4f);
+        assertTrue(capped[0] < full, "capped panel is not smaller than the full one");
+        ctx.runOnClient(mc -> cfg.maxPanelHeight.setValue(100));
+        ctx.waitTicks(10);
+        // search + type to search + enabled filter
+        int total = ctx.computeOnClient(mc -> gui.visibleMatches());
+        ctx.runOnClient(mc -> gui.setSearch("kill"));
+        ctx.waitTicks(3);
+        int some = ctx.computeOnClient(mc -> gui.visibleMatches());
+        assertTrue(some >= 1 && some < total, "search matches " + some + " of " + total);
+        ctx.runOnClient(mc -> gui.setSearch(""));
+        ctx.runOnClient(mc -> gui.charTyped('z'));
+        String typed = ctx.computeOnClient(mc -> gui.searchQuery());
+        assertTrue("z".equals(typed), "type to search gave '" + typed + "'");
+        ctx.runOnClient(mc -> gui.setSearch(""));
+        on(ctx, "Zoom");
+        ctx.runOnClient(mc -> gui.toggleOnlyEnabled());
+        ctx.waitTicks(3);
+        int enabledShown = ctx.computeOnClient(mc -> gui.visibleMatches());
+        long enabledReal = ctx.computeOnClient(mc -> ModuleManager.modules.stream().filter(m -> m.enabled).count());
+        log("clickgui enabled-only shown=" + enabledShown + " real=" + enabledReal);
+        assertTrue(enabledShown == enabledReal && enabledShown >= 1, "enabled filter " + enabledShown + " vs " + enabledReal);
+        ctx.runOnClient(mc -> gui.toggleOnlyEnabled());
+        ctx.runOnClient(mc -> ModuleManager.getModuleByName("Zoom").toggle());
+        // collapse / expand all
+        ctx.runOnClient(mc -> gui.toggleCollapseAll());
+        ctx.waitTicks(15);
+        boolean all = ctx.computeOnClient(mc -> gui.allCollapsed());
+        assertTrue(all, "collapse all failed");
+        ctx.runOnClient(mc -> gui.toggleCollapseAll());
+        ctx.waitTicks(20);
+        assertTrue(!ctx.computeOnClient(mc -> gui.allCollapsed()), "expand all failed");
+        Path shot = ctx.takeScreenshot("newbridge_clickgui_dupe");
+        log("ClickGui screenshot: " + shot);
+        ctx.runOnClient(mc -> gui.close());
+        ctx.waitTicks(15);
     }
 }

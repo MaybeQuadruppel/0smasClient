@@ -30,7 +30,7 @@ public class PacketBurst extends Module {
     public int lastSent;
 
     public PacketBurst() {
-        super("PacketBurst", "Sends one packet type many times in a row (one-shot, bind it to a key).", Category.MISC);
+        super("PacketBurst", "Sends one packet type many times in a row (one-shot, bind it to a key).", Category.DUPE);
         INSTANCE = this;
         settings.add(new ModeButton("Packet", List.of("Container Click", "Bundle Select", "Use Item", "Swing", "Set Carried Item", "Close Container"), 0, v -> mode = v)
                 .withDescription("Which packet to send."));
