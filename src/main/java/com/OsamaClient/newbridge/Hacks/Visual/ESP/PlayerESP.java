@@ -57,6 +57,7 @@ public class PlayerESP extends Module {
     public boolean renderTracers = false;
     public boolean distanceColors = false;
     public boolean splitVisibility = false;
+    public boolean friendColorOverride = true;
     public boolean teamColorOverride = true; // NEU: Steuert, ob Teamfarben invertiert/überschrieben werden
     public final ColorPicker occludedColor = new ColorPicker("Occluded Color", 0xFFFF3B3B, null);
     public boolean glow = false;
@@ -99,7 +100,7 @@ public class PlayerESP extends Module {
     }
 
     public PlayerESP() {
-        super("EntityESP", "Lets you See Entities by their Threatlevels", Category.VISUAL);
+        super("EntityESP", "Highlights entities through walls, coloured by threat or distance.", Category.VISUAL);
         INSTANCE = this;
 
         this.targetPicker = new EntityFilterPicker("Targets");
@@ -121,8 +122,10 @@ public class PlayerESP extends Module {
         this.settings.add(new ToggleButton("Distance Colors", distanceColors, val -> distanceColors = val)
                 .withDescription("Uses distance-based colors for all ESP modes."));
 
+        this.settings.add(new ToggleButton("Friend Color", friendColorOverride, val -> friendColorOverride = val)
+                .withDescription("Draws friends in the colour set in the Friends module (instead of the normal entity colour)."));
         this.settings.add(new ToggleButton("Team Color Override", teamColorOverride, val -> teamColorOverride = val)
-                .withDescription("Inverts ESP colors for teammates."));
+                .withDescription("Inverts ESP colors for real teammates (friends have their own colour)."));
 
         this.settings.add(new ToggleButton("Tracers", renderTracers, val -> renderTracers = val)
                 .withDescription("Draws tracer lines to entities."));
@@ -323,7 +326,11 @@ public class PlayerESP extends Module {
         }
 
         // Respektiert nun den Toggle-Status im UI!
-        if (teamColorOverride && TeamUtils.isTeammate(target)) {
+        if (friendColorOverride && TeamUtils.isFriend(target)) {
+            int a = Math.max(8, (int) (((color >>> 24) & 0xFF)));
+            return (a << 24) | (com.OsamaClient.newbridge.Hacks.Client.Friends.color() & 0xFFFFFF);
+        }
+        if (teamColorOverride && TeamUtils.isTeamMember(target)) {
             color = invertColor(color);
         }
 

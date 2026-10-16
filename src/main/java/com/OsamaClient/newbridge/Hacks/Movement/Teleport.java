@@ -18,7 +18,7 @@ public class Teleport extends Module {
     private int delayCounter = 0;
 
     public Teleport() {
-        super("Teleport", "Instantly teleports you in steps to bypass rubberbands", Category.MOVEMENT);
+        super("Teleport", "Teleports you in small steps so the server does not pull you back.", Category.MOVEMENT);
         INSTANCE = this;
 
         // UI-Slider für Schrittweite und Frequenz
@@ -82,4 +82,4 @@ public class Teleport extends Module {
 
         delayCounter = tickDelay;
     }
-}
+}

@@ -13,7 +13,7 @@ public class Freelook extends Module {
     public boolean noClip = true;
 
     public Freelook() {
-        super("Freelook", "Free third person perspective (hold Left Alt)", Category.MISC);
+        super("Freelook", "Look around freely in third person while holding Left Alt.", Category.MISC);
         instance = this;
 
         this.settings.add(new ToggleButton("NoClip", noClip, val -> noClip = val)

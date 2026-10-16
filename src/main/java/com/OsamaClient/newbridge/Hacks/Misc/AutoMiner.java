@@ -42,7 +42,7 @@ public class AutoMiner extends Module {
     public BlockPicker blockPicker() { return blockPicker; }
 
     public AutoMiner() {
-        super("AutoMiner", "Farms for you", Category.MISC);
+        super("AutoMiner", "Finds and mines the blocks you select (ores, for example).", Category.MISC);
         this.settings.add(blockPicker.withDescription("Selects which blocks to automatically mine."));
         this.settings.add(scanRadius.withDescription("Sets the radius to scan for target blocks."));
         this.settings.add(new ColorPicker("Path Color", pathColor, color -> pathColor = color));

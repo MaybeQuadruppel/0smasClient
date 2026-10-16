@@ -83,8 +83,12 @@ public class NoGuiMixin {
     }
 
     @Inject(method = "extractCrosshair", at = @At("HEAD"), cancellable = true)
-    private void onExtractCrosshair(CallbackInfo ci) {
+    private void onExtractCrosshair(GuiGraphicsExtractor graphics, net.minecraft.client.DeltaTracker delta, CallbackInfo ci) {
         if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.crosshair) ci.cancel();
+        else if (com.OsamaClient.newbridge.Hacks.Visual.CustomCrosshair.hidesVanilla()) {
+            com.OsamaClient.newbridge.Hacks.Visual.CustomCrosshair.drawInverted(graphics);
+            ci.cancel();
+        }
     }
 
     @Inject(method = "extractTitle", at = @At("HEAD"), cancellable = true)
@@ -95,5 +99,45 @@ public class NoGuiMixin {
     @Inject(method = "extractSelectedItemName", at = @At("HEAD"), cancellable = true)
     private void onExtractSelectedItemName(CallbackInfo ci) {
         if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.heldItemName) ci.cancel();
+    }
+
+    @Inject(method = "extractBossOverlay", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractBossOverlay(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.bossBars)) ci.cancel();
+    }
+
+    @Inject(method = "extractSubtitleOverlay", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractSubtitleOverlay(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.subtitles)) ci.cancel();
+    }
+
+    @Inject(method = "extractOverlayMessage", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractOverlayMessage(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.actionBar)) ci.cancel();
+    }
+
+    @Inject(method = "extractSleepOverlay", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractSleepOverlay(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.sleepOverlay)) ci.cancel();
+    }
+
+    @Inject(method = "extractPlayerHealth", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractPlayerHealth(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.healthBar)) ci.cancel();
+    }
+
+    @Inject(method = "extractFood", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractFood(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.foodBar)) ci.cancel();
+    }
+
+    @Inject(method = "extractVehicleHealth", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractVehicleHealth(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.vehicleHealth)) ci.cancel();
+    }
+
+    @Inject(method = "extractSavingIndicator", at = @At("HEAD"), cancellable = true)
+    private void noRender_extractSavingIndicator(CallbackInfo ci) {
+        if (NoRender.on(NoRender.INSTANCE != null && NoRender.INSTANCE.savingIcon)) ci.cancel();
     }
 }

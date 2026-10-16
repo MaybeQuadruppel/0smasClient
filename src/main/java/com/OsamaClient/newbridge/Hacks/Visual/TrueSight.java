@@ -7,7 +7,7 @@ public class TrueSight extends Module {
     public static TrueSight instance;
 
     public TrueSight() {
-        super("TrueSight", "Renders invisible entities visible", Category.VISUAL);
+        super("TrueSight", "Makes invisible entities visible.", Category.VISUAL);
         instance = this;
     }
-}
+}

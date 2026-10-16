@@ -42,7 +42,7 @@ public class StashLogger extends Module {
     }
 
     public StashLogger(java.nio.file.Path file) {
-        super("StashLogger", "Logs container stashes (chests, shulkers, barrels ...) you pass by", Category.MISC);
+        super("StashLogger", "Logs container stashes (chests, shulkers, barrels ...) you pass by", Category.WORLD);
         INSTANCE = this;
         store = new StashStore(file);
         ToggleButton[] open = new ToggleButton[1];

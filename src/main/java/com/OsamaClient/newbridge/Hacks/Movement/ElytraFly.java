@@ -17,7 +17,7 @@ public class ElytraFly extends Module {
     private boolean hoverWhenIdle = false;
 
     public ElytraFly() {
-        super("ElytraFly", "Boost your Elytra flight without rockets!", Category.MOVEMENT);
+        super("ElytraFly", "Boosts your elytra flight with the space bar, no rockets needed.", Category.MOVEMENT);
 
         this.settings.add(new Slider("Boost Strength", 0.1, 5.0, boostStrength, val -> boostStrength = val)
                 .withDescription("How strong the spacebar boost should be."));
@@ -96,4 +96,4 @@ public class ElytraFly extends Module {
         resetHover(mc);
         super.onDisable();
     }
-}
+}

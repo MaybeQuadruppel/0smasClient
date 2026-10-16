@@ -9,7 +9,7 @@ import net.minecraft.world.phys.Vec3;
 public class HighJump extends Module {
 
     private double multiplier = 2.0;
-    private boolean boosted;
+    private boolean boosted, wasGround;
 
     public HighJump() {
         super("HighJump", "Makes you jump higher.", Category.MOVEMENT);
@@ -21,15 +21,14 @@ public class HighJump extends Module {
     public void onTick(Minecraft mc) {
         var p = mc.player;
         if (p == null) return;
-        if (p.onGround()) {
-            boosted = false;
-            return;
-        }
+        boolean ground = p.onGround();
         Vec3 dm = p.getDeltaMovement();
-        // the tick right after a normal jump has y velocity of about 0.42
-        if (!boosted && dm.y > 0.40 && dm.y < 0.45) {
+        // the tick the player leaves the ground upwards = the jump (the velocity is already reduced by one tick of gravity)
+        if (wasGround && !ground && !boosted && dm.y > 0.1 && dm.y < 0.7 && !p.isInLiquid() && !p.onClimbable()) {
             p.setDeltaMovement(dm.x, dm.y * multiplier, dm.z);
             boosted = true;
         }
+        if (ground) boosted = false;
+        wasGround = ground;
     }
 }

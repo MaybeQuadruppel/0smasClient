@@ -5,7 +5,7 @@ import net.minecraft.client.Minecraft;
 
 public class AutoSprint extends Module {
     public AutoSprint() {
-        super("AutoSprint", "Sprints automatically when moving forward", Category.MOVEMENT);
+        super("AutoSprint", "Sprints automatically while you walk forward.", Category.MOVEMENT);
     }
     @Override
     public void onTick(Minecraft client) {
@@ -15,4 +15,4 @@ public class AutoSprint extends Module {
             client.player.setSprinting(true);
         }
     }
-}
+}

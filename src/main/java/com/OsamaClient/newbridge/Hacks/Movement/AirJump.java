@@ -16,7 +16,7 @@ public class AirJump extends Module {
     private boolean lastTickJumpPressed = false;
 
     public AirJump() {
-        super("AirJump","Lets you Jump in the Air", Category.MOVEMENT);
+        super("AirJump","Lets you jump again in mid air.", Category.MOVEMENT);
         this.settings.add(new Slider("Max Jumps", 1.0, 20.0, maxJumps, val -> maxJumps = val).withDescription("Controls how many times you can jump in mid-air."));
     }
 
@@ -39,4 +39,4 @@ public class AirJump extends Module {
             lastTickJumpPressed = isJumpPressed;
         }
     }
-}
+}

@@ -64,6 +64,10 @@ public class EntryPoint implements ClientModInitializer {
                 "Friends: who is online or nearby, last seen, add / remove, message, go to", com.OsamaClient.newbridge.Hacks.Client.FriendsWindow::new);
         com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Keybinds",
                 "Keybind overview: a real keyboard showing module and vanilla binds and any conflicts", com.OsamaClient.newbridge.UI.gui.window.KeyboardWindow::new);
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Shortcuts",
+                "Every shortcut at a glance: mouse and keyboard actions, your module keybinds and the chat commands (F1)", com.OsamaClient.newbridge.UI.gui.window.ShortcutsWindow::new);
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.registerDock("Crosshair",
+                "Pixel editor: draw your own crosshair with colours", com.OsamaClient.newbridge.UI.gui.window.CustomCrosshairWindow::new);
         com.OsamaClient.newbridge.Utils.ChatSuggest.register();
         com.OsamaClient.newbridge.UI.gui.Keybinds.register();
         // Alles speichern/laden (Module, Keybinds, Einstellungen, Panels, GUI-Theme)

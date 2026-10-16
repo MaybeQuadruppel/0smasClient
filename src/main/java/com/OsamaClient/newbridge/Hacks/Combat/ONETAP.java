@@ -16,7 +16,7 @@ public class ONETAP extends Module {
     private int heightIncrease = 9;
 
     public ONETAP() {
-        super("ONETAP", "Spoofs Y position to boost mace damage", Category.COMBAT);
+        super("ONETAP", "Mace exploit: fakes a big fall so the next hit deals smash damage.", Category.COMBAT);
         settings.add(new Slider("FallHeight", 0, 45, 49, v -> fallHeight = v.intValue()).withDescription("Sets the spoofed fall height for mace damage calculation."));
         settings.add(new Slider("SpamPackets", 0, 17, 8, v -> spamPackets = v.intValue()).withDescription("Number of packets sent to spoof the fall height."));
         settings.add(new Slider("Attacks", 0, 10, 5, v -> attackCount = v.intValue()).withDescription("Number of attacks executed during the exploit."));
@@ -47,4 +47,4 @@ public class ONETAP extends Module {
         }
         mc.getConnection().send(new ServerboundMovePlayerPacket.Pos(x, y, z, onGround, false));
     }
-}
+}

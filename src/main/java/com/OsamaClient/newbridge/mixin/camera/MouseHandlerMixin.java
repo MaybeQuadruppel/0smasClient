@@ -17,8 +17,15 @@ public class MouseHandlerMixin {
     @Shadow private double accumulatedDX;
     @Shadow private double accumulatedDY;
 
+    @Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
+    private void newbridge$zoomScroll(long window, double xOffset, double yOffset, CallbackInfo ci) {
+        if (com.OsamaClient.newbridge.Hacks.Visual.Zoom.onScroll(yOffset)) ci.cancel();
+    }
+
     @Inject(method = "turnPlayer", at = @At("HEAD"), cancellable = true)
     private void onTurnPlayer(CallbackInfo ci) {
+        double zs = com.OsamaClient.newbridge.Hacks.Visual.Zoom.sensitivity();
+        if (zs < 1.0) { this.accumulatedDX *= zs; this.accumulatedDY *= zs; }
         if (Freecam.isActive) {
 
             double sensitivity = minecraft.options.sensitivity().get() * 0.6F + 0.2F;
@@ -44,4 +51,4 @@ public class MouseHandlerMixin {
             ci.cancel();
         }
     }
-}
+}

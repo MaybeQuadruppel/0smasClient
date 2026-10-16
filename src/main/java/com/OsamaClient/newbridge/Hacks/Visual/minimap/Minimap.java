@@ -173,7 +173,7 @@ public class Minimap extends Module {
             ui = new Ui(renderer);
         }
         renderer.begin();
-        ui.scale = Theme.scale();
+        ui.scale = Theme.scale(); ui.scale *= com.OsamaClient.newbridge.Hacks.Visual.HudLayout.scale("minimap");
         ui.alpha = (float) self.opacity;
         ui.hoverBlocked = true;
         self.render(mc);
@@ -229,7 +229,7 @@ public class Minimap extends Module {
                 double[] m = MinimapMath.worldToMap(ex, ez, bpp, rotate, yaw);
                 double sx = m[0] * scale, sy = m[1] * scale;
                 if (circle ? sx * sx + sy * sy > edge * edge : Math.max(Math.abs(sx), Math.abs(sy)) > edge) continue;
-                int col = isPlayer ? (TeamUtils.isTeammate(e) ? 0xFF4ADE80 : 0xFFFFFFFF) : e instanceof Enemy ? 0xFFFF4D4D : 0xFFFFD43B;
+                int col = isPlayer ? (TeamUtils.isFriend(e) ? com.OsamaClient.newbridge.Hacks.Client.Friends.color() : TeamUtils.isTeamMember(e) ? 0xFF4ADE80 : 0xFFFFFFFF) : e instanceof Enemy ? 0xFFFF4D4D : 0xFFFFD43B;
                 float d = isPlayer ? 2.2f : 1.6f;
                 ui.round((float) (cx + sx) - d / 2f - 0.4f, (float) (cy + sy) - d / 2f - 0.4f, d + 0.8f, d + 0.8f, d, 0xC0000000);
                 ui.round((float) (cx + sx) - d / 2f, (float) (cy + sy) - d / 2f, d, d, d / 2f, col);

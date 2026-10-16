@@ -34,20 +34,20 @@ public class AimAssist extends Module {
     public float fov = 40.0f;
     public boolean randomHeight = true;
     public float staticHeight = 0.5f;
+    public boolean ignoreFriends = true;
     public boolean ignoreTeammates = true;
 
     private float currentAimHeight = 0.5f;
     private UUID lockedTargetUUID = null;
 
     public AimAssist() {
-        super("AimAssist", "Advanced Humanized Aim", Category.COMBAT);
+        super("AimAssist", "Gently pulls your aim towards the nearest target while you fight.", Category.COMBAT);
         INSTANCE = this;
 
         this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
 
         this.settings.add(new ModeButton("Logic", List.of("Always", "On Hit"), mode, val -> mode = val.equals("Always") ? 0 : 1).withDescription("Determines when the aim assist should activate."));
         this.settings.add(this.entityFilter);
-        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents targeting teammates."));
         this.settings.add(new Slider("Range", 1.0, 6.0, (double) range, val -> range = val.floatValue()).withDescription("Maximum distance to target entities."));
         this.settings.add(new Slider("Smoothness", 0.01, 1.0, (double) smoothness, val -> smoothness = val.floatValue()).withDescription("Controls how smooth and human-like the aim movement is."));
         this.settings.add(new Slider("FOV", 10.0, 180.0, (double) fov, val -> fov = val.floatValue()).withDescription("Field of view restriction for valid targets."));
@@ -83,7 +83,7 @@ public class AimAssist extends Module {
             return false;
         }
 
-        if (ignoreTeammates && TeamUtils.isTeammate(entity)) {
+        if (TeamUtils.ignored(entity, ignoreTeammates, ignoreFriends)) {
             return false;
         }
 

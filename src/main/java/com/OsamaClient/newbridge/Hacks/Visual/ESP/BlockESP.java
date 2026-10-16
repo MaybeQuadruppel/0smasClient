@@ -47,7 +47,7 @@ public class BlockESP extends Module {
     private volatile List<RenderBox> renderBoxes = List.of();
 
     public BlockESP() {
-        super("BlockESP", "Look-Up Blocks with Chams", Category.VISUAL);
+        super("BlockESP", "Highlights the blocks you choose through walls.", Category.VISUAL);
         this.blockPicker = new BlockPicker("Block List").withDescription("Selects which blocks to highlight with ESP.");
         this.settings.add(this.blockPicker);
         this.settings.add(new Slider("Chunk Range", 1.0, 16.0, rangeInChunks, val -> rangeInChunks = val).withDescription("Sets the chunk render and scan range for block ESP."));
@@ -310,4 +310,4 @@ public class BlockESP extends Module {
     }
 
     private record RenderBox(AABB bounds, int argb) {}
-}
+}

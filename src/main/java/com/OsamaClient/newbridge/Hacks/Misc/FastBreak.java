@@ -11,7 +11,7 @@ public class FastBreak extends Module {
     private Field destroyDelayField;
 
     public FastBreak() {
-        super("FastBreak", "Removes delay between breaking blocks", Category.MISC);
+        super("FastBreak", "Removes the delay between breaking blocks.", Category.MISC);
         INSTANCE = this;
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
@@ -29,4 +29,4 @@ public class FastBreak extends Module {
             destroyDelayField.setInt(client.gameMode, 0);
         } catch (Exception ignored) {}
     }
-}
+}

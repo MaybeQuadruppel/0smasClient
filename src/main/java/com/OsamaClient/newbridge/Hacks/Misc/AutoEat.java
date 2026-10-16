@@ -15,7 +15,7 @@ public class AutoEat extends Module {
     private boolean isEating = false;
 
     public AutoEat() {
-        super("AutoEat", "Automatically eats food when hungry", Category.MISC);
+        super("AutoEat", "Eats food from your hotbar when you get hungry.", Category.MISC);
 
         EntryPoint.EVENT_BUS.subscribe(this);
     }
@@ -75,4 +75,4 @@ public class AutoEat extends Module {
             stopEating();
         }
     }
-}
+}

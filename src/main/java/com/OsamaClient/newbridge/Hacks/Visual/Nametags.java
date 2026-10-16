@@ -38,6 +38,8 @@ public class Nametags extends Module {
 
     public float range = 128f;
     public double fontScale = 0.8;
+    public final com.OsamaClient.newbridge.UI.components.ToggleButton distanceScaling = new com.OsamaClient.newbridge.UI.components.ToggleButton("Distance Scaling", true, null)
+            .withDescription("Tags shrink with distance and grow when you get close (off: always the same size).");
     public String renderMode = "Both"; // None, Outline, Fill, Both
     public EntityFilterPicker targetPicker;
 
@@ -69,7 +71,7 @@ public class Nametags extends Module {
     private static final Ui ui = new Ui(renderer);
 
     public Nametags() {
-        super("Nametags", "Displays 2D nametags above visible entities", Category.VISUAL);
+        super("Nametags", "Big, readable nametags with health, armor icons and distance.", Category.VISUAL);
         instance = this;
 
         this.targetPicker = new EntityFilterPicker("Targets");
@@ -80,6 +82,7 @@ public class Nametags extends Module {
                 .withDescription("Selects box rendering style."));
         this.settings.add(new Slider("Range", 1.0, 128.0, (double) range, val -> range = val.floatValue())
                 .withDescription("Maximum distance for nametags."));
+        this.settings.add(distanceScaling);
         this.settings.add(new Slider("Scale", 0.5, 2.0, fontScale, val -> fontScale = val)
                 .withDescription("Adjusts nametag text scale."));
 
@@ -167,6 +170,9 @@ public class Nametags extends Module {
             int outlineColor = instance.targetPicker.getColor(filterKey);
             double distance = Math.sqrt(distSqr);
 
+            // nah = groesser, weit weg = kleiner (ca. 1/Entfernung, begrenzt)
+            float f = instance.distanceScaling.enabled ? Mth.clamp(5f / (float) Math.max(1.0, distance), 0.3f, 3.0f) : 1f;
+            ui.scale = Theme.scale() * (float) instance.fontScale * f;
             renderTag(text, distance, living, fb.x() / ui.scale, fb.y() / ui.scale, outlineColor);
         }
 

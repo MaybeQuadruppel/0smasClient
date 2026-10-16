@@ -14,7 +14,7 @@ public class BoatFly extends Module {
     public boolean lockRotation = true;
 
     public BoatFly() {
-        super("BoatFly", "Allows you to fly while riding a boat or other entities.", Category.MOVEMENT);
+        super("BoatFly", "Fly while riding a boat or another vehicle.", Category.MOVEMENT);
 
         this.settings.add(new Slider("Speed", 0.1, 5.0, speed, val -> speed = val)
                 .withDescription("Your horizontal flying speed."));
@@ -83,4 +83,4 @@ public class BoatFly extends Module {
                 forward * cos + strafe * sin
         ).normalize();
     }
-}
+}

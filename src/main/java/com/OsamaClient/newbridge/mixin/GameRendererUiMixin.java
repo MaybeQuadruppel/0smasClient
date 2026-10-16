@@ -30,6 +30,7 @@ public abstract class GameRendererUiMixin {
     )
     private void newbridge$drawHudBefore(CallbackInfo ci) {
         com.OsamaClient.newbridge.Hacks.Visual.HudLayout.nextFrame();
+        com.OsamaClient.newbridge.Hacks.Visual.CustomCrosshair.draw();
         if (!HudOverlay.editing()) {
             HudOverlay.draw();
             TeammateList.draw();
@@ -65,6 +66,8 @@ public abstract class GameRendererUiMixin {
         com.OsamaClient.newbridge.Hacks.Visual.DamageIndicator.draw();
         com.OsamaClient.newbridge.Hacks.Visual.SplitChat.draw();
         com.OsamaClient.newbridge.Hacks.Client.CheckMeter.draw();
+        com.OsamaClient.newbridge.Hacks.Visual.music.MusicOverlay.draw();
         com.OsamaClient.newbridge.Hacks.Misc.Waypoints.draw();
+        com.OsamaClient.newbridge.Hacks.Visual.HurtCam.draw();
     }
 }

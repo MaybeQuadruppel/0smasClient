@@ -59,13 +59,11 @@ public class ModuleManager {
         modules.add(new GoTo());
         modules.add(new AutoMiner());
         modules.add(new Teleport());
-        modules.add(new ChestStealer());
         modules.add(new FastBreak());
         modules.add(new FastPlace());
         modules.add(new KillAura());
         modules.add(new NoRender());
         modules.add(new AutoSell());
-        modules.add(new NoHunger());
         modules.add(new com.OsamaClient.newbridge.Hacks.Misc.AntiAfk());
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.FastLadder());
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.Glide());
@@ -79,7 +77,18 @@ public class ModuleManager {
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.SafeWalk());
         modules.add(new com.OsamaClient.newbridge.Hacks.Movement.BHop());
         modules.add(new com.OsamaClient.newbridge.Hacks.Visual.Zoom());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.music.MusicOverlay());
+        modules.add(new com.OsamaClient.newbridge.Hacks.World.sky.CustomSky());
+        modules.add(new com.OsamaClient.newbridge.Hacks.World.WorldColors());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.NormalMode());
         modules.add(new com.OsamaClient.newbridge.Hacks.Visual.ArmorWarning());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Misc.AutoBreed());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Misc.AntiVanish());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Misc.CopyCoords());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.HitEffects());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.HurtCam());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.Animations());
         modules.add(new com.OsamaClient.newbridge.Hacks.Misc.AutoDrop());
         modules.add(new com.OsamaClient.newbridge.Hacks.Misc.AutoReplenish());
         modules.add(new com.OsamaClient.newbridge.Hacks.Player.ToolSaver());
@@ -119,6 +128,7 @@ public class ModuleManager {
         modules.add(new TrueSight());
         modules.add(new AutoEat());
         modules.add(new TeammateList());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Visual.CustomCrosshair());
         modules.add(new ClickGuiModule());
         modules.add(new HudOverlay());
         modules.add(new BaseFinder());
@@ -145,6 +155,9 @@ public class ModuleManager {
         modules.add(new com.OsamaClient.newbridge.Hacks.Misc.stash.StashLogger());
         modules.add(new com.OsamaClient.newbridge.Hacks.Client.macro.Macros());
         modules.add(new com.OsamaClient.newbridge.Hacks.Player.AutoLog());
+        modules.add(new com.OsamaClient.newbridge.Hacks.Client.Targets());
+        Basics.apply(modules);
+        Deps.apply(modules);
 
 
 

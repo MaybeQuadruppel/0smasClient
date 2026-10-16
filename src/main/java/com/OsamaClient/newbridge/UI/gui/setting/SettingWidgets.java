@@ -50,6 +50,7 @@ public final class SettingWidgets {
         if (c instanceof Slider s) return new SliderWidget(s);
         if (c instanceof ModeButton m) return new ModeWidget(m);
         if (c instanceof ColorPicker p) return new ColorWidget(p);
+        if (c instanceof com.OsamaClient.newbridge.UI.components.MediaPicker mp) return new MediaWidget(mp);
         if (c instanceof TextBox t) return new TextWidget(t);
         if (c instanceof EntityFilterPicker f) return new EntityFilterWidget(f, new ListPickerWidget(f, entities(f)), new ListPickerWidget(f, excludedEntities(f)));
         if (c instanceof BlockPicker b) return new ListPickerWidget(b, blocks(b));
@@ -296,4 +297,4 @@ public final class SettingWidgets {
             }
         };
     }
-}
+}

@@ -11,7 +11,7 @@ public class Spider extends Module {
     public double climbSpeed = 0.2;
 
     public Spider() {
-        super("Spider","Lets you climb walls", Category.MOVEMENT);
+        super("Spider","Lets you climb up walls.", Category.MOVEMENT);
 
         this.settings.add(new Slider("Climb Speed", 0.1, 1.0, climbSpeed, val -> climbSpeed = val).withDescription("Sets the speed at which you climb up walls."));
     }
@@ -26,4 +26,4 @@ public class Spider extends Module {
             client.player.fallDistance = 0;
         }
     }
-}
+}

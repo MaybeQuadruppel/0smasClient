@@ -17,6 +17,7 @@ import net.minecraft.world.phys.HitResult;
 public class AutoCrit extends Module {
 
     public double range = 3.5;
+    public boolean ignoreFriends = true;
     public boolean ignoreTeammates = true;
     public EntityFilterPicker entityFilter;
 
@@ -24,12 +25,11 @@ public class AutoCrit extends Module {
     private LivingEntity activeTarget = null;
 
     public AutoCrit() {
-        super("AutoCrit", "Makes every hit a Crit", Category.COMBAT);
+        super("AutoCrit", "Jumps before your hits so every hit lands as a critical hit.", Category.COMBAT);
 
         this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
 
         this.settings.add(new Slider("Range", 1.0, 6.0, range, val -> range = val).withDescription("Maximum distance to execute critical hits."));
-        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents critical hits on teammates."));
         this.settings.add(this.entityFilter);
     }
 
@@ -93,7 +93,7 @@ public class AutoCrit extends Module {
         double dist = client.player.distanceTo(targetEntity);
         if (dist > range) return false;
 
-        if (ignoreTeammates && TeamUtils.isTeammate(targetEntity)) {
+        if (TeamUtils.ignored(targetEntity, ignoreTeammates, ignoreFriends)) {
             return false;
         }
 

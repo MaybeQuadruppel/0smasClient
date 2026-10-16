@@ -146,12 +146,23 @@ public class ChatHandler {
                 }
                 return false;
             }
+            if (lower.equals(".vanish") || lower.startsWith(".vanish ")) {
+                if (com.OsamaClient.newbridge.Hacks.Misc.AntiVanish.INSTANCE != null) {
+                    com.OsamaClient.newbridge.Hacks.Misc.AntiVanish.INSTANCE.handleCommand(message.trim().split("\\s+"));
+                }
+                return false;
+            }
             if (lower.equals(".keys") || lower.startsWith(".keys ")) {
                 handleKeys(message.trim().split("\\s+"));
                 return false;
             }
             if (lower.equals(".friend") || lower.startsWith(".friend ") || lower.equals(".friends")) {
                 handleFriend(message.trim().split("\\s+"));
+                return false;
+            }
+            if (lower.equals(".music") || lower.startsWith(".music ")) {
+                if (com.OsamaClient.newbridge.Hacks.Visual.music.MusicOverlay.INSTANCE != null)
+                    com.OsamaClient.newbridge.Hacks.Visual.music.MusicOverlay.INSTANCE.handleCommand(message.trim().split("\\s+"));
                 return false;
             }
             if (lower.equals(".config") || lower.startsWith(".config ")) {

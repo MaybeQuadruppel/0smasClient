@@ -29,7 +29,7 @@ public class AttributeSwapping extends Module {
     private int cachedWindChargeSlot = -1;
 
     public AttributeSwapping() {
-        super("AttrSwap", "Does Attribute swapping for you", Category.COMBAT);
+        super("AttrSwap", "Swaps items mid-attack to combine their stats (spear lunge, mace/sword, pearl + wind charge).", Category.COMBAT);
 
         this.settings.add(new ToggleButton("Spear Lunge Swap", spearSwap, val -> spearSwap = val).withDescription("Automatically performs attribute swapping during spear lunges."));
         this.settings.add(new ToggleButton("Mace/Sword Swap", maceSwap, val -> maceSwap = val).withDescription("Automatically swaps attributes when using maces and swords."));
@@ -153,4 +153,4 @@ public class AttributeSwapping extends Module {
         cachedWindChargeSlot = -1;
         wasUsePressed = false;
     }
-}
+}

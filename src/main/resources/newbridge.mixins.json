@@ -14,14 +14,28 @@
     "ServerboundMovePlayerPacketAccessor",
     "Connection.ClientConnectionMixin",
     "Connection.ClientPacketListenerMixin",
+    "Connection.ConnectionReceiveMixin",
     "NoRender.NoGuiMixin",
     "NoRender.RenderEffectLocalPlayerMixin",
     "NoRender.ScreenEffectRendererMixin",
+    "NoRender.NoGameRendererMixin",
+    "NoRender.NoWeatherMixin",
+    "NoRender.NoParticlesMixin",
     "EntityMixin",
     "GameRendererUiMixin",
     "MinecraftMixin"
   ],
   "client": [
+    "accounts.MinecraftUserAccessor",
+    "accounts.TitleScreenAccountsMixin",
+    "visual.AvatarRendererCapeMixin",
+    "visual.GameRendererHurtMixin",
+    "visual.LivingEntitySwingMixin",
+    "world.FluidRendererMixin",
+    "world.FogRendererMixin",
+    "world.CloudRendererMixin",
+    "world.SkyRendererMixin",
+    "ChatScreenMusicMixin",
     "emote.LayerDefinitionAccessor",
     "emote.EntityModelSetMixin",
     "emote.HumanoidModelMixin",
@@ -49,6 +63,7 @@
     "xray.AbstractBlockStateMixin",
     "xray.BlockEntityRenderDispatcherMixin",
     "camera.CameraNoClipMixin",
+    "camera.CameraZoomMixin",
     "combat.LocalPlayerRotationAccessor",
     "combat.MinecraftHandleKeybindsMixin",
     "FirstPersonHandsMixin",
@@ -61,4 +76,4 @@
   "overwrites": {
     "requireAnnotations": true
   }
-}
+}

@@ -137,6 +137,11 @@ public final class Config {
             Map<String, ConfigCodec.WidgetPos> hud = new HashMap<>();
             ConfigCodec.decode(data, ModuleManager.modules, panels, hud, REGISTRY_IDS, m -> m.toggle());
             ClickGui.INSTANCE.applyPanelStates(panels);
+            if (data.root().has("foldedGroups") && data.root().get("foldedGroups").isJsonArray()) {
+                var keys = new java.util.ArrayList<String>();
+                for (var el : data.root().getAsJsonArray("foldedGroups")) if (el.isJsonPrimitive()) keys.add(el.getAsString());
+                com.OsamaClient.newbridge.UI.components.SubCategories.restoreFolded(keys);
+            }
             if (HudOverlay.instance != null) HudOverlay.instance.applyWidgetPositions(hud);
         } catch (Exception e) {
             LOG.error("Could not read {}, using defaults (kept a copy as .broken)", f, e);
@@ -358,6 +363,9 @@ public final class Config {
             Map<String, ConfigCodec.WidgetPos> hud = HudOverlay.instance != null
                     ? HudOverlay.instance.widgetPositions() : Map.of();
             ConfigCodec.Data data = ConfigCodec.encode(ModuleManager.modules, ClickGui.INSTANCE.panelStates(), hud, REGISTRY_IDS);
+            var folded = new com.google.gson.JsonArray();
+            for (String k : com.OsamaClient.newbridge.UI.components.SubCategories.foldedKeys()) folded.add(k);
+            data.root().add("foldedGroups", folded);
             Files.createDirectories(f.getParent());
             Path tmp = f.resolveSibling(f.getFileName() + ".tmp");
             Files.writeString(tmp, ConfigCodec.toJson(data.root()), StandardCharsets.UTF_8);

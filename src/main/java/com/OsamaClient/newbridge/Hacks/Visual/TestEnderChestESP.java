@@ -36,7 +36,7 @@ public final class TestEnderChestESP extends Module {
     private final List<AABB> renderBoxes = new CopyOnWriteArrayList<>();
 
     public TestEnderChestESP() {
-        super("TestEnderChestESP", "Renders Ender Chests through walls using Chams", Category.VISUAL);
+        super("TestEnderChestESP", "Shows ender chests through walls.", Category.VISUAL);
         INSTANCE = this;
 
         List<String> modes = List.of("Fill", "Outline", "Both");
@@ -233,4 +233,4 @@ public final class TestEnderChestESP extends Module {
                 .setNormal(normal.x(), normal.y(), normal.z())
                 .setLineWidth(1.0f);
     }
-}
+}

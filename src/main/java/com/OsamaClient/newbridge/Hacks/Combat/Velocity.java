@@ -10,9 +10,9 @@ public class Velocity extends Module {
     public double vertical = 0.0;
 
     public Velocity() {
-        super("Velocity", "Allows you to get no Knockback", Category.COMBAT);
+        super("Velocity", "Reduces or removes the knockback you take.", Category.COMBAT);
         this.settings.add(new Slider("Horizontal", 0.0, 100.0, horizontal, val -> horizontal = val).withDescription("Modifies or reduces horizontal knockback taken."));
         this.settings.add(new Slider("Vertical", 0.0, 100.0, vertical, val -> vertical = val).withDescription("Modifies or reduces vertical knockback taken."));
         INSTANCE = this;
     }
-}
+}

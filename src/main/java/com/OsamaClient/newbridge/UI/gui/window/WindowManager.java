@@ -132,6 +132,10 @@ public final class WindowManager {
         if (window != null) window.mouseReleased(button);
     }
 
+    void filesDropped(java.util.List<java.nio.file.Path> paths) {
+        if (window instanceof MediaPickerWindow m) m.onDrop(paths);
+    }
+
     void mouseScrolled(double amount) {
         if (window != null) window.queueScroll(amount);
     }

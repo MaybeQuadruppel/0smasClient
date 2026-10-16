@@ -88,7 +88,7 @@ public class Waypoints extends Module {
     private static final Ui ui = new Ui(renderer);
 
     public Waypoints() {
-        super("Waypoints", "Saved locations with beams, labels, death point and auto-pathing", Category.MISC);
+        super("Waypoints", "Saved locations with beams, labels, death point and auto-pathing", Category.WORLD);
         INSTANCE = this;
         this.settings.add(new ColorPicker("Color", color, c -> color = c)
                 .withDescription("Color for new waypoints."));
@@ -114,7 +114,7 @@ public class Waypoints extends Module {
             }
         }).withDescription("Opens the waypoint manager (also: .wp)");
         this.settings.add(0, open[0]);
-        this.enabled = true;
+        this.enabled = false;
         EntryPoint.EVENT_BUS.subscribe(this);
     }
 

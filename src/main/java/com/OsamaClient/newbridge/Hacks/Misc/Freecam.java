@@ -20,7 +20,7 @@ public class Freecam extends Module {
     private static long lastFrameTime = System.nanoTime();
 
     public Freecam() {
-        super("Freecam", "Cuts your Camera from your Player.", Category.MOVEMENT);
+        super("Freecam", "Detaches the camera from your body so you can fly around freely.", Category.MOVEMENT);
         this.settings.add(new Slider("Speed", 0.1, 3.0, speedValue, val -> speedValue = val).withDescription("Controls the movement speed of the camera."));
     }
 
@@ -122,4 +122,4 @@ public class Freecam extends Module {
 
         super.onDisable();
     }
-}
+}

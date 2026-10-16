@@ -22,7 +22,7 @@ public class GoTo extends Module {
     private final PathRenderer pathRenderer = new PathRenderer();
 
     public GoTo() {
-        super("GoTo", "Professional pathfinding navigation to specific coordinates", Category.MISC);
+        super("GoTo", "Walks you to coordinates on its own (.goto x y z).", Category.MISC);
         this.settings.add(new ColorPicker("Path Color", pathColor, color -> pathColor = color));
         this.settings.add(new ColorPicker("Target Color", targetColor, color -> targetColor = color));
         EntryPoint.EVENT_BUS.subscribe(this);

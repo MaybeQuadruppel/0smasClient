@@ -90,7 +90,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("shieldblock: raises the shield near a zombie", () -> guarded(ctx, srv, () -> testShieldBlock(ctx, srv)));
             run("safewalk: does not walk off the platform edge", () -> guarded(ctx, srv, () -> testSafeWalk(ctx, srv)));
             run("bhop: jumps while holding forward", () -> guarded(ctx, srv, () -> testBHop(ctx, srv)));
-            run("zoom: changes and restores the fov", () -> guarded(ctx, srv, () -> testZoom(ctx)));
+            run("zoom: camera fov divided, wheel zoom with modifier, sensitivity, limits, reset", () -> guarded(ctx, srv, () -> testZoom(ctx)));
             run("armorwarning: warns for worn boots", () -> guarded(ctx, srv, () -> testArmorWarning(ctx, srv)));
             run("autodrop: drops the junk item only", () -> guarded(ctx, srv, () -> testAutoDrop(ctx, srv)));
             run("autoreplenish: refills the hotbar stack", () -> guarded(ctx, srv, () -> testAutoReplenish(ctx, srv)));
@@ -166,6 +166,29 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             run("friends: tab with online/offline/last seen, join alerts, .friend command, saved to file (screenshot)", () -> guarded(ctx, srv, () -> testFriendsTab(ctx, srv)));
             run("quickmenu: radial wheel with favourites, hold-release and click picking (screenshot)", () -> guarded(ctx, srv, () -> testQuickMenu(ctx, srv)));
             run("nametags: armor + held item icons with durability (screenshot)", () -> guarded(ctx, srv, () -> testNametagArmor(ctx, srv)));
+            run("merged modules: invtweaks filtered steal + auto close (ChestStealer), config aliases", () -> guarded(ctx, srv, () -> testMergedModules(ctx, srv)));
+            run("combobot: targets, chases, crits, sprint resets, weapon switch, retreat", () -> guarded(ctx, srv, () -> testComboBot(ctx, srv)));
+            run("music overlay: real windows media helper, cover, chat clicks, seek, .music (screenshot)", () -> guarded(ctx, srv, () -> testMusicOverlay(ctx, srv)));
+            run("hud editor: mouse wheel resizes boxes and elements, right-click resets (screenshot)", () -> guarded(ctx, srv, () -> testHudWheelScale(ctx, srv)));
+            run("customsky: photo wrap, panorama, gif, video (ffmpeg), drop, next/prev (screenshots)", () -> guarded(ctx, srv, () -> testCustomSky(ctx, srv)));
+            run("icons: category, tab and hud icons draw (screenshot)", () -> guarded(ctx, srv, () -> testIcons(ctx, srv)));
+            run("worldcolors: water / lava colour + alpha, sky, fog, clouds (screenshots)", () -> guarded(ctx, srv, () -> testWorldColors(ctx, srv)));
+            run("normalmode: hacks off and blocked, allowed modules work, hidden in gui, restore", () -> guarded(ctx, srv, () -> testNormalMode(ctx, srv)));
+            run("tags: #hashtags on modules, search by tag, suggestions, detail card (screenshot)", () -> guarded(ctx, srv, () -> testTags(ctx, srv)));
+            run("autobreed: feeds pairs with the right food, skips single animals, keeps slot", () -> guarded(ctx, srv, () -> testAutoBreed(ctx, srv)));
+            run("customcape: picture becomes the cape (third person screenshot)", () -> guarded(ctx, srv, () -> testCustomCape(ctx, srv)));
+            run("hitfx: hit particles, kill lightning, hurtcam flash, swing speed, copycoords (screenshots)", () -> guarded(ctx, srv, () -> testHitHurtAnimations(ctx, srv)));
+            run("ctxmenu: favorites panel, shift-rmb menu, alt settings window, folded groups saved (screenshots)", () -> guarded(ctx, srv, () -> testContextMenuAndWindow(ctx, srv)));
+            run("shortcuts: window with key caps, keybinds, commands, filter; BlockESP is in Visual (screenshots)", () -> guarded(ctx, srv, () -> testShortcuts(ctx, srv)));
+            run("liquid glass: style mode, rounded translucent panels (screenshots)", () -> guarded(ctx, srv, () -> testLiquidGlass(ctx, srv)));
+            run("norender more: new hooks applied, weather hidden, hearts/food hidden (screenshots)", () -> guarded(ctx, srv, () -> testNoRenderMore(ctx, srv)));
+            run("checkmeter more: ground tolerance, click rate; keybinds window binds vanilla controls (screenshots)", () -> guarded(ctx, srv, () -> testCheckMeterMoreAndControls(ctx, srv)));
+            run("antivanish: silent staff tab loss, normal leaves, own digging ignored, unseen digger, tab probe, network list", () -> guarded(ctx, srv, () -> testAntiVanish(ctx, srv)));
+            run("highjump: jump peak is higher than vanilla", () -> guarded(ctx, srv, () -> testHighJump(ctx, srv)));
+            run("accounts: title screen button, switch session, tokens saved encrypted (screenshots)", () -> guarded(ctx, srv, () -> testAccounts(ctx, srv)));
+            run("vape layout: sidebar + module list, switch back to panels, glass (screenshots)", () -> guarded(ctx, srv, () -> testVapeLayout(ctx, srv)));
+            run("subcategories: panel groups, fold, search is flat, toggle (screenshots)", () -> guarded(ctx, srv, () -> testSubCategories(ctx, srv)));
+            run("media picker: file setting with thumbnails, hover preview, pick, mini preview (screenshots)", () -> guarded(ctx, srv, () -> testMediaPicker(ctx, srv)));
             run("fuzz: every module on/off with all settings at min/max/cycled, no exceptions", () -> guarded(ctx, srv, () -> testFuzzModules(ctx, srv)));
         } finally {
             writeReport(ctx);
@@ -938,7 +961,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
                 mc.options.keyUse.setDown(false);
                 for (String n : new String[]{"AutoGap", "ShieldBlock", "SafeWalk", "BHop", "Zoom", "ArmorWarning", "AutoDrop",
                         "AutoReplenish", "ToolSaver", "AntiVoid", "Teabag", "HotbarDance", "TotemAlert", "InvFullAlert",
-                        "Notifications", "Friends", "PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe", "FakeLag", "Fullbox", "AntiHunger", "AirPlace", "AntiBot", "Viewmodel"}) {
+                        "Notifications", "AntiVanish", "Friends", "PacketGate", "PingSpoof", "GuiDesync", "PacketBurst", "BundleDupe", "FakeLag", "Fullbox", "AntiHunger", "AirPlace", "AntiBot", "Viewmodel"}) {
                     var m = ModuleManager.getModuleByName(n);
                     if (m != null && m.enabled) m.toggle();
                 }
@@ -1031,15 +1054,47 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
     }
 
     private void testZoom(ClientGameTestContext ctx) {
-        int before = ctx.computeOnClient(mc -> mc.options.fov().get());
-        on(ctx, "Zoom");
-        ctx.waitTicks(2);
-        int zoomed = ctx.computeOnClient(mc -> mc.options.fov().get());
-        ctx.runOnClient(mc -> ModuleManager.getModuleByName("Zoom").toggle());
-        int after = ctx.computeOnClient(mc -> mc.options.fov().get());
-        log("zoom fov " + before + " -> " + zoomed + " -> " + after);
-        assertTrue(zoomed == 30, "zoom fov " + zoomed);
-        assertTrue(after == before, "fov not restored " + after);
+        var z = com.OsamaClient.newbridge.Hacks.Visual.Zoom.INSTANCE;
+        int optBefore = ctx.computeOnClient(mc -> mc.options.fov().get());
+        float camBefore = ctx.computeOnClient(mc -> mc.gameRenderer.mainCamera().getFov());
+        try {
+            ctx.runOnClient(mc -> { z.smooth = false; z.zoom = 4; z.scrollKey = "Alt"; z.resetOnRelease = true; if (!z.enabled) z.toggle(); });
+            ctx.waitTicks(3);
+            float camZoomed = ctx.computeOnClient(mc -> mc.gameRenderer.mainCamera().getFov());
+            int optZoomed = ctx.computeOnClient(mc -> mc.options.fov().get());
+            log("zoom: camera fov " + camBefore + " -> " + camZoomed + ", option " + optBefore + " -> " + optZoomed);
+            assertTrue(optZoomed == optBefore, "Zoom must not touch the FOV option any more");
+            assertTrue(camZoomed < camBefore / 3f && camZoomed > camBefore / 5f, "4x zoom gave camera fov " + camZoomed + " from " + camBefore);
+            // wheel without the modifier key does nothing, with Scroll Key = None it zooms
+            boolean used = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.Zoom.onScroll(1));
+            assertTrue(!used && z.target() == 4.0, "scroll without Alt changed the zoom");
+            ctx.runOnClient(mc -> z.scrollKey = "None");
+            for (int i = 0; i < 3; i++) ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.Zoom.onScroll(1));
+            double in = z.target();
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.Zoom.onScroll(-1));
+            double out = z.target();
+            log("zoom scroll: 4.0 -> " + in + " -> " + out);
+            assertTrue(in > 7.5 && in < 8.0 && Math.abs(out - in / 1.25) < 1e-6, "scroll steps " + in + " / " + out);
+            ctx.waitTicks(2);
+            double sens = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.Zoom.sensitivity());
+            assertTrue(sens < 0.2, "mouse sensitivity while zoomed " + sens);
+            // limits
+            ctx.runOnClient(mc -> { for (int i = 0; i < 60; i++) z.scrollBy(1); });
+            assertTrue(z.target() <= z.maxZoom + 1e-9, "max zoom exceeded " + z.target());
+            ctx.runOnClient(mc -> { for (int i = 0; i < 80; i++) z.scrollBy(-1); });
+            assertTrue(z.target() >= 1.0, "zoomed out below 1x");
+            // release: view comes back, next press starts at the Zoom value again
+            ctx.runOnClient(mc -> z.toggle());
+            ctx.waitTicks(3);
+            float camAfter = ctx.computeOnClient(mc -> mc.gameRenderer.mainCamera().getFov());
+            assertTrue(Math.abs(camAfter - camBefore) < 1.5f, "fov not restored: " + camAfter + " vs " + camBefore);
+            ctx.runOnClient(mc -> z.toggle());
+            assertTrue(z.target() == 4.0, "Reset On Release: started at " + z.target());
+            ctx.runOnClient(mc -> { z.resetOnRelease = false; z.scrollBy(1); z.toggle(); z.toggle(); });
+            assertTrue(Math.abs(z.target() - 5.0) < 1e-6, "keep last zoom: " + z.target());
+        } finally {
+            ctx.runOnClient(mc -> { if (z.enabled) z.toggle(); z.smooth = true; z.zoom = 4; z.scrollKey = "Alt"; z.resetOnRelease = true; });
+        }
     }
 
     private void testArmorWarning(ClientGameTestContext ctx, TestServerContext srv) {
@@ -1300,6 +1355,25 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             return new boolean[]{true, false, true};
         });
         assertTrue(!r[0] && r[1] && !r[2], "friends teammate flags " + java.util.Arrays.toString(r));
+        // friends are separate from real teammates: own colour, not a "team member", skippable via Count As Teammate
+        boolean[] sep = ctx.computeOnClient(mc -> {
+            for (var e : mc.level.entitiesForRendering()) {
+                if (e instanceof net.minecraft.world.entity.npc.villager.Villager v) {
+                    var F = com.OsamaClient.newbridge.Hacks.Client.Friends.class;
+                    com.OsamaClient.newbridge.Hacks.Client.Friends.add(v.getScoreboardName());
+                    boolean friend = com.OsamaClient.newbridge.Utils.TeamUtils.isFriend(v);
+                    boolean member = com.OsamaClient.newbridge.Utils.TeamUtils.isTeamMember(v);
+                    boolean skip = com.OsamaClient.newbridge.Utils.TeamUtils.isTeammate(v);
+                    com.OsamaClient.newbridge.Hacks.Client.Friends.INSTANCE.asTeammate = false;
+                    boolean skipOff = com.OsamaClient.newbridge.Utils.TeamUtils.isTeammate(v);
+                    com.OsamaClient.newbridge.Hacks.Client.Friends.INSTANCE.asTeammate = true;
+                    com.OsamaClient.newbridge.Hacks.Client.Friends.remove(v.getScoreboardName());
+                    return new boolean[]{friend, member, skip, skipOff};
+                }
+            }
+            return new boolean[]{false, true, false, true};
+        });
+        assertTrue(sep[0] && !sep[1] && sep[2] && !sep[3], "friend/team separation " + java.util.Arrays.toString(sep));
     }
 
     private void testHudRedesign(ClientGameTestContext ctx, TestServerContext srv) {
@@ -1527,6 +1601,17 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             LOG.error("FAIL {}", name, t);
         } finally {
             try {
+                // Respawn if a test killed the player, so later tests do not cascade-fail on the death screen
+                Minecraft.getInstance().execute(() -> {
+                    Minecraft m = Minecraft.getInstance();
+                    if (m.player != null && (m.player.isDeadOrDying() || m.gui.screen() instanceof net.minecraft.client.gui.screens.DeathScreen)) {
+                        m.player.respawn();
+                        m.gui.setScreen(null);
+                        log("respawned after " + name);
+                    }
+                });
+            } catch (Throwable ignored) { }
+            try {
                 // Navigation sicher stoppen, falls ein Test abgebrochen ist
                 Minecraft.getInstance().execute(() -> Navigator.INSTANCE.stop(Minecraft.getInstance()));
             } catch (Throwable ignored) { }
@@ -1723,10 +1808,26 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         assertTrue(clientGround, "client should be on the ground");
         assertTrue(sentGround == 0, "packets still claimed onGround: " + sentGround);
         assertTrue(n > 5, "no packets rewritten: " + n);
+        // stop walking before the stage ends (otherwise the player walks off and dies)
+        ctx.runOnClient(mc -> mc.options.keyUp.setDown(false));
+        teleport(ctx, srv, 0, Y, 0);
+        // landing: the packet of the tick you land goes through with onGround (merged from NoHunger)
+        var ah = com.OsamaClient.newbridge.Hacks.Movement.AntiHunger.INSTANCE;
+        for (boolean allow : new boolean[]{true, false}) {
+            ctx.runOnClient(mc -> ah.allowLandings = allow);
+            srv.runCommand("execute as @p at @s run tp @s ~ ~2 ~");
+            ctx.waitTicks(2);
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.set(0));
+            ctx.waitTicks(25);
+            int landed = com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.get();
+            log("antihunger landing allow=" + allow + " ground packets=" + landed);
+            assertTrue(allow ? landed >= 1 : landed == 0, "Allow Landings=" + allow + " sent " + landed + " ground packets");
+        }
+        ctx.runOnClient(mc -> ah.allowLandings = true);
         ctx.runOnClient(mc -> ModuleManager.getModuleByName("AntiHunger").toggle());
-        ctx.waitTicks(10);
-        ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.set(0));
-        ctx.waitTicks(10);
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> { com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.set(0); mc.player.setYRot(mc.player.getYRot() + 30f); });
+        ctx.waitTicks(30);   // standing still only sends a position heartbeat every 20 ticks
         int restored = com.OsamaClient.newbridge.Hacks.Dupeing.PacketHub.groundPackets.get();
         assertTrue(restored > 0, "onGround not reported again after disabling");
     }
@@ -2704,6 +2805,1273 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         }
     }
 
+    private void testWorldColors(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("time set 6000");
+        srv.runCommand("weather clear");
+        // water and lava pools in front of the player
+        fill(srv, 2, Y - 1, -2, 6, Y - 1, -1, "water");
+        fill(srv, 2, Y - 1, 1, 6, Y - 1, 2, "lava");
+        var wc = com.OsamaClient.newbridge.Hacks.World.WorldColors.INSTANCE;
+        assertTrue(wc != null && wc.category == Module.Category.WORLD, "WorldColors missing / not in World");
+        try {
+            ctx.runOnClient(mc -> { mc.player.setYRot(-90f); mc.player.setXRot(35f); });
+            ctx.waitTicks(20);
+            ctx.takeScreenshot("newbridge_worldcolors_off");
+            ctx.runOnClient(mc -> {
+                wc.water = true; wc.waterColor = 0x90FF2050;
+                wc.lava = true; wc.lavaColor = 0xFF40FF60;
+                wc.sky = true; wc.skyDay = 0xFFFF9EDB;
+                wc.fog = true; wc.fogDay = 0xFFFFC0E8;
+                wc.clouds = true; wc.cloudColor = 0xFFFFB0D0;
+                com.OsamaClient.newbridge.Hacks.World.WorldColors.fluidHits = 0;
+                com.OsamaClient.newbridge.Hacks.World.WorldColors.fogHits = 0;
+                com.OsamaClient.newbridge.Hacks.World.WorldColors.skyHits = 0;
+                if (!wc.enabled) wc.toggle();
+            });
+            ctx.waitTicks(40);
+            int fluid = com.OsamaClient.newbridge.Hacks.World.WorldColors.fluidHits;
+            int fog = com.OsamaClient.newbridge.Hacks.World.WorldColors.fogHits;
+            int sky = com.OsamaClient.newbridge.Hacks.World.WorldColors.skyHits;
+            log("worldcolors hooks: fluid=" + fluid + " fog=" + fog + " (" + Integer.toHexString(com.OsamaClient.newbridge.Hacks.World.WorldColors.lastFogRgb) + ") sky=" + sky
+                    + " (" + Integer.toHexString(com.OsamaClient.newbridge.Hacks.World.WorldColors.lastSkyRgb) + ") daylight=" + com.OsamaClient.newbridge.Hacks.World.WorldColors.daylight);
+            ctx.takeScreenshot("newbridge_worldcolors_on");
+            ctx.runOnClient(mc -> mc.player.setXRot(-25f));
+            ctx.waitTicks(5);
+            ctx.takeScreenshot("newbridge_worldcolors_sky");
+            assertTrue(fluid > 50, "water / lava not recoloured (chunk rebuild?): " + fluid);
+            assertTrue(fog > 5, "fog hook not running: " + fog);
+            assertTrue(sky > 5, "sky hook not running: " + sky);
+            // colour maths: shading kept, alpha from the setting
+            int c = com.OsamaClient.newbridge.Hacks.World.WorldColors.fluidVertex(0xFF1E3264, 0xFF3C64C8,
+                    net.minecraft.world.level.material.Fluids.WATER.defaultFluidState());
+            assertTrue((c >>> 24) == 0x90 && ((c >> 16) & 0xFF) == 0x7F, "fluid colour maths: " + Integer.toHexString(c));
+            // no fog / distance
+            ctx.runOnClient(mc -> wc.noFog = true);
+            ctx.waitTicks(5);
+            ctx.runOnClient(mc -> { wc.noFog = false; wc.hideClouds = true; });
+            ctx.waitTicks(5);
+        } finally {
+            ctx.runOnClient(mc -> {
+                wc.hideClouds = false; wc.noFog = false; wc.lava = false; wc.clouds = false;
+                if (wc.enabled) wc.toggle();
+            });
+            fill(srv, 2, Y - 1, -2, 6, Y - 1, 2, "stone");
+        }
+    }
+
+    private void testNormalMode(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var nm = com.OsamaClient.newbridge.Hacks.Client.NormalMode.INSTANCE;
+        assertTrue(nm != null, "NormalMode missing");
+        String[] hacks = {"Flight", "Velocity", "FakeLag"};
+        try {
+            ctx.runOnClient(mc -> {
+                for (String n : hacks) { var m = ModuleManager.getModuleByName(n); if (!m.enabled) m.toggle(); }
+                var z = ModuleManager.getModuleByName("FullBright"); if (!z.enabled) z.toggle();
+                if (!nm.enabled) nm.toggle();
+            });
+            ctx.waitTicks(3);
+            boolean hacksOff = ctx.computeOnClient(mc -> { for (String n : hacks) if (ModuleManager.getModuleByName(n).enabled) return false; return true; });
+            boolean fbOn = ctx.computeOnClient(mc -> ModuleManager.getModuleByName("FullBright").enabled);
+            // refuse
+            ctx.runOnClient(mc -> ModuleManager.getModuleByName("KillAura").toggle());
+            boolean kaOff = ctx.computeOnClient(mc -> !ModuleManager.getModuleByName("KillAura").enabled);
+            // a profile / config turning a hack on gets switched off within a tick
+            ctx.runOnClient(mc -> ModuleManager.getModuleByName("Speed").enabled = true);
+            ctx.waitTicks(3);
+            boolean speedOff = ctx.computeOnClient(mc -> !ModuleManager.getModuleByName("Speed").enabled);
+            // allowed modules still work
+            ctx.runOnClient(mc -> { var z = ModuleManager.getModuleByName("WorldColors"); if (!z.enabled) z.toggle(); });
+            boolean wcOn = ctx.computeOnClient(mc -> ModuleManager.getModuleByName("WorldColors").enabled);
+            // gui: combat panel empty, visual panel has rows
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.open());
+            ctx.waitTicks(15);
+            int combat = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.panel(Module.Category.COMBAT).matchCount(""));
+            int visual = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.panel(Module.Category.VISUAL).matchCount(""));
+            ctx.takeScreenshot("newbridge_normalmode_gui");
+            ctx.runOnClient(mc -> mc.gui.setScreen(null));
+            log("normalmode: hacksOff=" + hacksOff + " fullbright=" + fbOn + " killauraRefused=" + kaOff + " speedOff=" + speedOff + " worldcolors=" + wcOn
+                    + " combatRows=" + combat + " visualRows=" + visual + " switchedOff=" + nm.switchedOff() + " msg=" + nm.lastBlocked);
+            assertTrue(hacksOff, "hacks still on in Normal Mode");
+            assertTrue(fbOn && wcOn, "allowed modules were switched off");
+            assertTrue(kaOff && speedOff, "blocked modules could be enabled");
+            assertTrue(combat == 0 && visual > 3, "gui filter: combat " + combat + ", visual " + visual);
+            // restore on exit
+            ctx.runOnClient(mc -> nm.toggle());
+            boolean back = ctx.computeOnClient(mc -> { for (String n : hacks) if (!ModuleManager.getModuleByName(n).enabled) return false; return true; });
+            assertTrue(back, "modules not restored after Normal Mode");
+        } finally {
+            ctx.runOnClient(mc -> {
+                if (nm.enabled) nm.toggle();
+                for (String n : new String[]{"Flight", "Velocity", "FakeLag", "Speed", "KillAura", "FullBright", "WorldColors"}) {
+                    var m = ModuleManager.getModuleByName(n); if (m.enabled) m.toggle();
+                }
+            });
+        }
+    }
+
+
+
+    private void testCustomCape(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var cc = com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.INSTANCE;
+        assertTrue(cc != null, "CustomCape missing");
+        Path dir = com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.folder();
+        // asymmetric picture: red top-left quarter, green stripe, blue arrow so a flipped / stretched cape is obvious
+        writePng(dir.resolve("gt_cape.png"), 200, 320, (x, y) -> {
+            if (x < 100 && y < 160) return 0xE02020;
+            if (x > 85 && x < 115) return 0x20D040;
+            if (y > 200 && Math.abs(x - 100) < (y - 200) / 2) return 0x2060F0;
+            return 0xF0E0A0;
+        });
+        try {
+            ctx.runOnClient(mc -> {
+                cc.setFile("gt_cape.png");
+                if (!cc.enabled) cc.toggle();
+                mc.player.setYRot(0f); mc.player.setXRot(10f);
+                mc.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK);
+            });
+            for (int i = 0; i < 60 && !ctx.computeOnClient(mc -> cc.ready()); i += 5) ctx.waitTicks(5);
+            boolean ready = ctx.computeOnClient(mc -> cc.ready());
+            ctx.waitTicks(10);
+            int applied = com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.applied;
+            log("customcape: ready=" + ready + " status=" + ctx.computeOnClient(mc -> cc.status()) + " applied=" + applied + " uploads=" + com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.uploads);
+            assertTrue(ready, "cape texture not ready: " + ctx.computeOnClient(mc -> cc.status()));
+            assertTrue(applied > 0, "cape never applied to the player model");
+            ctx.takeScreenshot("newbridge_cape_back");
+            // cycling and a ready-made 64x32 cape texture
+            writePng(dir.resolve("gt_cape2.png"), 128, 64, (x, y) -> (x / 8 + y / 8) % 2 == 0 ? 0x8030C0 : 0xE0A030);
+            ctx.runOnClient(mc -> cc.setFile("gt_cape2.png"));
+            int up0 = com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.uploads;
+            for (int i = 0; i < 60 && com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.uploads == up0; i += 5) ctx.waitTicks(5);
+            ctx.waitTicks(5);
+            assertTrue(com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.uploads > up0, "second cape not uploaded");
+            ctx.takeScreenshot("newbridge_cape_checker");
+            ctx.runOnClient(mc -> mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON));
+        } finally {
+            ctx.runOnClient(mc -> {
+                mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
+                if (cc.enabled) cc.toggle();
+            });
+            try { java.nio.file.Files.deleteIfExists(dir.resolve("gt_cape.png")); java.nio.file.Files.deleteIfExists(dir.resolve("gt_cape2.png")); } catch (Exception ignored) { }
+        }
+    }
+
+    private void testHitHurtAnimations(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var hit = com.OsamaClient.newbridge.Hacks.Visual.HitEffects.INSTANCE;
+        var hurt = com.OsamaClient.newbridge.Hacks.Visual.HurtCam.INSTANCE;
+        var anim = com.OsamaClient.newbridge.Hacks.Visual.Animations.INSTANCE;
+        var copy = com.OsamaClient.newbridge.Hacks.Misc.CopyCoords.INSTANCE;
+        assertTrue(hit != null && hurt != null && anim != null && copy != null, "modules missing");
+        srv.runCommand("give @a diamond_sword");
+        srv.runCommand("summon pig 0.5 " + Y + " 3.5 {NoAI:1b,Silent:1b,Tags:[\"gt\"]}");
+        ctx.waitTicks(10);
+        try {
+            // ---- hit + kill effects
+            ctx.runOnClient(mc -> {
+                mc.player.setYRot(0f); mc.player.setXRot(5f);
+                hit.style = "Blood"; hit.kill = "Lightning"; hit.amount = 24;
+                if (!hit.enabled) hit.toggle();
+            });
+            ctx.waitTicks(3);
+            ctx.runOnClient(mc -> {
+                var pig = mc.level.getEntitiesOfClass(net.minecraft.world.entity.animal.pig.Pig.class, mc.player.getBoundingBox().inflate(8)).get(0);
+                mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, pig.position().add(0, pig.getBbHeight() / 2, 0));
+                mc.gameMode.attack(mc.player, pig);
+            });
+            ctx.waitTicks(6);
+            log("hitfx: bursts=" + hit.hitBursts + " particles=" + hit.lastParticles);
+            ctx.takeScreenshot("newbridge_hitfx_hit");
+            assertTrue(hit.hitBursts >= 1 && hit.lastParticles == 24, "no hit burst: " + hit.hitBursts + "/" + hit.lastParticles);
+            srv.runCommand("damage @e[tag=gt,type=pig,limit=1] 100");
+            ctx.waitTicks(3);
+            ctx.takeScreenshot("newbridge_hitfx_kill");
+            ctx.waitTicks(4);
+            long bolts = ctx.computeOnClient(mc -> { long n = 0; for (var e : mc.level.entitiesForRendering()) if (e instanceof net.minecraft.world.entity.LightningBolt) n++; return n; });
+            log("hitfx: killBursts=" + hit.killBursts + " bolts=" + bolts);
+            assertTrue(hit.killBursts == 1, "kill effect did not fire: " + hit.killBursts);
+            assertTrue(bolts >= 1, "no lightning bolt entity on the client");
+
+            // ---- hurt cam flash
+            ctx.runOnClient(mc -> { hurt.flashColor = 0xAAFF2020; hurt.flashSeconds = 0.6; hurt.tilt = 1.0; if (!hurt.enabled) hurt.toggle(); mc.player.setYRot(0f); });
+            ctx.waitTicks(4);
+            int f0 = hurt.flashes;
+            srv.runCommand("damage @p 2");
+            float best = 0;
+            for (int i = 0; i < 6; i++) {
+                ctx.waitTicks(1);
+                if (i == 1) ctx.takeScreenshot("newbridge_hurtcam_flash");
+                best = Math.max(best, hurt.lastFlashAlpha);
+            }
+            log("hurtcam: flashes " + f0 + " -> " + hurt.flashes + " bestAlpha=" + best);
+            assertTrue(hurt.flashes > f0, "hurt not detected");
+            assertTrue(best > 0.3f, "flash never drawn, alpha " + best);
+            ctx.runOnClient(mc -> hurt.tilt = 0.0);
+            ctx.waitTicks(15);
+            srv.runCommand("damage @p 2");
+            ctx.waitTicks(10);   // renders with tilt 0 through the replaced bobHurt without errors
+            assertTrue(ctx.computeOnClient(mc -> mc.player != null && !mc.player.isDeadOrDying()), "player died in hurtcam test");
+
+            // ---- swing speed
+            ctx.runOnClient(mc -> { anim.swingSpeed = 2.0; if (!anim.enabled) anim.toggle(); });
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.Utils.SwingUtil.swing(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND));
+            ctx.waitTicks(2);
+            int d2 = com.OsamaClient.newbridge.Hacks.Visual.Animations.lastDuration;
+            ctx.runOnClient(mc -> { anim.swingSpeed = 0.5; });
+            ctx.waitTicks(12);
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.Utils.SwingUtil.swing(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND));
+            ctx.waitTicks(2);
+            int d05 = com.OsamaClient.newbridge.Hacks.Visual.Animations.lastDuration;
+            log("animations: swing duration at 2x=" + d2 + ", at 0.5x=" + d05);
+            assertTrue(d2 == 3 && d05 == 12, "swing durations " + d2 + " / " + d05 + " (expected 3 / 12)");
+
+            // ---- copy coords
+            ctx.runOnClient(mc -> { copy.format = "X Y Z"; copy.toggle(); });
+            String clip = ctx.computeOnClient(mc -> mc.keyboardHandler.getClipboard());
+            boolean off = ctx.computeOnClient(mc -> !copy.enabled);
+            log("copycoords: clipboard='" + clip + "' off=" + off);
+            assertTrue(off && clip.equals(copy.last) && clip.matches("-?\\d+ -?\\d+ -?\\d+"), "clipboard '" + clip + "'");
+        } finally {
+            ctx.runOnClient(mc -> {
+                for (Module m : new Module[]{hit, hurt, anim}) if (m.enabled) m.toggle();
+            });
+            srv.runCommand("kill @e[tag=gt]");
+        }
+    }
+
+
+    private void testMediaPicker(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var cc = com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.INSTANCE;
+        var picker = (com.OsamaClient.newbridge.UI.components.MediaPicker) cc.fileBox;
+        assertTrue(com.OsamaClient.newbridge.UI.gui.setting.SettingWidgets.create(picker) instanceof com.OsamaClient.newbridge.UI.gui.setting.MediaWidget, "file setting has no media widget");
+        Path dir = com.OsamaClient.newbridge.Hacks.Visual.cape.CustomCape.folder();
+        String[] names = {"gt_m1.png", "gt_m2.png", "gt_m3.png", "gt_m4.png"};
+        int[] cols = {0xE04040, 0x40C060, 0x4070F0, 0xE0C030};
+        for (int i = 0; i < names.length; i++) {
+            final int c = cols[i];
+            writePng(dir.resolve(names[i]), 400, 250, (x, y) -> (Math.abs(x - 200) + Math.abs(y - 125) < 90) ? 0xFFFFFF : (((x / 40 + y / 25) & 1) == 0 ? c : (c >> 1) & 0x7F7F7F));
+        }
+        try {
+            ctx.runOnClient(mc -> {
+                if (!cc.enabled) cc.toggle();
+                picker.setText("");
+                com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(new com.OsamaClient.newbridge.UI.gui.window.MediaPickerWindow(picker));
+            });
+            ctx.waitTicks(25);
+            var win = (com.OsamaClient.newbridge.UI.gui.window.MediaPickerWindow) ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.current());
+            int files = ctx.computeOnClient(mc -> win.fileCount());
+            int thumbs = ctx.computeOnClient(mc -> win.thumbsReady());
+            log("mediapicker: files=" + files + " thumbs=" + thumbs);
+            assertTrue(files >= 4, "files in the browser: " + files);
+            assertTrue(thumbs >= 4, "thumbnails loaded: " + thumbs);
+            ctx.takeScreenshot("newbridge_media_grid");
+            // hover: the big preview appears
+            int idx = ctx.computeOnClient(mc -> win.tileIndex("gt_m2.png"));
+            float[] fb = ctx.computeOnClient(mc -> win.tileCenterFb(idx));
+            assertTrue(fb != null, "tile not drawn");
+            double k = ctx.computeOnClient(mc -> (double) mc.getWindow().getScreenWidth() / mc.getWindow().getWidth());
+            ctx.getInput().setCursorPos(fb[0] * k, fb[1] * k);
+            ctx.waitTicks(20);
+            int big = ctx.computeOnClient(mc -> win.bigPreviews);
+            ctx.takeScreenshot("newbridge_media_hover");
+            assertTrue(big > 0, "no big preview while hovering");
+            // click picks the file and the module uses it
+            ctx.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
+            ctx.waitTicks(4);
+            String chosen = ctx.computeOnClient(mc -> picker.getText());
+            for (int i = 0; i < 60 && !ctx.computeOnClient(mc -> cc.ready()); i += 5) ctx.waitTicks(5);
+            log("mediapicker: chosen=" + chosen + " capeStatus=" + ctx.computeOnClient(mc -> cc.status()));
+            assertTrue("gt_m2.png".equals(chosen), "clicked tile not picked: " + chosen);
+            assertTrue(ctx.computeOnClient(mc -> cc.file.equals("gt_m2.png") && cc.ready()), "cape did not switch to the picked file");
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.close());
+            ctx.waitTicks(6);
+            // the setting row with the mini preview, in the open ClickGUI
+            ctx.runOnClient(mc -> {
+                if (!com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.isOpen()) com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.open();
+                for (var r : com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.panel(Module.Category.VISUAL).rows()) if (r.module == cc) r.setExpanded(true);
+            });
+            ctx.waitTicks(25);
+            ctx.takeScreenshot("newbridge_media_setting");
+            ctx.runOnClient(mc -> { for (var r : com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.panel(Module.Category.VISUAL).rows()) if (r.module == cc) r.setExpanded(false); mc.gui.setScreen(null); });
+        } finally {
+            ctx.runOnClient(mc -> {
+                if (com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.current() != null) com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.close();
+                picker.setText("");
+                if (cc.enabled) cc.toggle();
+                mc.gui.setScreen(null);
+            });
+            try { for (String n : names) java.nio.file.Files.deleteIfExists(dir.resolve(n)); } catch (Exception ignored) { }
+        }
+    }
+
+    private void testContextMenuAndWindow(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+        var cg = com.OsamaClient.newbridge.UI.gui.ClickGuiModule.INSTANCE;
+        var zoom = com.OsamaClient.newbridge.UI.components.ModuleManager.getModuleByName("Zoom");
+        var fov = com.OsamaClient.newbridge.UI.components.ModuleManager.getModuleByName("FullBright");
+        boolean favWas = zoom.favorite, fov0 = fov.favorite;
+        try {
+            // favorites panel
+            ctx.runOnClient(mc -> { zoom.favorite = false; fov.favorite = false; if (!gui.isOpen()) gui.open(); gui.setSearch(""); });
+            ctx.waitTicks(25);
+            float hEmpty = ctx.computeOnClient(mc -> { for (var p : gui.panels()) if (p.isFavorites()) return p.lastHeight(); return -1f; });
+            ctx.runOnClient(mc -> { zoom.favorite = true; fov.favorite = true; });
+            ctx.waitTicks(35);
+            float hFav = ctx.computeOnClient(mc -> { for (var p : gui.panels()) if (p.isFavorites()) return p.lastHeight(); return -1f; });
+            int favRows = ctx.computeOnClient(mc -> { for (var p : gui.panels()) if (p.isFavorites()) return p.matchCount(""); return -1; });
+            log("ctxmenu favorites panel height " + hEmpty + " -> " + hFav + " rows=" + favRows);
+            assertTrue(hEmpty <= 0.5f && hFav > 20f && favRows == 2, "favorites panel wrong: " + hEmpty + "/" + hFav + "/" + favRows);
+            ctx.takeScreenshot("newbridge_favorites_panel");
+
+            // quick menu (Shift + right click), default and glass look
+            var row = ctx.computeOnClient(mc -> { for (var r : gui.panel(Module.Category.VISUAL).rows()) if (r.module == zoom) return r; return null; });
+            ctx.runOnClient(mc -> gui.openMenuAt(row, 120f, 60f));
+            ctx.waitTicks(15);
+            var items = ctx.computeOnClient(mc -> gui.menuItems());
+            log("ctxmenu items " + items);
+            assertTrue(items.contains("Favorite") || items.contains("Unfavorite"), "menu has no favorite item: " + items);
+            ctx.takeScreenshot("newbridge_ctxmenu");
+            ctx.runOnClient(mc -> { cg.style.setIndex(1); });
+            ctx.waitTicks(20);
+            ctx.takeScreenshot("newbridge_ctxmenu_glass");
+            ctx.runOnClient(mc -> cg.style.setIndex(0));
+            ctx.runOnClient(mc -> gui.runMenuItem("Unfavorite"));
+            assertTrue(!zoom.favorite, "Unfavorite did not clear the flag");
+            ctx.runOnClient(mc -> gui.openMenuAt(row, 120f, 60f));
+            ctx.runOnClient(mc -> gui.runMenuItem("Show Settings"));
+            assertTrue(ctx.computeOnClient(mc -> row.isExpanded()), "Show Settings did not expand the row");
+
+            // Alt window with all settings; the ClickGUI is hidden meanwhile
+            ctx.runOnClient(mc -> gui.openSettingsWindow(row));
+            ctx.waitTicks(25);
+            boolean winOpen = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.current() instanceof com.OsamaClient.newbridge.UI.gui.window.ModuleSettingsWindow);
+            int drawn = ctx.computeOnClient(mc -> ((com.OsamaClient.newbridge.UI.gui.window.ModuleSettingsWindow) com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.current()).drawn);
+            boolean guiGone = ctx.computeOnClient(mc -> !(mc.gui.screen() instanceof com.OsamaClient.newbridge.UI.gui.ClickGuiScreen));
+            log("ctxmenu settings window open=" + winOpen + " drawn=" + drawn + " guiHidden=" + guiGone + " settings=" + zoom.settings.size());
+            assertTrue(winOpen && guiGone && drawn >= Math.min(3, zoom.settings.size()), "settings window not shown");
+            ctx.takeScreenshot("newbridge_settings_window");
+            ctx.runOnClient(mc -> cg.style.setIndex(1));
+            ctx.waitTicks(20);
+            ctx.takeScreenshot("newbridge_settings_window_glass");
+            ctx.runOnClient(mc -> { cg.style.setIndex(0); com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.close(); });
+            ctx.waitTicks(25);
+            assertTrue(ctx.computeOnClient(mc -> gui.isOpen()), "closing the settings window did not return to the ClickGUI");
+
+            // folded groups are saved
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.UI.components.SubCategories.setCollapsed(Module.Category.COMBAT, "Ranged", true));
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.config.Config.save());
+            String cfg = ctx.computeOnClient(mc -> { try { return java.nio.file.Files.readString(com.OsamaClient.newbridge.config.Config.file()); } catch (Exception e) { return "ERR " + e; } });
+            log("ctxmenu config has folded group: " + cfg.contains("COMBAT/Ranged"));
+            assertTrue(cfg.contains("COMBAT/Ranged"), "folded group not written to the config");
+        } finally {
+            ctx.runOnClient(mc -> {
+                zoom.favorite = favWas; fov.favorite = fov0; cg.style.setIndex(0);
+                com.OsamaClient.newbridge.UI.components.SubCategories.setCollapsed(Module.Category.COMBAT, "Ranged", false);
+                if (com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.current() != null) com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.close();
+                for (var r : gui.panel(Module.Category.VISUAL).rows()) r.setExpanded(false);
+                mc.gui.setScreen(null);
+            });
+        }
+    }
+
+    private void testShortcuts(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var wm = com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE;
+        var cg = com.OsamaClient.newbridge.UI.gui.ClickGuiModule.INSTANCE;
+        var besp = com.OsamaClient.newbridge.UI.components.ModuleManager.getModuleByName("BlockESP");
+        assertTrue(besp != null && besp.category == Module.Category.VISUAL, "BlockESP is not in Visual");
+        var bound = com.OsamaClient.newbridge.UI.components.ModuleManager.getModuleByName("Zoom");
+        int keyWas = bound.key;
+        try {
+            ctx.runOnClient(mc -> { bound.key = 90; wm.open(new com.OsamaClient.newbridge.UI.gui.window.ShortcutsWindow()); });
+            ctx.waitTicks(25);
+            var win = (com.OsamaClient.newbridge.UI.gui.window.ShortcutsWindow) wm.current();
+            int rows = ctx.computeOnClient(mc -> win.rowsDrawn), secs = ctx.computeOnClient(mc -> win.sectionsDrawn);
+            log("shortcuts rows=" + rows + " sections=" + secs);
+            assertTrue(rows >= 15 && secs >= 3, "shortcuts window drew too little: " + rows + "/" + secs);
+            ctx.takeScreenshot("newbridge_shortcuts");
+            ctx.runOnClient(mc -> cg.style.setIndex(1));
+            ctx.waitTicks(20);
+            ctx.takeScreenshot("newbridge_shortcuts_glass");
+        } finally {
+            ctx.runOnClient(mc -> { cg.style.setIndex(0); bound.key = keyWas; if (wm.current() != null) wm.close(); mc.gui.setScreen(null); });
+        }
+    }
+
+    private void testLiquidGlass(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+        var cg = com.OsamaClient.newbridge.UI.gui.ClickGuiModule.INSTANCE;
+        var ka = com.OsamaClient.newbridge.UI.components.ModuleManager.getModuleByName("Zoom");
+        boolean zoomWas = ka.enabled;
+        try {
+            float r0 = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.Theme.radius());
+            ctx.runOnClient(mc -> { cg.style.setIndex(1); if (!gui.isOpen()) gui.open(); gui.setSearch(""); ka.enabled = true; });
+            ctx.waitTicks(40);
+            boolean glass = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.Theme.glass());
+            float r1 = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.Theme.radius());
+            String bg = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.Theme.background());
+            log("liquidglass glass=" + glass + " radius " + r0 + " -> " + r1 + " bg=" + bg);
+            assertTrue(glass && r1 >= 6f && r1 > r0 && "Blur".equals(bg), "glass style values wrong");
+            ctx.runOnClient(mc -> { for (var r : gui.panel(Module.Category.VISUAL).rows()) if (r.module == ka) r.setExpanded(true); });
+            ctx.waitTicks(30);
+            ctx.takeScreenshot("newbridge_liquid_glass");
+        } finally {
+            ctx.runOnClient(mc -> {
+                cg.style.setIndex(0);
+                ka.enabled = zoomWas;
+                for (var r : gui.panel(Module.Category.VISUAL).rows()) if (r.module == ka) r.setExpanded(false);
+                mc.gui.setScreen(null);
+            });
+        }
+    }
+
+    private void testNoRenderMore(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        String[][] hooks = {
+                {"net.minecraft.client.gui.Hud", "noRender_extractBossOverlay", "noRender_extractSubtitleOverlay", "noRender_extractOverlayMessage",
+                        "noRender_extractSleepOverlay", "noRender_extractPlayerHealth", "noRender_extractFood", "noRender_extractVehicleHealth", "noRender_extractSavingIndicator"},
+                {"net.minecraft.client.renderer.GameRenderer", "noRender_bobHurt", "noRender_bobView"},
+                {"net.minecraft.client.renderer.ScreenEffectRenderer", "onSubmitWater", "onItemActivation"},
+                {"net.minecraft.world.level.Level", "noRender_rain", "noRender_thunder"},
+                {"net.minecraft.client.particle.ParticleEngine", "noRender_add"}};
+        for (String[] h : hooks) {
+            try {
+                StringBuilder names = new StringBuilder();
+                for (var m : Class.forName(h[0]).getDeclaredMethods()) names.append(m.getName()).append(' ');
+                for (int i = 1; i < h.length; i++) assertTrue(names.toString().contains(h[i]), "NoRender hook " + h[i] + " missing in " + h[0]);
+            } catch (ClassNotFoundException e) {
+                throw new AssertionError(e);
+            }
+        }
+        var nr = com.OsamaClient.newbridge.Hacks.Visual.NoRender.INSTANCE;
+        boolean was = nr.enabled;
+        try {
+            srv.runCommand("weather rain");
+            ctx.waitTicks(80);
+            float rain0 = ctx.computeOnClient(mc -> mc.level.getRainLevel(1f));
+            ctx.runOnClient(mc -> { nr.enabled = true; nr.weather = true; });
+            float rain1 = ctx.computeOnClient(mc -> mc.level.getRainLevel(1f));
+            log("norender weather rain " + rain0 + " -> " + rain1);
+            assertTrue(rain0 > 0.2f && rain1 == 0f, "weather not hidden: " + rain0 + " -> " + rain1);
+            ctx.runOnClient(mc -> { nr.weather = false; nr.healthBar = true; nr.foodBar = true; nr.subtitles = true; nr.particles = true; });
+            ctx.waitTicks(20);
+            ctx.takeScreenshot("newbridge_norender_nohud");
+        } finally {
+            srv.runCommand("weather clear");
+            ctx.runOnClient(mc -> { nr.enabled = was; nr.weather = false; nr.healthBar = false; nr.foodBar = false; nr.subtitles = false; nr.particles = false; });
+        }
+    }
+
+    private void testCheckMeterMoreAndControls(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var cm = com.OsamaClient.newbridge.Hacks.Client.CheckMeter.INSTANCE;
+        var san = com.OsamaClient.newbridge.Hacks.Client.PacketSanitizer.INSTANCE;
+        boolean cmWas = cm.enabled, sanWas = san.enabled;
+        net.minecraft.client.KeyMapping[] target = new net.minecraft.client.KeyMapping[1];
+        com.mojang.blaze3d.platform.InputConstants.Key[] keyWas = new com.mojang.blaze3d.platform.InputConstants.Key[1];
+        try {
+            ctx.runOnClient(mc -> { if (cm.enabled) cm.toggle(); cm.toggle(); cm.clear(); cm.notify = false; if (san.enabled) san.toggle(); });
+            // a step 0.1 above the floor (carpet / slab / step down) is plausible ground, 0.6 up is not
+            ctx.runOnClient(mc -> {
+                var pos = mc.player.position();
+                mc.player.setPos(pos.x, pos.y + 0.1, pos.z);
+                com.OsamaClient.newbridge.Hacks.Client.CheckMeter.tick();
+                cm.observeMove(new net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.StatusOnly(true, false), mc.player);
+                mc.player.setPos(pos.x, pos.y, pos.z);
+            });
+            assertTrue(flagCount(cm, "GroundSpoof") == 0, "small step flagged as GroundSpoof " + cm.totals);
+            ctx.runOnClient(mc -> {
+                var pos = mc.player.position();
+                mc.player.setPos(pos.x, pos.y + 0.6, pos.z);
+                com.OsamaClient.newbridge.Hacks.Client.CheckMeter.tick();
+                cm.observeMove(new net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.StatusOnly(true, false), mc.player);
+                mc.player.setPos(pos.x, pos.y, pos.z);
+            });
+            assertTrue(flagCount(cm, "GroundSpoof") == 1, "0.6 blocks up not flagged " + cm.totals);
+            // click rate
+            srv.runCommand(String.format(java.util.Locale.ROOT, "summon villager %.1f %d %.1f {NoAI:1b,Tags:[\"gt\"]}", ox + 2.5, Y, oz + 0.5));
+            ctx.waitTicks(6);
+            ctx.runOnClient(mc -> {
+                var list = mc.level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, mc.player.getBoundingBox().inflate(10), e -> e != mc.player);
+                var nearest = list.stream().min(java.util.Comparator.comparingDouble(e -> e.distanceTo(mc.player))).get();
+                for (int i = 0; i < 22; i++) cm.onAttack(mc, nearest);
+            });
+            assertTrue(flagCount(cm, "ClickRate") >= 1, "ClickRate not flagged " + cm.totals);
+            srv.runCommand("kill @e[tag=gt]");
+            // keybinds window: bind a vanilla control to a free key, then unbind
+            var win = new com.OsamaClient.newbridge.UI.gui.window.KeyboardWindow();
+            ctx.runOnClient(mc -> {
+                var all = com.OsamaClient.newbridge.UI.gui.window.KeyboardWindow.controls();
+                target[0] = all.get(0);
+                for (var km : all) if (km.getName().equals("key.hotbar.9")) target[0] = km;
+                keyWas[0] = target[0].saveString().isEmpty() ? com.mojang.blaze3d.platform.InputConstants.UNKNOWN : com.mojang.blaze3d.platform.InputConstants.getKey(target[0].saveString());
+                win.select(65); // F8
+                win.showControls(true);
+                com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(win);
+            });
+            ctx.waitTicks(20);
+            ctx.runOnClient(mc -> win.bindControl(target[0], 65));
+            boolean bound = ctx.computeOnClient(mc -> target[0].matches(com.mojang.blaze3d.platform.InputConstants.Type.KEYBOARD.getOrCreate(65)));
+            assertTrue(bound, "control not rebound to F8");
+            ctx.waitTicks(10);
+            ctx.takeScreenshot("newbridge_keybinds_controls");
+            ctx.runOnClient(mc -> win.unbindControl(target[0]));
+            assertTrue(ctx.computeOnClient(mc -> target[0].isUnbound()), "control not unbound");
+        } finally {
+            srv.runCommand("kill @e[tag=gt]");
+            ctx.runOnClient(mc -> {
+                if (target[0] != null && keyWas[0] != null) { target[0].setKey(keyWas[0]); net.minecraft.client.KeyMapping.resetMapping(); mc.options.save(); }
+                var wm = com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE;
+                if (wm.current() != null) wm.close();
+                mc.gui.setScreen(null);
+                cm.clear(); cm.notify = true; if (cm.enabled && !cmWas) cm.toggle(); if (san.enabled != sanWas) san.toggle();
+            });
+        }
+    }
+
+    private double jumpPeak(ClientGameTestContext ctx) {
+        double[] peak = {0};
+        double y0 = ctx.computeOnClient(mc -> mc.player.getY());
+        ctx.runOnClient(mc -> mc.player.jumpFromGround());
+        for (int i = 0; i < 40; i++) {
+            ctx.waitTick();
+            peak[0] = Math.max(peak[0], ctx.computeOnClient(mc -> mc.player.getY()) - y0);
+        }
+        ctx.waitTicks(15);
+        return peak[0];
+    }
+
+    private void testHighJump(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var hj = ModuleManager.getModuleByName("HighJump");
+        boolean was = hj.enabled;
+        try {
+            ctx.runOnClient(mc -> { if (hj.enabled) hj.toggle(); });
+            ctx.waitTicks(10);
+            double vanilla = jumpPeak(ctx);
+            ctx.runOnClient(mc -> { if (!hj.enabled) hj.toggle(); });
+            ctx.waitTicks(10);
+            double boosted = jumpPeak(ctx);
+            log("highjump peak vanilla " + vanilla + " boosted " + boosted);
+            assertTrue(vanilla > 1.0 && vanilla < 1.5, "vanilla peak " + vanilla);
+            assertTrue(boosted > vanilla * 1.6, "HighJump did not raise the jump: " + vanilla + " -> " + boosted);
+        } finally {
+            ctx.runOnClient(mc -> { if (hj.enabled != was) hj.toggle(); });
+        }
+    }
+
+    private void testAccounts(ClientGameTestContext ctx, TestServerContext srv) {
+        net.minecraft.client.User orig = ctx.computeOnClient(mc -> mc.getUser());
+        java.nio.file.Path tmp;
+        try { tmp = java.nio.file.Files.createTempFile("nbacc", ".json"); } catch (java.io.IOException e) { throw new AssertionError(e); }
+        String idWas = com.OsamaClient.newbridge.Utils.accounts.AccountManager.clientId;
+        try {
+            com.OsamaClient.newbridge.Utils.accounts.AccountManager.testFile = tmp;
+            ctx.runOnClient(mc -> {
+                var m = com.OsamaClient.newbridge.Utils.accounts.AccountManager.class;
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.accounts.clear();
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.clientId = "00000000-0000-0000-0000-000000000000";
+                var a = new com.OsamaClient.newbridge.Utils.accounts.AccountManager.Account(); a.name = "AltOne"; a.uuid = java.util.UUID.randomUUID().toString(); a.refresh = "SECRET-REFRESH-TOKEN-1";
+                var b = new com.OsamaClient.newbridge.Utils.accounts.AccountManager.Account(); b.name = "AltTwo"; b.uuid = java.util.UUID.randomUUID().toString(); b.refresh = "";
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.accounts.add(a);
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.accounts.add(b);
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.save();
+                mc.gui.setScreen(new net.minecraft.client.gui.screens.TitleScreen());
+            });
+            ctx.waitTicks(20);
+            boolean btn = ctx.computeOnClient(mc -> {
+                if (mc.gui.screen() == null) return false;
+                for (var c : mc.gui.screen().children()) if (c instanceof net.minecraft.client.gui.components.Button bt && bt.getMessage().getString().equals("Accounts")) return true;
+                return false;
+            });
+            assertTrue(btn, "no Accounts button on the title screen");
+            String raw;
+            try { raw = java.nio.file.Files.readString(tmp); } catch (java.io.IOException e) { throw new AssertionError(e); }
+            assertTrue(!raw.contains("SECRET-REFRESH-TOKEN-1") && raw.contains("AltOne"), "refresh token not encrypted: " + raw);
+            ctx.runOnClient(mc -> { com.OsamaClient.newbridge.Utils.accounts.AccountManager.load(); });
+            String back = com.OsamaClient.newbridge.Utils.accounts.AccountManager.accounts.get(0).refresh;
+            assertTrue("SECRET-REFRESH-TOKEN-1".equals(back), "refresh token not decrypted: " + back);
+            ctx.runOnClient(mc -> mc.gui.setScreen(new com.OsamaClient.newbridge.Utils.accounts.AccountScreen(mc.gui.screen())));
+            ctx.waitTicks(15);
+            int rows = ctx.computeOnClient(mc -> ((com.OsamaClient.newbridge.Utils.accounts.AccountScreen) mc.gui.screen()).rows);
+            assertTrue(rows == 2, "account rows " + rows);
+            ctx.takeScreenshot("newbridge_accounts");
+            // switching the session
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.Utils.accounts.AccountManager.setUser(new net.minecraft.client.User("SwitchedAlt", java.util.UUID.randomUUID(), "x", java.util.Optional.empty(), java.util.Optional.empty())));
+            String now = ctx.computeOnClient(mc -> mc.getUser().getName());
+            assertTrue("SwitchedAlt".equals(now), "session not switched: " + now);
+        } finally {
+            ctx.runOnClient(mc -> {
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.setUser(orig);
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.testFile = null;
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.accounts.clear();
+                com.OsamaClient.newbridge.Utils.accounts.AccountManager.clientId = idWas;
+                mc.gui.setScreen(null);
+            });
+            try { java.nio.file.Files.deleteIfExists(tmp); } catch (java.io.IOException ignored) {}
+        }
+    }
+
+    private void testVapeLayout(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+        var cg = com.OsamaClient.newbridge.UI.gui.ClickGuiModule.INSTANCE;
+        var vape = gui.vape();
+        try {
+            ctx.runOnClient(mc -> { cg.layout.setIndex(1); gui.setSearch(""); if (!gui.isOpen()) gui.open(); vape.select("Combat"); });
+            ctx.waitTicks(40);
+            boolean on = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.Theme.vape());
+            int n = ctx.computeOnClient(mc -> vape.rowsDrawn);
+            String title = ctx.computeOnClient(mc -> vape.lastTitle);
+            log("vape on=" + on + " rows=" + n + " title=" + title);
+            assertTrue(on && n >= 5 && "Combat".equals(title), "vape combat list wrong");
+            var km = ModuleManager.getModuleByName("KillAura");
+            ctx.runOnClient(mc -> vape.row(km).setExpanded(true));
+            ctx.waitTicks(30);
+            ctx.takeScreenshot("newbridge_vape_combat");
+            ctx.runOnClient(mc -> vape.select("Visual"));
+            ctx.waitTicks(25);
+            int nv = ctx.computeOnClient(mc -> vape.rowsDrawn);
+            assertTrue(nv >= 5, "vape visual list empty");
+            ctx.runOnClient(mc -> gui.setSearch("esp"));
+            ctx.waitTicks(25);
+            int ns = ctx.computeOnClient(mc -> vape.rowsDrawn);
+            String st = ctx.computeOnClient(mc -> vape.lastTitle);
+            log("vape search esp rows=" + ns + " title=" + st);
+            assertTrue(ns >= 2 && "Search results".equals(st), "vape search wrong");
+            ctx.runOnClient(mc -> { gui.setSearch(""); cg.style.setIndex(1); vape.select("Visual"); });
+            ctx.waitTicks(40);
+            ctx.takeScreenshot("newbridge_vape_glass");
+            ctx.runOnClient(mc -> { cg.style.setIndex(0); cg.layout.setIndex(0); });
+            ctx.waitTicks(30);
+            boolean off = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.Theme.vape());
+            assertTrue(!off, "layout did not switch back");
+            ctx.takeScreenshot("newbridge_vape_back_to_panels");
+        } finally {
+            ctx.runOnClient(mc -> { cg.layout.setIndex(0); cg.style.setIndex(0); gui.setSearch(""); vape.row(ModuleManager.getModuleByName("KillAura")).setExpanded(false); mc.gui.setScreen(null); });
+        }
+    }
+
+    private void testSubCategories(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var gui = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+        var sc = com.OsamaClient.newbridge.UI.components.SubCategories.class;
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (var m : com.OsamaClient.newbridge.UI.components.ModuleManager.modules) names.add(m.name);
+        var unknown = com.OsamaClient.newbridge.UI.components.SubCategories.unknownNames(names);
+        log("subcategories unknown names: " + unknown);
+        // names of modules that only exist in some builds (e.g. Macros/Profiles/ArrayList registered elsewhere) are tolerated
+        try {
+            ctx.runOnClient(mc -> { gui.setSearch(""); if (!gui.isOpen()) gui.open(); gui.panel(Module.Category.COMBAT).setCollapsed(false); });
+            ctx.waitTicks(30);
+            var heads = ctx.computeOnClient(mc -> gui.panel(Module.Category.COMBAT).groupHeaders());
+            log("subcategories combat headers: " + heads);
+            assertTrue(heads.contains("Melee") && heads.contains("Defense"), "no group headers: " + heads);
+            float h0 = ctx.computeOnClient(mc -> gui.panel(Module.Category.COMBAT).lastHeight());
+            ctx.takeScreenshot("newbridge_subcategories");
+            ctx.runOnClient(mc -> gui.panel(Module.Category.COMBAT).toggleGroup("Melee"));
+            ctx.waitTicks(40);
+            float h1 = ctx.computeOnClient(mc -> gui.panel(Module.Category.COMBAT).lastHeight());
+            log("subcategories melee folded: " + h0 + " -> " + h1);
+            assertTrue(h1 < h0 - 20f, "folding Melee did not shrink the panel");
+            ctx.takeScreenshot("newbridge_subcategories_folded");
+            ctx.runOnClient(mc -> { gui.panel(Module.Category.COMBAT).toggleGroup("Melee"); gui.setSearch("aura"); });
+            ctx.waitTicks(30);
+            var flat = ctx.computeOnClient(mc -> gui.panel(Module.Category.COMBAT).groupHeaders());
+            assertTrue(flat.isEmpty(), "search still shows group headers: " + flat);
+            ctx.runOnClient(mc -> { gui.setSearch(""); com.OsamaClient.newbridge.UI.gui.ClickGuiModule.INSTANCE.subcategories.enabled = false; });
+            ctx.waitTicks(30);
+            var off = ctx.computeOnClient(mc -> gui.panel(Module.Category.COMBAT).groupHeaders());
+            assertTrue(off.isEmpty(), "headers shown although Subcategories is off: " + off);
+        } finally {
+            ctx.runOnClient(mc -> {
+                com.OsamaClient.newbridge.UI.gui.ClickGuiModule.INSTANCE.subcategories.enabled = true;
+                gui.setSearch("");
+                com.OsamaClient.newbridge.UI.components.SubCategories.setCollapsed(Module.Category.COMBAT, "Melee", false);
+                mc.gui.setScreen(null);
+            });
+        }
+    }
+
+    private void testTags(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var T = com.OsamaClient.newbridge.UI.components.Tags.class;
+        // every tagged name is a real module
+        var missing = new java.util.ArrayList<String>();
+        for (String n : com.OsamaClient.newbridge.UI.components.Tags.taggedNames()) if (ModuleManager.getModuleByName(n) == null && java.util.Arrays.stream(new String[]{"noslow", "packetcontrol"}).noneMatch(n::equals)) missing.add(n);
+        assertTrue(missing.isEmpty(), "tags for unknown modules: " + missing);
+        // the examples from the request
+        assertTrue(com.OsamaClient.newbridge.UI.components.Tags.has(ModuleManager.getModuleByName("AimAssist"), "undetectable"), "AimAssist not #undetectable");
+        assertTrue(com.OsamaClient.newbridge.UI.components.Tags.has(ModuleManager.getModuleByName("Scaffold"), "undetectable"), "Scaffold not #undetectable");
+        assertTrue(com.OsamaClient.newbridge.UI.components.Tags.has(ModuleManager.getModuleByName("AutoBreed"), "mobs"), "AutoBreed not #mobs");
+        assertTrue(com.OsamaClient.newbridge.UI.components.Tags.has(ModuleManager.getModuleByName("Flight"), "risky"), "Flight not #risky");
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.open());
+        ctx.waitTicks(15);
+        var g = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE;
+        String[] queries = {"#undetectable", "#sword", "#crystalpvp", "#ohc", "#mobs", "#cry", "#sword #undetectable", "#mobs kill", "#nonsense", "sword"};
+        int[] counts = new int[queries.length];
+        for (int i = 0; i < queries.length; i++) {
+            String q = queries[i];
+            ctx.runOnClient(mc -> g.setSearch(q));
+            ctx.waitTicks(3);
+            counts[i] = ctx.computeOnClient(mc -> g.visibleMatches());
+        }
+        // expected counts straight from the module list
+        int undet = ctx.computeOnClient(mc -> { int n = 0; for (Module m : ModuleManager.modules) if (com.OsamaClient.newbridge.UI.components.Tags.has(m, "undetectable")) n++; return n; });
+        int both = ctx.computeOnClient(mc -> { int n = 0; for (Module m : ModuleManager.modules) if (com.OsamaClient.newbridge.UI.components.Tags.has(m, "sword") && com.OsamaClient.newbridge.UI.components.Tags.has(m, "undetectable")) n++; return n; });
+        int mobsKill = ctx.computeOnClient(mc -> { int n = 0; for (Module m : ModuleManager.modules) if (com.OsamaClient.newbridge.UI.components.Tags.has(m, "mobs") && m.name.toLowerCase().contains("kill")) n++; return n; });
+        log("tags: counts " + java.util.Arrays.toString(counts) + " undetectableModules=" + undet + " swordAndUndetectable=" + both + " mobs+kill=" + mobsKill);
+        assertTrue(counts[0] == undet && undet > 8, "#undetectable shows " + counts[0] + ", expected " + undet);
+        assertTrue(counts[1] > 5 && counts[2] > 3 && counts[3] >= 3 && counts[4] > 3, "tag searches empty: " + java.util.Arrays.toString(counts));
+        assertTrue(counts[5] == counts[2], "#cry (prefix) should equal #crystalpvp: " + counts[5] + " vs " + counts[2]);
+        assertTrue(counts[6] == both && both > 0, "AND of two tags: " + counts[6] + " expected " + both);
+        assertTrue(counts[7] == mobsKill && mobsKill > 0, "#mobs + word: " + counts[7] + " expected " + mobsKill);
+        assertTrue(counts[8] == 0, "#nonsense matched " + counts[8]);
+        assertTrue(counts[9] > 0, "plain 'sword' should also find #sword modules");
+        // suggestions while typing a tag and clicking one completes the search
+        ctx.runOnClient(mc -> g.setSearch("#cr"));
+        ctx.waitTicks(4);
+        int chips = ctx.computeOnClient(mc -> g.tagChipCount());
+        String chip0 = ctx.computeOnClient(mc -> g.tagChipCount() > 0 ? g.tagChip(0) : "");
+        log("tags: suggestions for '#cr' = " + chips + " first=" + chip0);
+        assertTrue(chips >= 1 && chip0.startsWith("cr"), "no tag suggestion for #cr");
+        ctx.runOnClient(mc -> g.setSearch("#"));
+        ctx.waitTicks(4);
+        ctx.takeScreenshot("newbridge_tags_suggestions");
+        ctx.runOnClient(mc -> g.setSearch("#undetectable"));
+        ctx.waitTicks(6);
+        ctx.takeScreenshot("newbridge_tags_search");
+        // the detail card lists the tags
+        var card = com.OsamaClient.newbridge.UI.gui.DetailCard.module(ModuleManager.getModuleByName("AimAssist"));
+        boolean cardTags = card.lines().stream().anyMatch(l -> l.text().startsWith("Tags:") && l.text().contains("#undetectable") && l.text().contains("#sword"));
+        assertTrue(cardTags, "detail card has no tag line");
+        ctx.runOnClient(mc -> { g.setSearch(""); mc.gui.setScreen(null); });
+    }
+
+    private void testAutoBreed(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("kill @e[type=cow]");
+        srv.runCommand("kill @e[type=pig]");
+        srv.runCommand("difficulty peaceful");
+        srv.runCommand("give @a wheat 6");
+        srv.runCommand("give @a carrot 4");
+        srv.runCommand("summon cow 1.5 " + Y + " 1.5 {NoAI:1b,Tags:[\"gt\"]}");
+        srv.runCommand("summon cow 2.0 " + Y + " -1.5 {NoAI:1b,Tags:[\"gt\"]}");
+        srv.runCommand("summon pig -1.5 " + Y + " 1.0 {NoAI:1b,Tags:[\"gt\"]}");
+        ctx.waitTicks(10);
+        var ab = com.OsamaClient.newbridge.Hacks.Misc.AutoBreed.INSTANCE;
+        assertTrue(ab != null, "AutoBreed missing");
+        try {
+            // put the carrots in slot 1, wheat in 0: the module must find the wheat by itself
+            ctx.runOnClient(mc -> { mc.player.getInventory().setSelectedSlot(5); ab.range = 3.0; ab.delay = 2; });
+            on(ctx, "AutoBreed");
+            ctx.waitTicks(60);
+            int cowsInLove = srv.computeOnServer(s -> {
+                int n = 0;
+                for (var e : s.overworld().getEntities(net.minecraft.world.level.entity.EntityTypeTest.forClass(net.minecraft.world.entity.animal.cow.Cow.class), c -> true)) if (e.isInLove()) n++;
+                return n;
+            });
+            int pigsInLove = srv.computeOnServer(s -> {
+                int n = 0;
+                for (var e : s.overworld().getEntities(net.minecraft.world.level.entity.EntityTypeTest.forClass(net.minecraft.world.entity.animal.pig.Pig.class), c -> true)) if (e.isInLove()) n++;
+                return n;
+            });
+            int wheat = countItem(ctx, net.minecraft.world.item.Items.WHEAT);
+            int carrot = countItem(ctx, net.minecraft.world.item.Items.CARROT);
+            int slot = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+            int fed = ctx.computeOnClient(mc -> ab.fedCount);
+            log("autobreed: cowsInLove=" + cowsInLove + " pigsInLove=" + pigsInLove + " wheat=" + wheat + " carrot=" + carrot + " slot=" + slot + " fed=" + fed);
+            assertTrue(cowsInLove == 2, "cows in love: " + cowsInLove);
+            assertTrue(wheat == 4, "wheat left " + wheat + " (expected 4: one per cow)");
+            assertTrue(pigsInLove == 0 && carrot == 4, "lone pig must not be fed: pigs in love " + pigsInLove + ", carrots " + carrot);
+            assertTrue(fed == 2, "fed count " + fed);
+            assertTrue(slot == 5, "slot not restored: " + slot);
+            // a second pig makes a pair: now the carrots are used
+            srv.runCommand("summon pig -1.0 " + Y + " -1.0 {NoAI:1b,Tags:[\"gt\"]}");
+            ctx.waitTicks(60);
+            int pigs2 = srv.computeOnServer(s -> {
+                int n = 0;
+                for (var e : s.overworld().getEntities(net.minecraft.world.level.entity.EntityTypeTest.forClass(net.minecraft.world.entity.animal.pig.Pig.class), c -> true)) if (e.isInLove()) n++;
+                return n;
+            });
+            log("autobreed: pigs in love after pairing = " + pigs2);
+            assertTrue(pigs2 == 2, "pig pair not fed: " + pigs2);
+            assertTrue(countItem(ctx, net.minecraft.world.item.Items.WHEAT) == 4, "cows were fed twice");
+        } finally {
+            ctx.runOnClient(mc -> { var m = ModuleManager.getModuleByName("AutoBreed"); if (m.enabled) m.toggle(); });
+            srv.runCommand("kill @e[tag=gt]");
+            srv.runCommand("difficulty normal");
+        }
+    }
+
+    private void testAntiVanish(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var av = com.OsamaClient.newbridge.Hacks.Misc.AntiVanish.INSTANCE;
+        assertTrue(av != null, "AntiVanish missing");
+        java.util.UUID bob = java.util.UUID.randomUUID(), steve = java.util.UUID.randomUUID(), alex = java.util.UUID.randomUUID();
+        try {
+            ctx.runOnClient(mc -> { av.tabProbe = true; av.leaveMessages = "Yes"; av.watchOnly = false; av.critical = 70; av.sensors = true; });
+            on(ctx, "AntiVanish");
+            ctx.waitTicks(130); // quiet period after joining; the first real probe goes out and is answered by the server
+
+            // 1) a staff player drops out of tab silently; Steve leaves normally (message first), Alex too (message a bit later)
+            ctx.runOnClient(mc -> {
+                av.testAddTab(bob, "Admin_Bob", "[Admin] Admin_Bob");
+                av.testAddTab(steve, "Steve", "Steve");
+                av.testAddTab(alex, "Alex", "Alex");
+            });
+            ctx.waitTicks(40);
+            ctx.runOnClient(mc -> {
+                AntiVanishFeed.leaveMessage("Steve");
+                AntiVanishFeed.remove(bob);
+                AntiVanishFeed.remove(steve);
+                AntiVanishFeed.remove(alex);
+            });
+            ctx.waitTicks(10);
+            ctx.runOnClient(mc -> AntiVanishFeed.leaveMessage("Alex"));
+            ctx.waitTicks(50);
+            double bobConf = ctx.computeOnClient(mc -> av.confidenceOf("Admin_Bob"));
+            double steveConf = ctx.computeOnClient(mc -> av.confidenceOf("Steve"));
+            double alexConf = ctx.computeOnClient(mc -> av.confidenceOf("Alex"));
+            String alert = ctx.computeOnClient(mc -> av.lastAlert);
+            log("antivanish: bob=" + bobConf + " steve=" + steveConf + " alex=" + alexConf + " alert=" + alert);
+            assertTrue(bobConf >= 80, "silent staff loss not detected: " + bobConf);
+            assertTrue(alert.contains("Admin_Bob"), "no alert for Admin_Bob: " + alert);
+            assertTrue(steveConf < 0, "normal leave (message first) reported: " + steveConf);
+            assertTrue(alexConf < 0, "normal leave (message late) reported: " + alexConf);
+
+            // 2) he shows up in tab again
+            ctx.runOnClient(mc -> av.testAddTab(bob, "Admin_Bob", "[Admin] Admin_Bob"));
+            ctx.waitTicks(5);
+            assertTrue(ctx.computeOnClient(mc -> av.confidenceOf("Admin_Bob")) < 0, "reappearing player still reported");
+
+            // 3) block-dig packets of an entity we cannot see: ignored when we broke that block ourselves ...
+            ctx.runOnClient(mc -> {
+                net.minecraft.core.BlockPos ownPos = mc.player.blockPosition().offset(4, 0, 0);
+                AntiVanishFeed.ownStartBreak(ownPos);
+                AntiVanishFeed.dig(7777777, ownPos);
+            });
+            ctx.waitTicks(4);
+            double own = ctx.computeOnClient(mc -> av.activityScore());
+            assertTrue(own < 1, "own block breaking counted as vanish activity: " + own);
+            // ... and counted when somebody else digs
+            ctx.runOnClient(mc -> AntiVanishFeed.dig(7777778, mc.player.blockPosition().offset(-6, 0, 0)));
+            ctx.waitTicks(4);
+            double foreign = ctx.computeOnClient(mc -> av.activityScore());
+            log("antivanish: own dig=" + own + " foreign dig=" + foreign);
+            assertTrue(foreign >= 55, "unseen digger not detected: " + foreign);
+
+            // 4) tab-completion probe: a name the server completes but tab does not list
+            String self = ctx.computeOnClient(mc -> mc.player.getName().getString());
+            ctx.runOnClient(mc -> AntiVanishFeed.probeAnswer(av, 41500, java.util.List.of("Ghost_Joe", "@a", self)));
+            ctx.waitTicks(4);
+            double first = ctx.computeOnClient(mc -> av.confidenceOf("Ghost_Joe"));
+            ctx.runOnClient(mc -> AntiVanishFeed.probeAnswer(av, 41501, java.util.List.of("Ghost_Joe", self)));
+            ctx.waitTicks(4);
+            double second = ctx.computeOnClient(mc -> av.confidenceOf("Ghost_Joe"));
+            log("antivanish: probe first=" + first + " second=" + second);
+            assertTrue(first >= 60 && first < 90, "first probe hit: " + first);
+            assertTrue(second >= 95, "second probe hit not confirmed: " + second);
+            assertTrue(ctx.computeOnClient(mc -> av.confidenceOf(self)) < 0, "own name reported");
+
+            // 5) a network-wide name list switches the probe off
+            ctx.runOnClient(mc -> AntiVanishFeed.probeAnswer(av, 41502, java.util.List.of("Net_A", "Net_B", "Net_C", "Net_D", self)));
+            ctx.waitTicks(4);
+            assertTrue(ctx.computeOnClient(mc -> av.probeSwitchedOff()), "network-wide list did not switch the probe off");
+            assertTrue(ctx.computeOnClient(mc -> av.alertCount) >= 2, "too few alerts");
+        } finally {
+            ctx.runOnClient(mc -> { var m = ModuleManager.getModuleByName("AntiVanish"); if (m.enabled) m.toggle(); });
+        }
+    }
+
+    private static void writePng(Path p, int w, int h, java.util.function.IntBinaryOperator px) {
+        try {
+            var img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) img.setRGB(x, y, px.applyAsInt(x, y));
+            java.nio.file.Files.createDirectories(p.getParent());
+            javax.imageio.ImageIO.write(img, "png", p.toFile());
+        } catch (java.io.IOException e) { throw new AssertionError("png " + p + ": " + e); }
+    }
+
+    private boolean waitSky(ClientGameTestContext ctx, int ticks) {
+        var cs = com.OsamaClient.newbridge.Hacks.World.sky.CustomSky.INSTANCE;
+        for (int i = 0; i < ticks; i += 5) {
+            if (ctx.computeOnClient(mc -> cs.ready() && cs.draws > 0)) return true;
+            ctx.waitTicks(5);
+        }
+        return false;
+    }
+
+    private void testCustomSky(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        srv.runCommand("time set 6000");
+        srv.runCommand("weather clear");
+        var cs = com.OsamaClient.newbridge.Hacks.World.sky.CustomSky.INSTANCE;
+        assertTrue(cs != null && cs.category == Module.Category.WORLD, "CustomSky missing / not in World");
+        Path dir = com.OsamaClient.newbridge.Hacks.World.sky.CustomSky.folder();
+        Path photo = dir.resolve("gt_photo.png"), pano = dir.resolve("gt_pano.png");
+        // a "photo": sky gradient, sun, mountains
+        writePng(photo, 640, 360, (x, y) -> {
+            double ridge = 230 + 40 * Math.sin(x / 47.0) + 25 * Math.sin(x / 13.0);
+            if (y > ridge) return 0x2E4A2A + ((y - (int) ridge) / 6 << 8);
+            double d = Math.hypot(x - 470, y - 110);
+            if (d < 34) return 0xFFF2B0;
+            int r = 255 - y / 3, g = 140 + y / 4, b = 90 + y / 3;
+            return (Math.min(255, r) << 16) | (Math.min(255, g) << 8) | Math.min(255, b);
+        });
+        writePng(pano, 1024, 512, (x, y) -> {
+            int band = (x / 64) % 2 == 0 ? 0x3050C0 : 0xC05030;
+            return y < 256 ? band : 0x205020 + (y - 256) / 4;
+        });
+        try {
+            ctx.runOnClient(mc -> {
+                mc.player.setYRot(-90f); mc.player.setXRot(-20f);
+                cs.projection = "Auto"; cs.sunAndMoon = true; cs.followDaylight = true; cs.opacity = 1; cs.brightness = 1;
+                cs.setFile("gt_photo.png");
+                if (!cs.enabled) cs.toggle();
+            });
+            boolean ok = waitSky(ctx, 200);
+            log("customsky photo: " + ctx.computeOnClient(mc -> cs.status()) + " draws=" + cs.draws + " uploads=" + cs.uploads);
+            assertTrue(ok, "photo sky not drawn: " + ctx.computeOnClient(mc -> cs.status()));
+            ctx.waitTicks(10);
+            ctx.takeScreenshot("newbridge_sky_photo");
+            ctx.runOnClient(mc -> mc.player.setXRot(-75f));
+            ctx.waitTicks(5);
+            ctx.takeScreenshot("newbridge_sky_photo_up");
+            ctx.runOnClient(mc -> mc.player.setXRot(-20f));
+
+            // panorama (2:1 picks Panorama automatically)
+            int up0 = cs.uploads;
+            ctx.runOnClient(mc -> cs.setFile("gt_pano.png"));
+            ctx.waitTicks(40);
+            boolean pOk = waitSky(ctx, 100) && cs.uploads > up0;
+            String pst = ctx.computeOnClient(mc -> cs.status());
+            log("customsky panorama: " + pst);
+            assertTrue(pOk && pst.contains("1024x512"), "panorama not used as 2:1 texture: " + pst);
+            ctx.takeScreenshot("newbridge_sky_panorama");
+
+            // next / previous go through the folder
+            String before = cs.file;
+            ctx.runOnClient(mc -> ((com.OsamaClient.newbridge.UI.components.MediaPicker) cs.fileBox).step(1));
+            String after = cs.file;
+            log("customsky next: " + before + " -> " + after);
+            assertTrue(!after.equals(before) && !after.isEmpty(), "step(1) did not change the file");
+
+            // dropping a file onto the window copies it into the folder
+            Path outside = Path.of(System.getProperty("java.io.tmpdir"), "gt_dropped_sky.png");
+            writePng(outside, 320, 180, (x, y) -> 0x8040C0 + x / 2);
+            boolean used = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.World.sky.CustomSky.dropped(java.util.List.of(outside)));
+            assertTrue(used && java.nio.file.Files.exists(dir.resolve("gt_dropped_sky.png")) && cs.file.equals("gt_dropped_sky.png"), "drop failed");
+
+            // animated GIF (works without ffmpeg)
+            Path gif = dir.resolve("gt_anim.gif");
+            writeGif(gif);
+            ctx.runOnClient(mc -> cs.setFile("gt_anim.gif"));
+            waitSky(ctx, 200);
+            int g0 = cs.uploads;
+            ctx.waitTicks(40);
+            int g1 = cs.uploads;
+            log("customsky gif: " + ctx.computeOnClient(mc -> cs.status()) + " uploads " + g0 + " -> " + g1);
+            assertTrue(g1 > g0 + 3, "gif frames do not change: " + g0 + " -> " + g1);
+
+            // video through ffmpeg, when installed
+            boolean ff = com.OsamaClient.newbridge.Hacks.World.sky.SkyMedia.Ffmpeg.available();
+            log("customsky ffmpeg available: " + ff);
+            if (ff) {
+                Path mp4 = dir.resolve("gt_video.mp4");
+                Process p = new ProcessBuilder(com.OsamaClient.newbridge.Hacks.World.sky.SkyMedia.Ffmpeg.exe(), "-y", "-loglevel", "error", "-f", "lavfi",
+                        "-i", "testsrc=size=480x270:rate=24", "-t", "3", "-pix_fmt", "yuv420p", mp4.toString()).redirectErrorStream(true).start();
+                try { p.getInputStream().readAllBytes(); p.waitFor(); } catch (Exception e) { throw new AssertionError(e); }
+                ctx.runOnClient(mc -> cs.setFile("gt_video.mp4"));
+                boolean vOk = waitSky(ctx, 300);
+                int v0 = cs.uploads;
+                ctx.waitTicks(40);
+                int v1 = cs.uploads;
+                log("customsky video: " + ctx.computeOnClient(mc -> cs.status()) + " uploads " + v0 + " -> " + v1);
+                assertTrue(vOk && v1 > v0 + 10, "video frames do not play: " + v0 + " -> " + v1);
+                ctx.takeScreenshot("newbridge_sky_video");
+            }
+            // off: vanilla sky again
+            ctx.runOnClient(mc -> cs.toggle());
+            int d0 = cs.draws;
+            ctx.waitTicks(10);
+            assertTrue(cs.draws == d0, "still drawing after disable");
+        } catch (java.io.IOException e) {
+            throw new AssertionError(e);
+        } finally {
+            ctx.runOnClient(mc -> { if (cs.enabled) cs.toggle(); cs.setFile(""); });
+            for (String f : new String[]{"gt_photo.png", "gt_pano.png", "gt_dropped_sky.png", "gt_anim.gif", "gt_video.mp4"}) {
+                try { java.nio.file.Files.deleteIfExists(dir.resolve(f)); } catch (java.io.IOException ignored) { }
+            }
+        }
+    }
+
+    private static void writeGif(Path p) throws java.io.IOException {
+        var writer = javax.imageio.ImageIO.getImageWritersByFormatName("gif").next();
+        try (var out = javax.imageio.ImageIO.createImageOutputStream(p.toFile())) {
+            writer.setOutput(out);
+            writer.prepareWriteSequence(null);
+            for (int f = 0; f < 6; f++) {
+                var img = new java.awt.image.BufferedImage(160, 90, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                for (int y = 0; y < 90; y++) for (int x = 0; x < 160; x++) img.setRGB(x, y, ((x + f * 25) % 160 < 80) ? 0xE0A020 : 0x2040A0);
+                var type = javax.imageio.ImageTypeSpecifier.createFromRenderedImage(img);
+                var meta = writer.getDefaultImageMetadata(type, null);
+                var root = (javax.imageio.metadata.IIOMetadataNode) meta.getAsTree("javax_imageio_gif_image_1.0");
+                var gce = new javax.imageio.metadata.IIOMetadataNode("GraphicControlExtension");
+                gce.setAttribute("disposalMethod", "none");
+                gce.setAttribute("userInputFlag", "FALSE");
+                gce.setAttribute("transparentColorFlag", "FALSE");
+                gce.setAttribute("delayTime", "8");
+                gce.setAttribute("transparentColorIndex", "0");
+                root.appendChild(gce);
+                meta.setFromTree("javax_imageio_gif_image_1.0", root);
+                writer.writeToSequence(new javax.imageio.IIOImage(img, null, meta), null);
+            }
+            writer.endWriteSequence();
+        }
+    }
+
+    private void testIcons(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        // every icon name draws (returns true) and an unknown name falls back
+        boolean all = ctx.computeOnClient(mc -> {
+            var r = new com.OsamaClient.newbridge.UI.gui.render.UiRenderer();
+            var u = new com.OsamaClient.newbridge.UI.gui.render.Ui(r);
+            r.begin();
+            boolean ok = true;
+            for (String n : com.OsamaClient.newbridge.UI.gui.render.Icons.NAMES) ok &= com.OsamaClient.newbridge.UI.gui.render.Icons.draw(u, n, 10, 10, 8, 0xFFFFFFFF);
+            ok &= !com.OsamaClient.newbridge.UI.gui.render.Icons.draw(u, "nope", 10, 10, 8, 0xFFFFFFFF);
+            r.flush();
+            return ok;
+        });
+        assertTrue(all, "an icon name does not draw");
+        boolean worldPanel = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.panel(Module.Category.WORLD) != null
+                || true);
+        ctx.runOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.open());
+        ctx.waitTicks(20);
+        boolean hasWorld = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.panel(Module.Category.WORLD) != null);
+        ctx.takeScreenshot("newbridge_icons_clickgui");
+        ctx.runOnClient(mc -> mc.gui.setScreen(null));
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> { var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance; if (!h.enabled) h.toggle(); h.showSpeed.enabled = true; h.showFps.enabled = true; h.showPing.enabled = true; h.showBiome.enabled = true; });
+        srv.runCommand("effect give @p speed 30 1");
+        ctx.waitTicks(15);
+        ctx.takeScreenshot("newbridge_icons_hud");
+        ctx.runOnClient(mc -> { var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance; h.showSpeed.enabled = false; h.showFps.enabled = false; h.showPing.enabled = false; h.showBiome.enabled = false; });
+        srv.runCommand("effect clear @p");
+        assertTrue(hasWorld && worldPanel, "no World panel in the ClickGUI");
+    }
+
+    private float[] musicCenter(ClientGameTestContext ctx, int i) {
+        return ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.music.MusicOverlay.INSTANCE.buttonCenter(i));
+    }
+
+    private void clickFb(ClientGameTestContext ctx, float[] fb) {
+        double k = ctx.computeOnClient(mc -> (double) mc.getWindow().getScreenWidth() / mc.getWindow().getWidth());
+        ctx.getInput().setCursorPos(fb[0] * k, fb[1] * k);
+        ctx.waitTicks(2);
+        ctx.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(3);
+    }
+
+    private void testMusicOverlay(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var MB = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.class;
+        var mo = com.OsamaClient.newbridge.Hacks.Visual.music.MusicOverlay.INSTANCE;
+        assertTrue(mo != null, "MusicOverlay missing");
+        try {
+            // 1) the real PowerShell helper starts and reports (Spotify may or may not be playing)
+            if (com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.windows()) {
+                ctx.runOnClient(mc -> { mo.source = "Any Player"; if (!mo.enabled) mo.toggle(); });
+                int waited = 0;
+                while (com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.sinceLastLine() > 5000 && waited < 400) { ctx.waitTicks(10); waited += 10; }
+                var st = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state();
+                String err = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.error();
+                log("music real helper: after " + waited + " ticks line=" + com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.sinceLastLine()
+                        + "ms err='" + err + "' track='" + st.title() + "' artist='" + st.artist() + "' app=" + st.player() + " status=" + st.status()
+                        + " pos=" + st.position() + "/" + st.dur() + " art=" + st.art());
+                assertTrue(com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.sinceLastLine() < 5000, "media helper did not report (err '" + err + "')");
+                assertTrue(err.isEmpty(), "media helper error: " + err);
+                if (st.hasTrack()) {
+                    ctx.waitTicks(20);
+                    Path real = ctx.takeScreenshot("newbridge_music_real");
+                    log("music real screenshot " + real + " cover=" + ctx.computeOnClient(mc -> mo.coverLoaded()));
+                }
+                ctx.runOnClient(mc -> { if (mo.enabled) mo.toggle(); });
+            }
+            // 2) fake player: cover, layout, buttons with the real mouse in the chat
+            Path png = Path.of(System.getProperty("java.io.tmpdir"), "newbridge-test-cover.png");
+            try (var img = new com.mojang.blaze3d.platform.NativeImage(128, 128, false)) {
+                for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
+                    int r = 40 + x, g = 30 + y / 2, b = 200 - y;
+                    boolean ring = Math.abs(Math.hypot(x - 64, y - 64) - 34) < 6;
+                    img.setPixel(x, y, ring ? 0xFFF0F0F0 : 0xFF000000 | (r << 16) | (g << 8) | b);
+                }
+                img.writeToFile(png);
+            } catch (java.io.IOException e) { throw new AssertionError("cover png: " + e); }
+            var fakeState = new com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.State("Spotify.exe",
+                    "A Really Long Song Title That Has To Slide Sideways", "Some Artist", "Some Album", "Playing",
+                    30, 200, System.currentTimeMillis(), true, true, png.toString(), 7);
+            ctx.runOnClient(mc -> {
+                com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.setFake(fakeState);
+                mo.source = "Spotify First";
+                if (!mo.enabled) mo.toggle();
+            });
+            ctx.waitTicks(25);
+            boolean cover = ctx.computeOnClient(mc -> mo.coverLoaded());
+            float[] rect = ctx.computeOnClient(mc -> mo.rect());
+            log("music fake: cover=" + cover + " rect=" + java.util.Arrays.toString(rect));
+            assertTrue(cover, "cover image not loaded");
+            assertTrue(rect != null && rect[2] > 100, "widget not drawn: " + java.util.Arrays.toString(rect));
+            ctx.takeScreenshot("newbridge_music_hud");
+
+            ctx.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.ChatScreen("", false)));
+            ctx.waitTicks(10);
+            float[] toggle = musicCenter(ctx, 1);
+            assertTrue(toggle != null, "no play button");
+            clickFb(ctx, toggle);
+            String st1 = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state().status();
+            clickFb(ctx, musicCenter(ctx, 2));
+            String title2 = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state().title();
+            clickFb(ctx, musicCenter(ctx, 0));
+            String title3 = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state().title();
+            float[] bar = ctx.computeOnClient(mc -> {
+                float[] c = mo.buttonCenter(3);
+                return c;
+            });
+            clickFb(ctx, bar);
+            double pos = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state().position();
+            double dur = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state().dur();
+            // wheel over the widget: +5 s
+            double k = ctx.computeOnClient(mc -> (double) mc.getWindow().getScreenWidth() / mc.getWindow().getWidth());
+            ctx.getInput().setCursorPos((rect[0] + rect[2] - 20) * k, (rect[1] + 6) * k);
+            ctx.waitTicks(2);
+            ctx.getInput().scroll(1);
+            ctx.waitTicks(3);
+            double pos2 = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state().position();
+            boolean chatStillOpen = ctx.computeOnClient(mc -> mc.gui.screen() instanceof net.minecraft.client.gui.screens.ChatScreen);
+            // hover hint screenshot
+            ctx.getInput().setCursorPos(bar[0] * k, bar[1] * k);
+            ctx.waitTicks(5);
+            ctx.takeScreenshot("newbridge_music_chat");
+            log("music clicks: status " + st1 + " next '" + title2 + "' prev '" + title3 + "' seek " + pos + "/" + dur + " wheel " + pos2 + " clicks=" + mo.clicks);
+            assertTrue("Paused".equals(st1), "play/pause click did not pause: " + st1);
+            assertTrue("Next Song".equals(title2), "next click: " + title2);
+            assertTrue("Previous Song".equals(title3), "previous click: " + title3);
+            assertTrue(Math.abs(pos - dur / 2) < dur * 0.08, "bar click should jump to the middle: " + pos + " of " + dur);
+            assertTrue(pos2 > pos + 3, "wheel did not skip 5 s: " + pos + " -> " + pos2);
+            assertTrue(chatStillOpen, "chat closed by a widget click");
+            ctx.runOnClient(mc -> mc.gui.setScreen(null));
+            // 3) commands
+            ctx.runOnClient(mc -> mo.handleCommand(new String[]{".music", "next"}));
+            String c1 = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.lastCommand;
+            ctx.runOnClient(mc -> mo.handleCommand(new String[]{".music", "seek", "1:05"}));
+            double seekTo = com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.state().position();
+            log("music commands: " + c1 + " seek->" + seekTo);
+            assertTrue("next".equals(c1), "command next sent " + c1);
+            assertTrue(Math.abs(seekTo - 65) < 2, ".music seek 1:05 -> " + seekTo);
+            // 4) idle: hidden when nothing plays
+            ctx.runOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.setFake(com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.NONE));
+            ctx.waitTicks(40);
+            float[] gone = ctx.computeOnClient(mc -> mo.rect());
+            assertTrue(gone == null, "widget still shown while idle");
+        } finally {
+            ctx.runOnClient(mc -> {
+                if (mc.gui.screen() != null) mc.gui.setScreen(null);
+                if (mo.enabled) mo.toggle();
+                com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.setFake(null);
+            });
+        }
+    }
+
+    private void testHudWheelScale(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var HL = com.OsamaClient.newbridge.Hacks.Visual.HudLayout.class;
+        var mo = com.OsamaClient.newbridge.Hacks.Visual.music.MusicOverlay.INSTANCE;
+        on(ctx, "CheckMeter");
+        ctx.runOnClient(mc -> {
+            com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.setFake(new com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.State("Spotify.exe",
+                    "Song", "Artist", "", "Playing", 10, 100, System.currentTimeMillis(), true, true, "", 0));
+            if (!mo.enabled) mo.toggle();
+            var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+            if (!h.enabled) h.toggle();
+            h.editLayout.enabled = true;
+            h.openEditor();
+        });
+        ctx.waitTicks(15);
+        try {
+            double k = ctx.computeOnClient(mc -> (double) mc.getWindow().getScreenWidth() / mc.getWindow().getWidth());
+            java.util.Map<String, String> res = new java.util.LinkedHashMap<>();
+            for (String id : new String[]{"music", "checkmeter"}) {
+                float[] r0 = ctx.computeOnClient(mc -> {
+                    for (var e : com.OsamaClient.newbridge.Hacks.Visual.HudLayout.visible()) if (e.id.equals(id)) return new float[]{e.x, e.y, e.w, e.h};
+                    return null;
+                });
+                assertTrue(r0 != null, id + " not in the editor");
+                ctx.getInput().setCursorPos((r0[0] + 5) * k, (r0[1] + 5) * k);
+                ctx.waitTicks(2);
+                StringBuilder steps = new StringBuilder();
+                for (int i = 0; i < 4; i++) {
+                    ctx.getInput().scroll(1);
+                    ctx.waitTicks(3);
+                    float stepScale = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.HudLayout.scale(id)); steps.append(stepScale).append(' ');
+                    String under = ctx.computeOnClient(mc -> {
+                        var e = com.OsamaClient.newbridge.Hacks.Visual.HudLayout.elementAt(com.OsamaClient.newbridge.UI.gui.input.UiInput.mouseFbX(), com.OsamaClient.newbridge.UI.gui.input.UiInput.mouseFbY());
+                        return e == null ? "-" : e.id;
+                    });
+                    steps.append('[').append(under).append("] ");
+                }
+                log("wheel " + id + " at " + java.util.Arrays.toString(r0) + ": " + steps);
+                ctx.waitTicks(3);
+                float sc = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.HudLayout.scale(id));
+                float[] r1 = ctx.computeOnClient(mc -> {
+                    for (var e : com.OsamaClient.newbridge.Hacks.Visual.HudLayout.visible()) if (e.id.equals(id)) return new float[]{e.x, e.y, e.w, e.h};
+                    return null;
+                });
+                res.put(id, sc + " w " + r0[2] + "->" + r1[2]);
+                assertTrue(Math.abs(sc - 1.2f) < 0.01f, id + " scale after 4 notches: " + sc);
+                assertTrue(r1[2] > r0[2] * 1.12f, id + " did not get bigger: " + r0[2] + " -> " + r1[2]);
+            }
+            // a HudOverlay box (coordinates): wheel down makes it smaller
+            float[] cr = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance.widgetRect("coords"));
+            assertTrue(cr != null, "coordinates box not drawn");
+            float[] cpos = {cr[0] + 6, cr[1] + 6};
+            ctx.getInput().setCursorPos(cpos[0] * k, cpos[1] * k);
+            ctx.waitTicks(2);
+            for (int i = 0; i < 3; i++) { ctx.getInput().scroll(-1); ctx.waitTicks(2); }
+            ctx.waitTicks(5);
+            float cs = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.HudLayout.scale("coords"));
+            res.put("coords", String.valueOf(cs));
+            ctx.takeScreenshot("newbridge_hud_wheel_scale");
+            log("hud wheel scale: " + res);
+            assertTrue(Math.abs(cs - 0.85f) < 0.01f, "coordinates box scale after 3 notches down: " + cs);
+            // saved in the config map
+            boolean saved = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance.widgetPositions().containsKey("scale.music")
+                    && com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance.widgetPositions().containsKey("scale.coords"));
+            assertTrue(saved, "scales not in the saved layout");
+            // right-click resets size (and place)
+            ctx.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT);
+            ctx.waitTicks(4);
+            float cs2 = ctx.computeOnClient(mc -> com.OsamaClient.newbridge.Hacks.Visual.HudLayout.scale("coords"));
+            assertTrue(cs2 == 1f, "right-click did not reset the scale: " + cs2);
+        } finally {
+            ctx.runOnClient(mc -> {
+                var h = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.instance;
+                h.editLayout.enabled = false;
+                h.closeEditor();
+                for (String id : new String[]{"music", "checkmeter", "coords"}) { com.OsamaClient.newbridge.Hacks.Visual.HudLayout.resetScale(id); com.OsamaClient.newbridge.Hacks.Visual.HudLayout.reset(id); }
+                if (mo.enabled) mo.toggle();
+                com.OsamaClient.newbridge.Hacks.Visual.music.MediaBridge.setFake(null);
+                var m = ModuleManager.getModuleByName("CheckMeter"); if (m.enabled) m.toggle();
+            });
+        }
+    }
+
     private void testHudRealDrag(ClientGameTestContext ctx, TestServerContext srv) {
         flatStage(ctx, srv);
         on(ctx, "CheckMeter"); on(ctx, "SplitChat"); on(ctx, "DamageIndicator");
@@ -2724,7 +4092,6 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             assertTrue(ids.contains("checkmeter") && ids.contains("splitchat"), "new widgets missing in editor: " + ids);
             java.util.List<String> failed = new java.util.ArrayList<>();
             for (String id : ids) {
-                int c0 = com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.dbgClicks;
                 float[] before = ctx.computeOnClient(mc -> {
                     for (var e : com.OsamaClient.newbridge.Hacks.Visual.HudLayout.visible()) if (e.id.equals(id)) return new float[]{e.x, e.y, e.w, e.h};
                     return null;
@@ -2750,7 +4117,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
                     for (var e : com.OsamaClient.newbridge.Hacks.Visual.HudLayout.visible()) if (e.id.equals(id)) return new float[]{e.x, e.y};
                     return null;
                 });
-                log("drag " + id + " clicks seen " + (com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.dbgClicks - c0) + " releases " + com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.dbgReleases + " screen " + ctx.computeOnClient(mc -> String.valueOf(mc.gui.screen())) + " dbg[" + com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.dbg + "|" + com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.dbg2 + "|" + com.OsamaClient.newbridge.Hacks.Visual.HudOverlay.dbg3 + "] cursor " + sx + "," + sy + ": " + java.util.Arrays.toString(before) + " -> " + java.util.Arrays.toString(after));
+                log("drag " + id + ": " + java.util.Arrays.toString(before) + " -> " + java.util.Arrays.toString(after));
                 if (after == null || Math.abs(after[0] - before[0]) < 20 || Math.abs(after[1] - before[1]) < 10) failed.add(id);
             }
             assertTrue(failed.isEmpty(), "elements that did not move with the real mouse: " + failed);
@@ -2816,7 +4183,6 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             ctx.getInput().typeChars("k");
             ctx.waitTicks(2);
             assertTrue(ctx.computeOnClient(mc -> com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.searchQuery().isEmpty()), "a typed letter opened the search");
-            int ch0 = com.OsamaClient.newbridge.UI.gui.ClickGui.dbgChars;
             ctx.getInput().setCursorPos(pos[0], pos[1]);
             ctx.waitTicks(3);
             log("text widget hovered before click: " + ctx.computeOnClient(mc -> { for (var cat : Module.Category.values()) { var pn = com.OsamaClient.newbridge.UI.gui.ClickGui.INSTANCE.panel(cat); if (pn == null) continue; for (var row : pn.rows()) for (var w : row.widgets()) if (w.setting() == box) return w.isHovered(); } return false; }));
@@ -2826,8 +4192,7 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
             ctx.waitTicks(3);
             ctx.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN);
             ctx.waitTicks(3);
-            log("click dbg: " + com.OsamaClient.newbridge.UI.gui.ClickGui.dbgClick);
-            log("typing: chars received by ClickGui " + (com.OsamaClient.newbridge.UI.gui.ClickGui.dbgChars - ch0) + ", text now '" + box.getText() + "'");
+            log("typing: text now '" + box.getText() + "'");
             log("text typing screenshot: " + ctx.takeScreenshot("newbridge_text_typing"));
             assertTrue(com.OsamaClient.newbridge.Utils.TextInputGate.active(), "SDL text input not started while the ClickGUI is open (real keyboard would not type)");
             assertTrue(box.getText().endsWith("Zq7"), "typed text did not arrive, box = '" + box.getText() + "'");
@@ -3171,8 +4536,10 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
         Boolean oldHost = nt.targetPicker.filters.get("Hostiles");
         try {
             srv.runCommand("difficulty easy");
-            srv.runCommand((
-                    "execute at @p run summon zombie ~4 ~ ~ {NoAI:1b,Silent:1b,PersistenceRequired:1b,Tags:[\"gt\"],equipment:{head:{id:\"minecraft:diamond_helmet\",components:{\"minecraft:damage\":150}},chest:{id:\"minecraft:iron_chestplate\"},feet:{id:\"minecraft:golden_boots\",components:{\"minecraft:damage\":80}},mainhand:{id:\"minecraft:diamond_sword\"}}}"));
+            ctx.waitTicks(10);
+            double[] pp = ctx.computeOnClient(mc -> new double[]{mc.player.getX(), mc.player.getY(), mc.player.getZ()});
+            srv.runCommand(String.format(java.util.Locale.ROOT, "summon zombie %.2f %.2f %.2f {NoGravity:1b,NoAI:1b,", pp[0] + 4, pp[1], pp[2]) + (
+                    "Silent:1b,PersistenceRequired:1b,Tags:[\"gt\"],equipment:{head:{id:\"minecraft:diamond_helmet\",components:{\"minecraft:damage\":150}},chest:{id:\"minecraft:iron_chestplate\"},feet:{id:\"minecraft:golden_boots\",components:{\"minecraft:damage\":80}},mainhand:{id:\"minecraft:diamond_sword\"}}}"));
             srv.runCommand("execute as @p at @s run tp @s ~ ~ ~ facing entity @e[tag=gt,limit=1] eyes");
             ctx.runOnClient(mc -> {
                 nt.targetPicker.filters.put("Hostiles", true);
@@ -3208,6 +4575,113 @@ public class NewBridgeClientGameTest implements FabricClientGameTest {
                 if (oldHost == null) nt.targetPicker.filters.remove("Hostiles"); else nt.targetPicker.filters.put("Hostiles", oldHost);
                 if (nt.enabled != wasOn) nt.toggle();
             });
+        }
+    }
+
+    private void testMergedModules(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        var it = com.OsamaClient.newbridge.Hacks.Player.InvTweaks.INSTANCE;
+        assertTrue(ModuleManager.getModuleByName("ChestStealer") == null && ModuleManager.getModuleByName("NoHunger") == null, "merged modules still registered");
+        on(ctx, "InvTweaks");
+        int cx = ox + 4;
+        fill(srv, 4, Y, -1, 4, Y, 1, "air");
+        srv.runCommand("setblock " + cx + " " + Y + " " + oz + " minecraft:chest");
+        String[] chest = {"diamond 3", "gold_ingot 40", "coal 64", "diamond 2"};
+        for (int i = 0; i < chest.length; i++) srv.runCommand("item replace block " + cx + " " + Y + " " + oz + " container." + i + " with minecraft:" + chest[i]);
+        srv.runCommand("clear @a");
+        ctx.waitTicks(5);
+        try {
+            ctx.runOnClient(mc -> {
+                it.delay = 0;
+                it.autoSteal = true; it.autoClose = true; it.onlyFiltered = true; it.randomDelay = true;
+                it.stealFilter.selectedItems.clear();
+                it.stealFilter.selectedItems.put(net.minecraft.world.item.Items.DIAMOND, 0xFFFFFFFF);
+            });
+            srv.runOnServer(s -> {
+                var sp = s.getPlayerList().getPlayers().get(0);
+                var be = sp.level().getBlockEntity(new net.minecraft.core.BlockPos(cx, Y, oz));
+                if (be instanceof net.minecraft.world.MenuProvider mp) sp.openMenu(mp);
+            });
+            ctx.waitTicks(40);
+            int diamonds = countItem(ctx, net.minecraft.world.item.Items.DIAMOND), gold = countItem(ctx, net.minecraft.world.item.Items.GOLD_INGOT);
+            boolean closed = ctx.computeOnClient(mc -> mc.gui.screen() == null);
+            log("merged steal: diamonds=" + diamonds + " gold=" + gold + " closed=" + closed);
+            assertTrue(diamonds == 5 && gold == 0, "filtered steal took diamonds=" + diamonds + " gold=" + gold);
+            assertTrue(closed, "Auto Close did not close the chest");
+            // config: an old config with NoHunger / ChestStealer enabled turns on the module it was merged into
+            var ah = ModuleManager.getModuleByName("AntiHunger");
+            ctx.runOnClient(mc -> {
+                if (ah.enabled) ah.toggle();
+                var root = com.google.gson.JsonParser.parseString("{\"modules\":{\"NoHunger\":{\"enabled\":true,\"key\":-1}}}").getAsJsonObject();
+                com.OsamaClient.newbridge.config.ConfigCodec.decode(new com.OsamaClient.newbridge.config.ConfigCodec.Data(root), java.util.List.of(ah),
+                        new java.util.HashMap<>(), new java.util.HashMap<>(), null, m -> m.toggle());
+            });
+            assertTrue(ctx.computeOnClient(mc -> ah.enabled), "NoHunger alias did not enable AntiHunger");
+            ctx.runOnClient(mc -> ah.toggle());
+        } finally {
+            ctx.runOnClient(mc -> {
+                it.autoSteal = false; it.autoClose = false; it.onlyFiltered = false; it.randomDelay = false;
+                it.stealFilter.selectedItems.clear();
+                if (mc.gui.screen() != null) mc.player.closeContainer();
+            });
+            srv.runCommand("clear @a");
+        }
+    }
+
+    private void testComboBot(ClientGameTestContext ctx, TestServerContext srv) {
+        flatStage(ctx, srv);
+        fill(srv, -12, Y - 1, -12, 18, Y - 1, 12, "stone");   // wide arena: knockback must not push the zombie into the void
+        var cb = com.OsamaClient.newbridge.Hacks.Combat.SwordBot.INSTANCE;
+        srv.runCommand("difficulty easy");
+        srv.runCommand("clear @a");
+        srv.runCommand("item replace entity @a hotbar.0 with minecraft:dirt 8");
+        srv.runCommand("item replace entity @a hotbar.3 with minecraft:wooden_sword");
+        srv.runCommand("item replace entity @a hotbar.5 with minecraft:diamond_sword");
+        ctx.waitTicks(5);
+        double[] pp = ctx.computeOnClient(mc -> new double[]{mc.player.getX(), mc.player.getY(), mc.player.getZ()});
+        srv.runCommand(String.format(java.util.Locale.ROOT, "summon zombie %.2f %.2f %.2f {NoAI:1b,Silent:1b,PersistenceRequired:1b,Tags:[\"gt\"],Health:60f,attributes:[{id:\"minecraft:max_health\",base:60}]}", pp[0] + 5, pp[1], pp[2]));
+        ctx.runOnClient(mc -> {
+            mc.player.getInventory().setSelectedSlot(0);
+            cb.targets.filters.put("Players", false);
+            cb.targets.filters.put("Hostiles", true);
+            cb.critMode = "Jump"; cb.resetMode = "W-Tap"; cb.strafeMode = "Circle"; cb.autoWeapon = true; cb.retreatHealth = 0;
+            if (!cb.enabled) cb.toggle();
+        });
+        try {
+            ctx.waitTicks(120);
+            int hits = cb.hits, crits = cb.critHits, wtaps = cb.wtaps;
+            int slot = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+            float zhp = ctx.computeOnClient(mc -> {
+                for (var e : mc.level.entitiesForRendering()) if (e instanceof net.minecraft.world.entity.monster.zombie.Zombie z) return z.getHealth();
+                return -1f;
+            });
+            log("combobot: target=" + cb.targetName + " hits=" + hits + " crits=" + crits + " wtaps=" + wtaps + " slot=" + slot + " zombieHp=" + zhp);
+            assertTrue(hits >= 2, "ComboBot hit only " + hits + " times");
+            assertTrue(crits >= 1, "no critical hit from a jump");
+            assertTrue(wtaps >= 1, "no sprint reset after hits");
+            assertTrue(slot == 5, "did not switch to the diamond sword, slot " + slot);
+            assertTrue(zhp < 60, "zombie took no damage");
+            // retreat: at or below 10 hearts (we have 10) the bot backs off and stops hitting
+            ctx.runOnClient(mc -> cb.retreatHealth = 10);
+            ctx.waitTicks(5);
+            int before = cb.hits;
+            boolean back = ctx.computeOnClient(mc -> mc.options.keyDown.isDown());
+            ctx.waitTicks(40);
+            assertTrue(cb.hits == before && back, "retreat: hits " + before + " -> " + cb.hits + ", back key " + back);
+            // disabling releases all keys and gives the old slot back
+            ctx.runOnClient(mc -> cb.toggle());
+            boolean keys = ctx.computeOnClient(mc -> mc.options.keyUp.isDown() || mc.options.keyDown.isDown() || mc.options.keyLeft.isDown() || mc.options.keyRight.isDown() || mc.options.keyJump.isDown());
+            int after = ctx.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
+            assertTrue(!keys && after == 0, "after disable: keys held=" + keys + " slot=" + after);
+        } finally {
+            ctx.runOnClient(mc -> {
+                if (cb.enabled) cb.toggle();
+                cb.targets.filters.put("Players", true);
+                cb.targets.filters.put("Hostiles", false);
+                cb.retreatHealth = 0;
+            });
+            srv.runCommand("kill @e[tag=gt]");
+            srv.runCommand("clear @a");
         }
     }
 

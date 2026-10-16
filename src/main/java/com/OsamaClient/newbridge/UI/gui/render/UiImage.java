@@ -38,6 +38,14 @@ public final class UiImage implements UiTexture {
 
     public void markDirty() { dirty = true; }
 
+    /** Bulk copy of a whole frame in NativeImage memory order (ABGR ints, row major); much faster than setPixel. */
+    public void setPixelsABGR(int[] abgr) {
+        NativeImage im = img();
+        int n = Math.min(abgr.length, width * height);
+        org.lwjgl.system.MemoryUtil.memIntBuffer(im.getPointer(), width * height).put(abgr, 0, n);
+        dirty = true;
+    }
+
     @Override
     public GpuTextureView texture() {
         if (texture == null) {

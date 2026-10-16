@@ -41,6 +41,11 @@ public abstract class SettingWidget {
 
     /** Row background shared by all settings (brightens on hover). */
     protected void background(Ui ui, float h) {
+        if (Theme.glass()) {
+            ui.rect(x, y, w, h, Theme.settingBg());
+            if (hoverA.value() > 0.001f) ui.round(x + 1f, y + 0.5f, w - 2f, h - 1f, Math.min(3.5f, (h - 1f) / 2f), ColorUtil.withAlpha(0xFFFFFF, Math.round(22 * hoverA.value())));
+            return;
+        }
         ui.rect(x, y, w, h, Theme.SETTING_BG);
         if (hoverA.value() > 0.001f) ui.rect(x, y, w, h, ColorUtil.withAlpha(0xFFFFFF, Math.round(10 * hoverA.value())));
     }

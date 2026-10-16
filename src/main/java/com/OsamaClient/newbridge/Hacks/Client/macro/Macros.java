@@ -37,7 +37,7 @@ public class Macros extends Module {
             }
         }).withDescription("Create and edit macros (also: .macro)");
         settings.add(open[0]);
-        this.enabled = true;
+        this.enabled = false;
     }
 
     @Override

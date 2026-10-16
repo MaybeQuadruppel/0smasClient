@@ -20,6 +20,7 @@ public class PlayerAlert extends Module {
 
     public double radius = 64.0;
     public boolean sound = true;
+    public boolean ignoreFriends = true;
     public boolean ignoreTeammates = true;
     public boolean disconnect = false;
 
@@ -31,7 +32,6 @@ public class PlayerAlert extends Module {
         INSTANCE = this;
         settings.add(new Slider("Radius", 8.0, 256.0, radius, 1.0, v -> radius = v).withDescription("Alert distance in blocks"));
         settings.add(new ToggleButton("Sound", sound, v -> sound = v).withDescription("Play a sound on alert"));
-        settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, v -> ignoreTeammates = v));
         settings.add(new ToggleButton("Disconnect", disconnect, v -> disconnect = v).withDescription("Leave the server when somebody comes close"));
     }
 
@@ -49,7 +49,7 @@ public class PlayerAlert extends Module {
         Set<UUID> now = new HashSet<>();
         for (Player other : mc.level.players()) {
             if (other == me || other.isSpectator()) continue;
-            if (ignoreTeammates && TeamUtils.isTeammate(other)) continue;
+            if (TeamUtils.ignored(other, ignoreTeammates, ignoreFriends)) continue;
             if (!within(me.distanceToSqr(other), radius)) continue;
             now.add(other.getUUID());
             if (inside.add(other.getUUID())) alert(mc, other);

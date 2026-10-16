@@ -50,7 +50,7 @@ public class Breadcrumbs extends Module {
     private final ChamsBufferSource bufferSource = new ChamsBufferSource();
 
     public Breadcrumbs() {
-        super("Breadcrumbs", "Draws the trail you walked and paths you back along it (.trail back)", Category.VISUAL);
+        super("Breadcrumbs", "Draws the trail you walked and paths you back along it (.trail back)", Category.WORLD);
         INSTANCE = this;
         this.settings.add(new ColorPicker("Color", color, c -> color = c).withDescription("Trail color."));
         this.settings.add(new Slider("Spacing", 0.3, 5.0, spacing, 0.1, v -> spacing = v)

@@ -14,7 +14,7 @@ public class FastPlace extends Module {
     private Field rightClickDelayField;
 
     public FastPlace() {
-        super("FastPlace", "Removes placement delay for blocks", Category.MISC);
+        super("FastPlace", "Removes the delay between placing blocks.", Category.MISC);
         INSTANCE = this;
 
         this.settings.add(new Slider("Delay", 0.0, 4.0, delay, val -> delay = val).withDescription("Sets the block placement delay in ticks."));
@@ -47,4 +47,4 @@ public class FastPlace extends Module {
         } catch (Exception e) {
         }
     }
-}
+}

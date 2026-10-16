@@ -13,7 +13,7 @@ public class StraightMine extends Module {
     private BlockPos currentMiningPos = null;
 
     public StraightMine() {
-        super("Straight Mine", "Mines forward cleanly and waits for blocks to be fully removed", Category.MISC);
+        super("Straight Mine", "Mines a clean straight tunnel and waits until every block is gone.", Category.MISC);
     }
 
     @Override

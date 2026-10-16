@@ -27,6 +27,7 @@ public class KillAura extends Module {
     public float cps = 12.0f;
     public boolean useCooldown = true; // Nutzt 1.9+ Waffen-Cooldown statt reinem CPS
     public boolean rotate = true;     // Dreht den Spieler zum Ziel
+    public boolean ignoreFriends = true;
     public boolean ignoreTeammates = true;
     public EntityFilterPicker entityFilter;
 
@@ -36,7 +37,7 @@ public class KillAura extends Module {
     public LivingEntity currentTarget = null;
 
     public KillAura() {
-        super("KillAura", "Attacks surrounding entities automatically", Category.COMBAT);
+        super("KillAura", "Attacks entities around you automatically.", Category.COMBAT);
         INSTANCE = this;
 
         this.entityFilter = new EntityFilterPicker("Targets").withDescription("Selects which types of entities to target.");
@@ -45,7 +46,6 @@ public class KillAura extends Module {
         this.settings.add(new Slider("CPS", 1.0, 20.0, (double) cps, val -> cps = val.floatValue()).withDescription("Clicks per second for attacking."));
         this.settings.add(new ToggleButton("1.9 Cooldown", useCooldown, val -> useCooldown = val).withDescription("Waits for the 1.9+ attack cooldown before swinging."));
         this.settings.add(new ToggleButton("Rotations", rotate, val -> rotate = val).withDescription("Automatically rotates towards the target entity."));
-        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents attacking teammates."));
         this.settings.add(this.entityFilter);
     }
 
@@ -95,7 +95,7 @@ public class KillAura extends Module {
             return false;
         }
 
-        if (ignoreTeammates && TeamUtils.isTeammate(target)) {
+        if (TeamUtils.ignored(target, ignoreTeammates, ignoreFriends)) {
             return false;
         }
 

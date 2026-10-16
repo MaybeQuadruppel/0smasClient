@@ -30,7 +30,7 @@ public class AutoSell extends Module {
     private final Random random = new Random();
 
     public AutoSell() {
-        super("AutoSell", "Automatically sells items in the sell menu", Category.Donut);
+        super("AutoSell", "Sells items in the sell menu automatically.", Category.Donut);
         INSTANCE = this;
 
         this.itemPicker = new ItemPicker("Items").withDescription("Selects specific items to sell when 'Sell All' is disabled.");
@@ -146,4 +146,4 @@ public class AutoSell extends Module {
         // HIER IST DER FIX: .containsKey anstelle von .contains
         return itemPicker.selectedItems.containsKey(stack.getItem());
     }
-}
+}

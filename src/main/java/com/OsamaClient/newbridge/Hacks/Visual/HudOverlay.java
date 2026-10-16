@@ -104,6 +104,9 @@ public class HudOverlay extends Module {
     private boolean editMode;
     private int buttonsDown;
     private boolean pendingClick, pendingRight, widgetGrabbed;
+    private double pendingScroll;
+    private String scaleMsg = "";
+    private long scaleMsgUntil;
 
     public HudOverlay() {
         super("HudOverlay", "Draggable info panel: coordinates, pitch/yaw, health, armor and more", Category.VISUAL);
@@ -192,13 +195,39 @@ public class HudOverlay extends Module {
             if ((buttonsDown & 1) != 0) HudLayout.dragTo(mx, my, fbW, fbH);
             else HudLayout.stopDrag();
         } else if (pendingClick && !widgetGrabbed && noWidgetDragging()) {
-            boolean b = HudLayout.beginDrag(mx, my);
-            dbg = "begin=" + b + " mx=" + mx + " my=" + my;
-        } else if (pendingClick) {
-            dbg = "click ignored grabbed=" + widgetGrabbed + " noDrag=" + noWidgetDragging();
+            HudLayout.beginDrag(mx, my);
         }
-        if (pendingRight) HudLayout.resetAt(mx, my);
+        if (pendingRight && !HudLayout.resetAt(mx, my)) {
+            String id = widgetAt(mx, my);
+            if (id != null) {
+                Widget w = widgets.get(id);
+                w.customPos = false;
+                HudLayout.resetScale(id);
+            }
+        }
+        if (pendingScroll != 0) {
+            HudLayout.Elem e = HudLayout.elementAt(mx, my);
+            String id = e != null ? e.id : widgetAt(mx, my);
+            String label = e != null ? e.label : id == null ? null : WIDGET_TITLES[java.util.Arrays.asList(WIDGET_IDS).indexOf(id)];
+            if (e != null && !HudLayout.has(e.id)) {
+                // pin the element where it is, otherwise its default spot (computed with its own scale) moves away
+                HudLayout.set(e.id, (e.anchorRight ? e.x + e.w : e.x) / fbW, e.y / fbH);
+            }
+            if (id != null) {
+                float sc2 = HudLayout.addScale(id, pendingScroll);
+                scaleMsg = label + "  " + Math.round(sc2 * 100) + "%";
+                scaleMsgUntil = System.currentTimeMillis() + 1200;
+            }
+            pendingScroll = 0;
+        }
         float sc = ui.scale;
+        if (System.currentTimeMillis() < scaleMsgUntil && !scaleMsg.isEmpty()) {
+            float tw = ui.textWidth(scaleMsg, 6.5f) + 8f;
+            float bx = mx / sc + 10f, by = my / sc - 12f;
+            ui.round(bx, by, tw, 10f, 2.5f, ColorUtil.alpha(0xFF101014, 0.95f));
+            ui.outline(bx, by, tw, 10f, 2.5f, 1f, Theme.accent(0.8f));
+            ui.text(scaleMsg, bx + 4f, by, 10f, 6.5f, Theme.TEXT);
+        }
         for (HudLayout.Elem e : HudLayout.visible()) {
             float x = e.x / sc, y = e.y / sc, w = e.w / sc, h = e.h / sc;
             boolean hov = mx >= e.x && mx <= e.x + e.w && my >= e.y && my <= e.y + e.h;
@@ -212,10 +241,27 @@ public class HudOverlay extends Module {
         }
     }
 
-    /** Input counters (tests). */
-    public static int dbgClicks, dbgReleases;
-    public static String dbg = "", dbg2 = "", dbg3 = "";
-    public static int dbgDraws;
+    /** Topmost HudOverlay box under the point (fb px), or null. */
+    private String widgetAt(float fx, float fy) {
+        String hit = null;
+        for (int i = 0; i < WIDGET_IDS.length; i++) {
+            Widget w = widgets.get(WIDGET_IDS[i]);
+            if (w == null || w.fb == null || !w.visibleFrame || w.appear < 0.5f) continue;
+            float[] r = w.fb;
+            if (fx >= r[0] && fx <= r[0] + r[2] && fy >= r[1] && fy <= r[1] + r[3]) hit = WIDGET_IDS[i];
+        }
+        return hit;
+    }
+
+    /** Last drawn rect of a HudOverlay box in fb px (tests), or null. */
+    public float[] widgetRect(String id) {
+        Widget w = widgets.get(id);
+        return w == null || w.fb == null ? null : w.fb.clone();
+    }
+
+    void mouseScrolled(double amount) {
+        if (amount != 0) pendingScroll += amount;
+    }
 
     /** Button bit: 1 = left, 2 = right, 4 = middle. 26.x numbers mouse buttons from 1 (SDL), so 1 << button is wrong. */
     private static int bit(int button) {
@@ -226,14 +272,12 @@ public class HudOverlay extends Module {
     }
 
     void mouseClicked(int button) {
-        dbgClicks++;
         buttonsDown |= bit(button);
         if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_LEFT) pendingClick = true;
         if (button == com.OsamaClient.newbridge.UI.gui.input.Keys.MOUSE_BUTTON_RIGHT) pendingRight = true;
     }
 
     void mouseReleased(int button) {
-        dbgReleases++;
         buttonsDown &= ~bit(button);
         for (Widget w : widgets.values()) w.dragging = false;
         HudLayout.stopDrag();
@@ -250,8 +294,6 @@ public class HudOverlay extends Module {
         if (instance == null || mc.player == null) return;
 
         boolean editing = instance.editMode && mc.gui.screen() instanceof HudOverlayScreen;
-        dbgDraws++;
-        if (instance.pendingClick) dbg3 = "draws=" + dbgDraws + " editing=" + editing + " buttons=" + instance.buttonsDown;
         if (!editing && (!instance.enabled || mc.gui.hud.isHidden() || mc.getDebugOverlay().showDebugScreen()
                 || ClickGui.INSTANCE.isOpen() || mc.gui.screen() != null)) {
             return;
@@ -271,7 +313,7 @@ public class HudOverlay extends Module {
         if (editing) instance.layoutEditor();
 
         if (editing) {
-            String hint = "Drag any box to move it  ·  Right-click a box to reset it  ·  Esc to finish";
+            String hint = "Drag to move  ·  Mouse wheel to resize  ·  Right-click to reset  ·  Esc to finish";
             float hs = 6.5f, hh = 9f;
             float hw = ui.textWidth(hint, hs) + Theme.PAD * 2;
             float hx = 6f, hy = ui.height() - hh - 4f;
@@ -301,9 +343,15 @@ public class HudOverlay extends Module {
         float flowY = 8f;
         float glow = Theme.glow();
 
+        float base = ui.scale;
+        float fbMx = UiInput.mouseFbX(), fbMy = UiInput.mouseFbY();
         for (int idx = 0; idx < WIDGET_IDS.length; idx++) {
             String id = WIDGET_IDS[idx];
             String title = WIDGET_TITLES[idx];
+            // per-box size (mouse wheel in the layout editor); x/y stay in base units, drawing happens in local units
+            float ws = HudLayout.scale(id);
+            ui.scale = base * ws;
+            if (editing) { ui.mouseX = fbMx / ui.scale; ui.mouseY = fbMy / ui.scale; }
             boolean special = id.equals("keys");
             List<Row> rows = special ? (showKeys.enabled ? KEYS_MARKER : List.of()) : rowsFor(id, mc);
             boolean active = !rows.isEmpty();
@@ -331,21 +379,24 @@ public class HudOverlay extends Module {
             wRef.w = boxW;
             wRef.h = boxH;
             if (!wRef.customPos) { wRef.x = 8f; wRef.y = flowY; }
-            flowY += boxH + WIDGET_GAP;
+            flowY += boxH * ws + WIDGET_GAP;
 
             if (editing && wRef.dragging && (buttonsDown & 1) != 0) {
-                wRef.x = ui.mouseX - wRef.grabDX;
-                wRef.y = ui.mouseY - wRef.grabDY;
+                wRef.x = (ui.mouseX - wRef.grabDX) * ws;
+                wRef.y = (ui.mouseY - wRef.grabDY) * ws;
                 wRef.customPos = true;
             }
+            final float X = wRef.x / ws, Y = wRef.y / ws;
+            wRef.fb = new float[]{X * ui.scale, Y * ui.scale, boxW * ui.scale, boxH * ui.scale};
+            wRef.visibleFrame = active;
 
-            boolean hovered = editing && ui.hovered(wRef.x, wRef.y, wRef.w, wRef.h);
+            boolean hovered = editing && ui.hovered(X, Y, wRef.w, wRef.h);
             // elements drawn on top (Split Chat, Check Meter, ...) win over an overlapping overlay widget
             if (editing && pendingClick && hovered && noWidgetDragging() && !HudLayout.hitsElement(UiInput.mouseFbX(), UiInput.mouseFbY())) {
                 wRef.dragging = true;
                 widgetGrabbed = true;
-                wRef.grabDX = ui.mouseX - wRef.x;
-                wRef.grabDY = ui.mouseY - wRef.y;
+                wRef.grabDX = ui.mouseX - X;
+                wRef.grabDY = ui.mouseY - Y;
             }
 
             float oldAlpha = ui.alpha;
@@ -355,29 +406,31 @@ public class HudOverlay extends Module {
             if (drawBg) {
                 // subtle accent glow behind the box, same recipe as ClickGui panels, so the overlay
                 // reads as part of the same UI language instead of a bare list of floating text
-                if (glow > 0f) ui.glow(wRef.x, wRef.y, wRef.w, wRef.h, Theme.radius(), 6f, Theme.accent(0.16f * glow));
+                if (glow > 0f) ui.glow(X, Y, wRef.w, wRef.h, Theme.radius(), 6f, Theme.accent(0.16f * glow));
                 int fill = background.enabled ? Theme.PANEL_BG : ColorUtil.alpha(0xFF000000, 0.28f);
-                ui.round(wRef.x, wRef.y, wRef.w, wRef.h, Theme.radius(), fill);
+                ui.round(X, Y, wRef.w, wRef.h, Theme.radius(), fill);
             }
             if (editing) {
-                ui.outline(wRef.x, wRef.y, wRef.w, wRef.h, Theme.radius(), 1f, Theme.accent(hovered ? 0.9f : 0.45f));
+                ui.outline(X, Y, wRef.w, wRef.h, Theme.radius(), 1f, Theme.accent(hovered ? 0.9f : 0.45f));
             } else if (background.enabled && Theme.outline()) {
-                ui.outline(wRef.x, wRef.y, wRef.w, wRef.h, Theme.radius(), 1f, Theme.OUTLINE);
+                ui.outline(X, Y, wRef.w, wRef.h, Theme.radius(), 1f, Theme.OUTLINE);
             }
             if (drawBg) {
                 // left accent bar, mirrors the same "this is one group" cue used by the module-settings
                 // block and the teammate/module HUD lists elsewhere in the theme
-                ui.round(wRef.x, wRef.y + 1.5f, 1.3f, wRef.h - 3f, 0.65f, Theme.accent(0.6f));
+                ui.round(X, Y + 1.5f, 1.3f, wRef.h - 3f, 0.65f, Theme.accent(0.6f));
             }
 
-            float captionX = wRef.x + PAD + (showIcons && !special ? ICON + GAP : 0f);
-            ui.text(title.toUpperCase(java.util.Locale.ROOT), captionX, wRef.y + PAD - 1f, CAPTION_H, Theme.FONT_SMALL,
+            float captionX = X + PAD + (showIcons ? ICON + GAP : 0f);
+            if (showIcons) com.OsamaClient.newbridge.UI.gui.render.Icons.draw(ui, WIDGET_ICONS.get(id), X + PAD + 1f, Y + PAD + (CAPTION_H - 6f) * 0.5f - 1f, 6f,
+                    ColorUtil.alpha(Theme.accent(), 0.85f));
+            ui.text(title.toUpperCase(java.util.Locale.ROOT), captionX, Y + PAD - 1f, CAPTION_H, Theme.FONT_SMALL,
                     ColorUtil.alpha(Theme.TEXT_DIM, 0.9f));
 
-            float rowY = wRef.y + PAD + CAPTION_H;
-            if (special) drawKeystrokes(mc, wRef.x + PAD, rowY);
+            float rowY = Y + PAD + CAPTION_H;
+            if (special) drawKeystrokes(mc, X + PAD, rowY);
             else for (Row r : drawRows) {
-                float rowX = wRef.x + PAD;
+                float rowX = X + PAD;
                 if (showIcons) {
                     float iconY = rowY + (ROW_H - ICON) * 0.5f;
                     boolean realItem = r.item() != null && !r.item().isEmpty();
@@ -390,7 +443,7 @@ public class HudOverlay extends Module {
                 }
                 ui.text(r.text(), rowX, rowY, ROW_H, textSize, Theme.TEXT);
                 if (r.ratio() >= 0f) {
-                    float barW = wRef.x + wRef.w - PAD - rowX;
+                    float barW = X + wRef.w - PAD - rowX;
                     float barY = rowY + ROW_H - 2.6f;
                     float ratio = Math.max(0f, Math.min(1f, r.ratio()));
                     ui.round(rowX, barY, barW, 1.4f, 0.7f, Theme.TRACK);
@@ -401,6 +454,8 @@ public class HudOverlay extends Module {
 
             ui.alpha = oldAlpha;
         }
+        ui.scale = base;
+        if (editing) { ui.mouseX = fbMx / base; ui.mouseY = fbMy / base; }
     }
 
     // ── Keystrokes ───────────────────────────────────────────────────────────
@@ -470,8 +525,38 @@ public class HudOverlay extends Module {
         float r = ICON * 0.28f;
         ui.round(x, y, ICON, ICON, r, ColorUtil.alpha(color, 0.20f));
         ui.outline(x, y, ICON, ICON, r, 1f, ColorUtil.alpha(color, 0.7f));
-        if (drawLabel) ui.textCentered(label, x + ICON * 0.5f, y - 0.3f, ICON, ICON * 0.58f, color);
+        if (!drawLabel) return;
+        String icon = rowIcon(label);
+        if (icon == null || !com.OsamaClient.newbridge.UI.gui.render.Icons.draw(ui, icon, x + 1.2f, y + 1.2f, ICON - 2.4f, color))
+            ui.textCentered(label, x + ICON * 0.5f, y - 0.3f, ICON, ICON * 0.58f, color);
     }
+
+    /** Vector icon for the short row tags ("HP", "PN", ...); null keeps the letter. */
+    private static String rowIcon(String tag) {
+        return switch (tag) {
+            case "P" -> "pin";
+            case "PI" -> "pitch";
+            case "YA" -> "compass";
+            case "HP" -> "heart";
+            case "SP" -> "speed";
+            case "FP" -> "bolt";
+            case "PN" -> "signal";
+            case "TP" -> "hourglass";
+            case "BI" -> "tree";
+            case "T" -> "clock";
+            case "S" -> "server";
+            case "PL" -> "players";
+            case "FX" -> "potion";
+            default -> null;
+        };
+    }
+
+    private static final java.util.Map<String, String> WIDGET_ICONS = java.util.Map.ofEntries(
+            java.util.Map.entry("coords", "pin"), java.util.Map.entry("facing", "compass"), java.util.Map.entry("health", "heart"),
+            java.util.Map.entry("armor", "shield"), java.util.Map.entry("speed", "speed"), java.util.Map.entry("fps", "bolt"),
+            java.util.Map.entry("ping", "signal"), java.util.Map.entry("biome", "tree"), java.util.Map.entry("held", "hand"),
+            java.util.Map.entry("items", "box"), java.util.Map.entry("effects", "potion"), java.util.Map.entry("info", "clock"),
+            java.util.Map.entry("keys", "keyboard"));
 
     // ── Per-widget drag state ───────────────────────────────────────────────
 
@@ -483,6 +568,8 @@ public class HudOverlay extends Module {
         float grabDX, grabDY; // mouse offset from x/y at drag start
         float appear;         // 0..1 fade, so toggling a row on/off doesn't pop the box in/out instantly
         List<Row> lastRows;   // kept around while fading out (rows() is empty by then)
+        float[] fb;           // last drawn rect in framebuffer px (wheel scaling / right-click reset)
+        boolean visibleFrame;
     }
 
     // ── Rows ─────────────────────────────────────────────────────────────────
@@ -574,7 +661,7 @@ public class HudOverlay extends Module {
                         String time = fx.isInfiniteDuration() ? "inf" : String.format("%d:%02d", fx.getDuration() / 1200, (fx.getDuration() / 20) % 60);
                         int col = eff.isBeneficial() ? 0xFF52E084 : 0xFFE0525A;
                         String nm = eff.getDisplayName().getString();
-                        rows.add(new Row(nm + lvl + "  " + time, col, nm.isEmpty() ? "E" : nm.substring(0, 1).toUpperCase(java.util.Locale.ROOT)));
+                        rows.add(new Row(nm + lvl + "  " + time, col, "FX"));
                     }
                 }
             }
@@ -678,4 +765,4 @@ public class HudOverlay extends Module {
         if (path.contains("turtle")) return 0xFF3FA560;
         return Theme.accent();
     }
-}
+}

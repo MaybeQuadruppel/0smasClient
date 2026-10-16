@@ -139,7 +139,7 @@ public class RtpFinder extends Module {
     private static boolean tickRegistered;
 
     public RtpFinder() {
-        super("RtpFinder", "Periodically RTPs through every region and logs where it's quiet", Category.Donut);
+        super("RtpFinder", "Uses /rtp again and again and maps where it is quiet.", Category.Donut);
         instance = this;
         settings.add(intervalSeconds);
         settings.add(logFailedAttempts);
@@ -296,4 +296,4 @@ public class RtpFinder extends Module {
         super.toggle();
         if (!enabled) state = State.IDLE; // clean restart on the next enable
     }
-}
+}

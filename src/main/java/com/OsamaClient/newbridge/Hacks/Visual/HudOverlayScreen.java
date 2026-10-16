@@ -41,6 +41,12 @@ public class HudOverlayScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double x, double y, double hAmount, double vAmount) {
+        HudOverlay.instance.mouseScrolled(vAmount);
+        return true;
+    }
+
+    @Override
     public boolean keyPressed(KeyEvent event) {
         HudOverlay.instance.keyPressed(event.key(), event.modifiers());
         return true;

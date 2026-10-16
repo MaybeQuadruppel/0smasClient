@@ -47,15 +47,30 @@ public class ClickGuiModule extends Module {
     public final ToggleButton settingHighlight = new ToggleButton("Setting Highlight", true, null)
             .withDescription("Give an expanded module's settings a distinct background so they stand out from the row list");
 
+    public final ModeButton style = new ModeButton("Style", List.of("Default", "Liquid Glass"), 0, null)
+            .withDescription("Liquid Glass: translucent frosted panels over a blurred world, big rounded corners, pill-shaped rows with a soft highlight and smoother animations.");
+    public final ModeButton layout = new ModeButton("Layout", List.of("Panels", "Vape"), 0, null)
+            .withDescription("Panels: one draggable column per category. Vape: one window with the categories on the left and a clear list of modules (with a short summary of their settings) on the right. Same modules and settings in both.");
+    public final ModeButton moduleView = new ModeButton("Module View", List.of("Essential", "All"), 0, null)
+            .withDescription("Essential: the GUI lists only the everyday modules (rare ones are hidden; searching, favorites and modules that are on still show up). All: every module. Troll, Dupe and Donut always show everything.");
+    public final ModeButton settingsView = new ModeButton("Settings View", List.of("Basic", "Advanced"), 0, null)
+            .withDescription("Basic: every module shows only its important settings; the rest is behind its 'Advanced (N)' row. Advanced: every module shows all settings at once.");
+    public final ToggleButton subcategories = new ToggleButton("Subcategories", true, null)
+            .withDescription("Split the panels into collapsible groups (Melee, Ranged, ... ). Click a group header to fold it; searching shows a flat list.");
+
     public final ToggleButton sounds = new ToggleButton("Sounds", true, null)
             .withDescription("Small click sounds when using the GUI");
     public final Slider soundVolume = new Slider("Sound Volume", 0.1, 2.0, 1.0, 0.1, null)
             .withDescription("Volume of the GUI sounds");
 
     public ClickGuiModule() {
-        super("ClickGui", "Opens this GUI", Category.CLIENT);
+        super("ClickGui", "Opens this GUI (bind it to a key).", Category.CLIENT);
         INSTANCE = this;
         key = Keys.KEY_RIGHT_SHIFT;
+        settings.add(style);
+        settings.add(layout);
+        settings.add(moduleView);
+        settings.add(settingsView);
         settings.add(accent);
         settings.add(rainbowAccent);
         settings.add(rainbowSpeed);
@@ -72,6 +87,7 @@ public class ClickGuiModule extends Module {
         settings.add(outline);
         settings.add(descriptions);
         settings.add(settingHighlight);
+        settings.add(subcategories);
         settings.add(sounds);
         settings.add(soundVolume);
     }
@@ -82,4 +98,4 @@ public class ClickGuiModule extends Module {
         enabled = false;
         ClickGui.INSTANCE.toggleOpen();
     }
-}
+}

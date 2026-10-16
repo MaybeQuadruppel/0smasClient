@@ -53,6 +53,9 @@ public final class ConfigCodec {
 
     public record Data(JsonObject root) {}
 
+    /** Old module name -> module it was merged into. */
+    public static final Map<String, String> MERGED = Map.of("NoHunger", "AntiHunger", "ChestStealer", "InvTweaks");
+
     private ConfigCodec() {}
 
     public static String toJson(JsonObject root) { return GSON.toJson(root); }
@@ -164,6 +167,15 @@ public final class ConfigCodec {
         boolean legacyKeys = kf == null || !kf.isJsonPrimitive() || !KEY_FORMAT.equals(kf.getAsString());
         JsonObject mods = obj(root, "modules");
         if (mods != null) {
+            // modules that were merged into another one: carry over on/off and the key (settings differ)
+            for (var alias : MERGED.entrySet()) {
+                JsonObject old = obj(mods, alias.getKey());
+                if (old == null || mods.has(alias.getValue())) continue;
+                JsonObject moved = new JsonObject();
+                if (old.has("enabled")) moved.add("enabled", old.get("enabled"));
+                if (old.has("key")) moved.add("key", old.get("key"));
+                mods.add(alias.getValue(), moved);
+            }
             for (Module m : modules) {
                 JsonObject o = obj(mods, m.name);
                 if (o == null) continue;

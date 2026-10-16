@@ -39,7 +39,7 @@ public class AutoTrade extends Module {
     private int actionTimer = 0;
 
     public AutoTrade() {
-        super("AutoLibrarian", "Automatically rolls for specific enchanted books.", Category.MISC);
+        super("AutoLibrarian", "Re-rolls a librarian until it sells the enchanted book you want.", Category.MISC);
 
         enchantPicker = new EnchantmentPicker("Enchantments");
         this.settings.add(enchantPicker);

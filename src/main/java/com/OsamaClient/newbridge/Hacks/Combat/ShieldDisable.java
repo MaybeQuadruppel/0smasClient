@@ -24,13 +24,13 @@ public class ShieldDisable extends Module {
     private boolean autoStrikeBack = true;
     private double range = 4.0;
     private int switchDelay = 50;
+    public boolean ignoreFriends = true;
     public boolean ignoreTeammates = true;
 
     public ShieldDisable() {
-        super("ShieldDisable", "Breaks enemy shields automatically", Category.COMBAT);
+        super("ShieldDisable", "Disables enemy shields with an axe hit automatically.", Category.COMBAT);
         this.settings.add(new ToggleButton("Hit with prev. Item", true, val -> autoStrikeBack = val).withDescription("Automatically strikes the target using the previously held item."));
         this.settings.add(new Slider("Range", 1.0, 6.0, 3.5, val -> range = val).withDescription("Maximum distance to detect and disable shields."));
-        this.settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, val -> ignoreTeammates = val).withDescription("Prevents disabling shields of teammates."));
     }
 
     @Override
@@ -39,7 +39,7 @@ public class ShieldDisable extends Module {
 
         HitResult hit = client.hitResult;
         if (hit instanceof EntityHitResult entityHit && entityHit.getEntity() instanceof Player target) {
-            if (ignoreTeammates && TeamUtils.isTeammate(target)) return;
+            if (TeamUtils.ignored(target, ignoreTeammates, ignoreFriends)) return;
 
             if (target.isBlocking() && client.player.distanceTo(target) <= range) {
                 executeShieldBreak(client, target);

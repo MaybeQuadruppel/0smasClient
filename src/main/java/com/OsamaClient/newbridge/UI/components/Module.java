@@ -21,7 +21,7 @@ public abstract class Module {
     public List<Component> settings = new ArrayList<>();
 
     public enum Category {
-        COMBAT, MOVEMENT, VISUAL, MISC, DUPE, Donut, CLIENT, PLAYER, TROLL
+        COMBAT, MOVEMENT, VISUAL, WORLD, MISC, DUPE, Donut, CLIENT, PLAYER, TROLL
     }
 
     public Module(String name, String description, Category category) {
@@ -31,7 +31,8 @@ public abstract class Module {
     }
 
     public void toggle() {
-        if (!enabled && com.OsamaClient.newbridge.Hacks.Client.LegitMode.refuse(this)) return;
+        if (!enabled && (com.OsamaClient.newbridge.Hacks.Client.NormalMode.refuse(this) || com.OsamaClient.newbridge.Hacks.Client.LegitMode.refuse(this))) return;
+        if (!enabled) Exclusive.beforeEnable(this);
         enabled = !enabled;
         if (enabled) onEnable();
         else onDisable();
@@ -45,4 +46,4 @@ public abstract class Module {
 
     // NEU: Wird jeden gerenderten Frame aufgerufen (für flüssige Bewegungen/Grafiken)
     public void onRender(Minecraft client) {}
-}
+}

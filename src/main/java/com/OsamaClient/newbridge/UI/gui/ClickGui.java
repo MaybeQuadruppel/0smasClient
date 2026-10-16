@@ -32,10 +32,10 @@ public final class ClickGui {
     private static final Logger LOG = LoggerFactory.getLogger("newbridge/ClickGui");
 
     private static final Module.Category[] ORDER = {
-            Module.Category.COMBAT, Module.Category.MOVEMENT, Module.Category.VISUAL,
+            Module.Category.COMBAT, Module.Category.MOVEMENT, Module.Category.VISUAL, Module.Category.WORLD,
             Module.Category.MISC, Module.Category.DUPE, Module.Category.Donut, Module.Category.CLIENT, Module.Category.PLAYER,
             Module.Category.TROLL};
-    private static final String[] TITLES = {"Combat", "Movement", "Visual", "Misc", "Dupe", "Donut", "Client", "Player", "Troll"};
+    private static final String[] TITLES = {"Combat", "Movement", "Visual", "World", "Misc", "Dupe", "Donut", "Client", "Player", "Troll"};
 
     private final UiRenderer renderer = new UiRenderer();
     private final BlurRenderer blur = new BlurRenderer();
@@ -49,8 +49,13 @@ public final class ClickGui {
     private String hint, shownHint = "";
     private float hintTime;
     private ModuleRow bindingRow;
+    private ContextMenu menu;
     private SettingWidget focused;
     private final SearchBar searchBar = new SearchBar();
+    private final VapeView vape = new VapeView();
+
+    /** The Vape layout view (tests). */
+    public VapeView vape() { return vape; }
     private int buttonsDown;
 
     /** Search filter: show only enabled modules. */
@@ -75,16 +80,24 @@ public final class ClickGui {
     }
 
     private void buildPanels() {
+        // the Favorites panel takes the first column for users without a saved layout; the others move one column right
+        Panel fav = new Panel(Module.Category.CLIENT, "Favorites", ModuleManager.modules, true);
+        boolean freshLayout = pendingPanels.isEmpty();
+        // an existing saved layout keeps its columns: Favorites goes after the last one
+        fav.x = 8 + (freshLayout ? 0 : ORDER.length) * (Theme.panelW() + Theme.GAP);
+        fav.y = 8;
+        applyPending(fav);
+        panels.add(fav);
         for (int i = 0; i < ORDER.length; i++) {
             Panel p = new Panel(ORDER[i], TITLES[i], ModuleManager.getModulesByCategory(ORDER[i]));
-            p.x = 8 + i * (Theme.panelW() + Theme.GAP);
+            p.x = 8 + (i + (freshLayout ? 1 : 0)) * (Theme.panelW() + Theme.GAP);
             p.y = 8;
             applyPending(p);
             panels.add(p);
         }
         // a category without a saved position (e.g. newly added) takes the first free column instead of overlapping
         for (Panel p : panels) {
-            if (pendingPanels.containsKey(p.category.name())) continue;
+            if (p.favorites || pendingPanels.containsKey(p.key())) continue;
             float w = Theme.panelW();
             for (int slot = 0; slot < ORDER.length; slot++) {
                 float sx = 8 + slot * (w + Theme.GAP);
@@ -100,7 +113,7 @@ public final class ClickGui {
     /** Panel layout for saving (panels that were never built keep their loaded state). */
     public java.util.Map<String, ConfigCodec.PanelState> panelStates() {
         java.util.Map<String, ConfigCodec.PanelState> out = new java.util.HashMap<>(pendingPanels);
-        for (Panel p : panels) out.put(p.category.name(), new ConfigCodec.PanelState(p.x, p.y, p.collapsed));
+        for (Panel p : panels) out.put(p.key(), new ConfigCodec.PanelState(p.x, p.y, p.collapsed));
         return out;
     }
 
@@ -111,7 +124,7 @@ public final class ClickGui {
     }
 
     private void applyPending(Panel p) {
-        ConfigCodec.PanelState s = pendingPanels.get(p.category.name());
+        ConfigCodec.PanelState s = pendingPanels.get(p.key());
         if (s == null) return;
         p.x = s.x();
         p.y = s.y();
@@ -119,7 +132,7 @@ public final class ClickGui {
     }
 
     public Panel panel(Module.Category c) {
-        for (Panel p : panels()) if (p.category == c) return p;
+        for (Panel p : panels()) if (!p.favorites && p.category == c) return p;
         return null;
     }
 
@@ -151,6 +164,7 @@ public final class ClickGui {
         if (focused != null) focused.blur();
         focused = null;
         bindingRow = null;
+        menu = null;
         for (Panel p : panels) p.dragging = false;
         for (Panel p : hudPanels) p.dragging = false;
         searchBar.close();
@@ -224,9 +238,9 @@ public final class ClickGui {
         float dim = "Blur".equals(bg) ? 0.2f : "Dim".equals(bg) ? 0.35f : 0f;
         if (dim > 0) ui.rect(0, 0, ui.width(), ui.height(), ColorUtil.alpha(0xFF000000, dim * open));
         ui.alpha = open;
-        drawHelp(); // under the panels
+        if (!Theme.vape()) drawHelp(); // under the panels
 
-        List<Panel> ps = active();
+        List<Panel> ps = Theme.vape() ? List.of() : active();
         for (Panel p : ps) p.drag(ui);
         Panel top = topPanelAtMouse();
 
@@ -238,12 +252,18 @@ public final class ClickGui {
             Panel p = ps.get(i);
             float appear = openP.forward() ? Anim.easeOutCubic(openP.delayed(i * 0.03f)) : open;
             ui.alpha = appear;
-            ui.hoverBlocked = p != top || !openP.forward();
+            ui.hoverBlocked = p != top || !openP.forward() || menu != null;
             p.render(ui, appear, query);
         }
         ui.hoverBlocked = false;
         ui.alpha = open;
+        if (Theme.vape()) {
+            ui.hoverBlocked = !openP.forward() || menu != null;
+            vape.render(ui, open, query);
+            ui.hoverBlocked = false;
+        }
 
+        if (menu != null) menu.draw(ui);
         searchBar.draw(ui, matchCount());
         drawTabs();
         drawToast(dt);
@@ -304,8 +324,10 @@ public final class ClickGui {
 
     private void buildTabs() {
         tabList.clear();
-        tabList.add(new Tab("Modules", "All modules by category", tab == 0, () -> setTab(0)));
-        tabList.add(new Tab("HUD", "HUD overlay, keystrokes, minimap, module list and other on-screen elements", tab == 1, () -> setTab(1)));
+        if (!Theme.vape()) {
+            tabList.add(new Tab("Modules", "All modules by category", tab == 0, () -> setTab(0)));
+            tabList.add(new Tab("HUD", "HUD overlay, keystrokes, minimap, module list and other on-screen elements", tab == 1, () -> setTab(1)));
+        }
         for (var e : com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.dock()) {
             tabList.add(new Tab(e.label(), e.description(), false,
                     () -> com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(e.factory().get())));
@@ -318,7 +340,7 @@ public final class ClickGui {
         tabRects.clear();
         float h = 12f, gap = 2f, pad = 6f;
         float total = -gap;
-        for (Tab t : tabList) total += ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad + gap;
+        for (Tab t : tabList) total += ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad + TAB_ICON + gap;
         float x = (ui.width() - total) * 0.5f, y = ui.height() - h - 4f;
         float barPad = 2.5f;
         ui.glow(x - barPad, y - barPad, total + 2 * barPad, h + 2 * barPad, Theme.radius() + 1f, 6f, Theme.accent(0.1f * Theme.glow()));
@@ -327,7 +349,7 @@ public final class ClickGui {
         // the selection pill glides between the view tabs instead of jumping
         float px = x;
         for (Tab t : tabList) {
-            float tw = ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad;
+            float tw = ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad + TAB_ICON;
             if (t.selected()) {
                 pillX.setTarget(px);
                 pillW.setTarget(tw);
@@ -335,6 +357,9 @@ public final class ClickGui {
             }
             px += tw + gap;
         }
+        boolean anySel = false;
+        for (Tab t : tabList) anySel |= t.selected();
+        if (!anySel) { pillW.snap(0f); } // Vape layout has no Modules/HUD tab: no pill
         pillX.update(ui.dt, Theme.animSpeed());
         pillW.update(ui.dt, Theme.animSpeed());
         if (pillW.value() > 0.5f) {
@@ -343,17 +368,36 @@ public final class ClickGui {
         }
         for (int i = 0; i < tabList.size(); i++) {
             Tab t = tabList.get(i);
-            float w = ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad;
+            float w = ui.textWidth(t.label(), Theme.FONT_SMALL) + 2 * pad + TAB_ICON;
             boolean hover = ui.hovered(x, y, w, h);
             if (!t.selected() && hover) {
                 ui.round(x, y, w, h, Theme.radius(), Theme.ROW_HOVER);
             }
-            ui.textCentered(t.label(), x + w / 2f, y, h, Theme.FONT_SMALL,
-                    t.selected() ? Theme.TEXT : hover ? Theme.TEXT : Theme.TEXT_DIM);
+            int tc = t.selected() ? Theme.TEXT : hover ? Theme.TEXT : Theme.TEXT_DIM;
+            com.OsamaClient.newbridge.UI.gui.render.Icons.draw(ui, tabIcon(t.label()), x + pad - 1f, y + (h - 6.5f) * 0.5f, 6.5f,
+                    t.selected() ? Theme.accent() : tc);
+            ui.text(t.label(), x + pad + TAB_ICON, y, h, Theme.FONT_SMALL, tc);
             if (hover) hint(t.description());
             tabRects.add(new float[]{x, y, w, h});
             x += w + gap;
         }
+    }
+
+    private static final float TAB_ICON = 8.5f;
+
+    private static String tabIcon(String label) {
+        return switch (label) {
+            case "Modules" -> "gear";
+            case "HUD" -> "client";
+            case "Waypoints" -> "pin";
+            case "Profiles" -> "user";
+            case "Stashes" -> "box";
+            case "Macros" -> "bolt";
+            case "Friends" -> "players";
+            case "Keybinds" -> "keyboard";
+            case "Sky" -> "sky";
+            default -> "star";
+        };
     }
 
     private boolean tabClicked() {
@@ -496,16 +540,18 @@ public final class ClickGui {
 
     // ------------------------------------------------------------------ input (from ClickGuiScreen)
 
-    public static String dbgClick = "", dbgRows = "";
-
     public void mouseClicked(int button, int mods) {
-        dbgRows = "";
-        dbgClick = "btn=" + button + " mouse=" + ui.mouseX + "," + ui.mouseY + " scale=" + ui.scale + " fb=" + UiInput.mouseFbX() + "," + UiInput.mouseFbY();
         buttonsDown |= 1 << Math.max(0, Math.min(button, 30));
         if (!openP.forward()) return;
         if (bindingRow != null) {
             bindingRow.binding = false;
             bindingRow = null;
+        }
+        if (menu != null) {
+            ContextMenu m = menu;
+            menu = null;
+            if (m.click(ui, button) || m.contains(ui)) return;
+            if (button == Keys.MOUSE_BUTTON_LEFT) return; // a click outside only closes the menu
         }
         if (button == Keys.MOUSE_BUTTON_LEFT && tabClicked()) return;
         if (searchBar.mouseClicked(button)) {
@@ -516,9 +562,10 @@ public final class ClickGui {
         searchBar.unfocus();
         SettingWidget wasFocused = focused;
         focused = null;
-        Panel top = topPanelAtMouse();
+        Panel top = Theme.vape() ? null : topPanelAtMouse();
         boolean consumed = false;
-        if (top != null) {
+        if (Theme.vape()) consumed = vape.mouseClicked(ui, button, mods);
+        else if (top != null) {
             consumed = top.mouseClicked(ui, button, mods);
             // bring to front
             List<Panel> act = active();
@@ -527,17 +574,18 @@ public final class ClickGui {
         }
         if (wasFocused != null && wasFocused != focused) wasFocused.blur();
         if (!consumed) focused = null;
-        dbgClick += " | rows=" + dbgRows + " | top=" + (top != null ? top.getClass().getSimpleName() : "null") + " consumed=" + consumed + " focused=" + (focused == null ? "null" : focused.getClass().getSimpleName());
     }
 
     public void mouseReleased(int button) {
         buttonsDown &= ~(1 << Math.max(0, Math.min(button, 30)));
         for (Panel p : panels) p.mouseReleased(ui, button);
         for (Panel p : hudPanels) p.mouseReleased(ui, button);
+        vape.mouseReleased(ui, button);
     }
 
     public void mouseScrolled(double amount) {
         if (!openP.forward()) return;
+        if (Theme.vape()) { vape.mouseScrolled(ui, amount); return; }
         Panel top = topPanelAtMouse();
         if (top != null) top.mouseScrolled(ui, amount);
     }
@@ -568,7 +616,7 @@ public final class ClickGui {
     }
 
     public void keyPressed(int key, int mods) {
-        if (key == Keys.KEY_LEFT_ALT || key == Keys.KEY_RIGHT_ALT) { altDown = true; return; }
+        if (key == Keys.KEY_LEFT_ALT || key == Keys.KEY_RIGHT_ALT) { altDown = true; if (openP.forward()) altOpensWindow(); return; }
         if (key == Keys.KEY_LEFT_CONTROL || key == Keys.KEY_RIGHT_CONTROL) { ctrlDown = true; return; }
         // Ctrl+Z (Y too: QWERTZ keyboards) undoes the last setting change, unless a text field is being edited
         if ((key == Keys.KEY_Z || key == Keys.KEY_Y) && (UiInput.ctrl(mods) || ctrlDown) && (focused == null || !focused.wantsKeyboard())) {
@@ -578,6 +626,11 @@ public final class ClickGui {
             return;
         }
         if (!openP.forward()) return;
+        if (menu != null && key == Keys.KEY_ESCAPE) { menu = null; return; }
+        if (key == Keys.KEY_F1 && focused == null && !searchBar.editing() && bindingRow == null) {
+            com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(new com.OsamaClient.newbridge.UI.gui.window.ShortcutsWindow());
+            return;
+        }
         if (focused == null) focused = editingWidget();
         if (bindingRow != null) {
             boolean unbind = key == Keys.KEY_ESCAPE || key == Keys.KEY_DELETE || key == Keys.KEY_BACKSPACE;
@@ -608,16 +661,13 @@ public final class ClickGui {
             close();
             return;
         }
+        if (Theme.vape()) { vape.hoverKey(key, mods); return; }
         List<Panel> act = active();
         for (int i = act.size() - 1; i >= 0; i--) if (act.get(i).hoverKey(key, mods)) return;
     }
 
-    /** Number of chars received (tests). */
-    public static int dbgChars;
-
     public void charTyped(int codepoint) {
         if (focused == null) focused = editingWidget();
-        dbgChars++;
         // the search only takes text after it was clicked (or opened with Ctrl+F) - no type-to-search,
         // otherwise the character of a key you just bound would start a search
         if (searchBar.charTyped(codepoint)) return;
@@ -629,8 +679,10 @@ public final class ClickGui {
     /** GUI scale actually used: the configured one, reduced so that all category columns of the tab fit the window. */
     public float effectiveScale() {
         float base = Theme.scale();
+        if (Theme.vape()) return Math.min(base, Math.max(0.6f, renderer.width() / 345f));
         if (!Theme.autoScale()) return base;
-        int n = active().size();
+        int n = 0;
+        for (Panel pn : active()) if (!pn.hiddenByMode()) n++;
         float need = 8f + n * (Theme.panelW() + Theme.GAP);
         float fit = renderer.width() / need;
         return Math.min(base, Math.max(0.6f, fit));
@@ -646,8 +698,9 @@ public final class ClickGui {
     /** Rows passing the search / enabled-only filter across the panels of the current tab. */
     int matchCount() {
         String q = searchBar.query();
+        if (Theme.vape()) return vape.matchCount(q);
         int n = 0;
-        for (Panel p : active()) n += p.matchCount(q);
+        for (Panel p : active()) if (!p.favorites) n += p.matchCount(q);
         return n;
     }
 
@@ -668,6 +721,9 @@ public final class ClickGui {
     }
 
     /** For tests: sets the search text as if typed. */
+    public int tagChipCount() { return searchBar.tagChips(); }
+    public String tagChip(int i) { return searchBar.tagChip(i); }
+
     public void setSearch(String text) {
         searchBar.setText(text);
     }
@@ -675,6 +731,56 @@ public final class ClickGui {
     public int visibleMatches() { return matchCount(); }
 
     // ------------------------------------------------------------------ helpers for rows / widgets
+
+    /** Opens the quick menu (Shift + right click) for a module row at the mouse. */
+    void openMenu(ModuleRow row) {
+        menu = new ContextMenu(row, ui.mouseX, ui.mouseY);
+    }
+
+    public boolean menuOpen() { return menu != null; }
+
+    /** Tests: opens the quick menu of a row at the given spot (units). */
+    public void openMenuAt(ModuleRow row, float x, float y) { menu = new ContextMenu(row, x, y); }
+
+    /** Tests: labels of the open quick menu. */
+    public java.util.List<String> menuItems() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (menu != null) for (int i = 0; i < menu.itemCount(); i++) out.add(menu.itemLabel(i));
+        return out;
+    }
+
+    /** Tests: runs the quick-menu item with that label, closes the menu. */
+    public boolean runMenuItem(String label) {
+        if (menu == null) return false;
+        for (int i = 0; i < menu.itemCount(); i++) if (menu.itemLabel(i).equals(label)) { ContextMenu m = menu; menu = null; m.run(i); return true; }
+        return false;
+    }
+
+    /** Tests: the open quick menu. */
+    ContextMenu menu() { return menu; }
+
+    /** Opens the window with every setting of the module (Alt on an expanded module); the GUI is hidden meanwhile. */
+    public void openSettingsWindow(ModuleRow row) {
+        menu = null;
+        altDown = false;
+        com.OsamaClient.newbridge.UI.gui.window.WindowManager.INSTANCE.open(new com.OsamaClient.newbridge.UI.gui.window.ModuleSettingsWindow(row.module, row.widgets()));
+    }
+
+    /** Alt pressed over a module whose settings are expanded: show all its settings in a window. */
+    private boolean altOpensWindow() {
+        if (bindingRow != null || menu != null) return false;
+        if (Theme.vape()) {
+            ModuleRow vr = vape.altTarget();
+            if (vr == null) return false;
+            openSettingsWindow(vr);
+            return true;
+        }
+        for (Panel p : active()) {
+            if (p.hiddenByMode() || p.collapsed) continue;
+            for (ModuleRow r : p.rows()) if (r.isExpanded() && r.anyHover()) { openSettingsWindow(r); return true; }
+        }
+        return false;
+    }
 
     void startBinding(ModuleRow row) {
         if (bindingRow != null) bindingRow.binding = false;
@@ -684,6 +790,8 @@ public final class ClickGui {
 
     /** A setting widget that is currently being edited (text field), found even if the click did not register it as focused. */
     private SettingWidget editingWidget() {
+        SettingWidget vw = vape.editingWidget();
+        if (vw != null) return vw;
         for (Panel p : panels) for (ModuleRow r : p.rows()) for (SettingWidget sw : r.widgets()) if (sw.wantsKeyboard()) return sw;
         for (Panel p : hudPanels) for (ModuleRow r : p.rows()) for (SettingWidget sw : r.widgets()) if (sw.wantsKeyboard()) return sw;
         return null;

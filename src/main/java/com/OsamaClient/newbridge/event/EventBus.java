@@ -20,6 +20,12 @@ public class EventBus {
         }
     }
 
+    /** True when somebody listens for this event type (lets hot paths skip creating events nobody reads). */
+    public boolean hasListeners(Class<?> eventType) {
+        List<Listener> l = listeners.get(eventType);
+        return l != null && !l.isEmpty();
+    }
+
     public void post(Object event) {
         List<Listener> eventListeners = listeners.get(event.getClass());
         if (eventListeners != null) {

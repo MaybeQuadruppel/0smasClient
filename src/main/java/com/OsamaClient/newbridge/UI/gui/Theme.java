@@ -51,10 +51,17 @@ public final class Theme {
     /** Max panel height as a fraction (0.2..1) of the screen height. */
     public static float maxPanelHeight() { return m() != null ? (float) m().maxPanelHeight.getValue() / 100f : 1f; }
     public static float scale() { return m() != null ? (float) m().scale.getValue() : 1.5f; }
-    public static float radius() { return m() != null ? (float) m().radius.getValue() : 2.5f; }
+    /** "Liquid Glass" style: translucent, strongly rounded, softly highlighted panels and pill-shaped rows. */
+    public static boolean glass() { return m() != null && "Liquid Glass".equals(m().style.getMode()); }
+    /** "Vape" layout: one window with a category sidebar instead of the draggable panels. */
+    public static boolean vape() { return m() != null && "Vape".equals(m().layout.getMode()); }
+    public static float radius() {
+        float r = m() != null ? (float) m().radius.getValue() : 2.5f;
+        return glass() ? Math.max(6f, r * 2.4f) : r;
+    }
     public static float glow() { return m() != null ? (float) m().glow.getValue() : 0.6f; }
-    public static float animSpeed() { return m() != null ? (float) m().animSpeed.getValue() : 1f; }
-    public static String background() { return m() != null ? m().background.getMode() : "Dim"; }
+    public static float animSpeed() { float a = m() != null ? (float) m().animSpeed.getValue() : 1f; return glass() ? a * 0.7f : a; }
+    public static String background() { return glass() ? "Blur" : m() != null ? m().background.getMode() : "Dim"; }
     public static boolean outline() { return m() == null || m().outline.enabled; }
     public static boolean descriptions() { return m() == null || m().descriptions.enabled; }
 
@@ -68,8 +75,12 @@ public final class Theme {
     public static boolean settingHighlight() { return m() == null || m().settingHighlight.enabled; }
 
     /** Panel background color with the current opacity applied on top of the fixed base tint. */
+    public static int settingBg() { return glass() ? 0x14FFFFFF : SETTING_BG; }
+    public static int settingBlockBg() { return glass() ? 0x1AFFFFFF : SETTING_BLOCK_BG; }
+
     public static int panelBg() {
+        if (glass()) return (Math.round(Math.min(panelOpacity(), 0.9f) * 0.62f * 255f) << 24) | 0x1A2030;
         int a = Math.round(panelOpacity() * 255f) << 24;
         return a | (PANEL_BG & 0x00FFFFFF);
     }
-}
+}

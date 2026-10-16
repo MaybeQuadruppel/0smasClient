@@ -15,13 +15,34 @@ public class TeamUtils {
 
     private static final int WHITE = 0xFFFFFF, GRAY = 0xAAAAAA, DARK_GRAY = 0x555555;
 
+    /** Friend (Friends module) - own colour in the ESP / minimap / lists, separate from teammates. */
+    public static boolean isFriend(Entity entity) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || entity == null || entity == mc.player || !(entity instanceof LivingEntity)) return false;
+        return com.OsamaClient.newbridge.Hacks.Client.Friends.isFriend(entity);
+    }
+
+    /** Per-module skip: teammates and friends are switched separately ("Ignore Teammates" / "Ignore Friends"). */
+    public static boolean ignored(Entity entity, boolean ignoreTeam, boolean ignoreFriends) {
+        if (com.OsamaClient.newbridge.Hacks.Client.Targets.active()) {
+            var t = com.OsamaClient.newbridge.Hacks.Client.Targets.INSTANCE;
+            ignoreTeam = t.ignoreTeammates;
+            ignoreFriends = t.ignoreFriends;
+        }
+        return (ignoreTeam && isTeamMember(entity)) || (ignoreFriends && isFriend(entity));
+    }
+
+    /** Skip target for combat modules: a real teammate, or a friend while Friends > Count As Teammate is on. */
     public static boolean isTeammate(Entity entity) {
+        return ignored(entity, true, true);
+    }
+
+    /** Real team mate only (scoreboard team, name colour, armor colour) - friends are not included. */
+    public static boolean isTeamMember(Entity entity) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || entity == null || entity == mc.player || !(entity instanceof LivingEntity living)) {
             return false;
         }
-
-        if (com.OsamaClient.newbridge.Hacks.Client.Friends.isFriend(entity)) return true;
 
         // 1. Scoreboard-Teams (Hypixel Bedwars/Skywars/... nutzen pro Team ein eigenes Scoreboard-Team)
         Scoreboard scoreboard = mc.level.getScoreboard();

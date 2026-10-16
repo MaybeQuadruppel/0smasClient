@@ -12,7 +12,7 @@ import net.minecraft.client.gui.screens.ChatScreen;
 public class InvMove extends Module {
 
     public InvMove() {
-        super("InvMove", "Allows movement while inventory screens are open", Category.MOVEMENT);
+        super("InvMove", "Keep walking while inventory screens are open.", Category.MOVEMENT);
         EntryPoint.EVENT_BUS.subscribe(this);
     }
 

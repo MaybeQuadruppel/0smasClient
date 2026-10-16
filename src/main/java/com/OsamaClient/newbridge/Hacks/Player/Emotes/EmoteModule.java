@@ -11,7 +11,7 @@ public class EmoteModule extends Module {
             .withDescription("Scale of the emote wheel");
 
     public EmoteModule() {
-        super("Emotes", "Opens the emote wheel", Category.PLAYER);
+        super("Emotes", "Opens the emote wheel.", Category.PLAYER);
         INSTANCE = this;
         key = Keys.KEY_B;
         settings.add(wheelScale);

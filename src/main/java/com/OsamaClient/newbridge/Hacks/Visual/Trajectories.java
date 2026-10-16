@@ -38,7 +38,7 @@ public class Trajectories extends Module {
     private final ChamsBufferSource bufferSource = new ChamsBufferSource();
 
     public Trajectories() {
-        super("Trajectories", "Predicts the flight path of arrows and targets", Category.VISUAL);
+        super("Trajectories", "Shows where your arrow will fly and land.", Category.VISUAL);
 
         this.settings.add(new ColorPicker("Color", trajColor, (newColor) -> this.trajColor = newColor).withDescription("Sets the color of the trajectory prediction line."));
         this.settings.add(new ToggleButton("Show Path", showPath, (val) -> this.showPath = val).withDescription("Enables or disables rendering of the flight path."));
@@ -195,4 +195,4 @@ public class Trajectories extends Module {
         consumer.addVertex(matrix, x4, y4, z4).setColor(r, g, b, a)
                 .setUv(0f, 0f).setOverlay(OverlayTexture.NO_OVERLAY).setNormal(normal.x(), normal.y(), normal.z());
     }
-}
+}

@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.Hacks.Client;
 
+import com.OsamaClient.newbridge.UI.components.ColorPicker;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
 import com.OsamaClient.newbridge.Utils.Notify;
@@ -46,6 +47,9 @@ public class Friends extends Module {
     public static Path testFile;
 
     public boolean joinAlerts = true;
+    public boolean asTeammate = true;
+    public final ColorPicker friendColor = new ColorPicker("Friend Color", 0xFFFF6EC7, null)
+            .withDescription("Colour of friends in the ESP, on the minimap and in the TeammateList. Teammates keep their own colours, so you can tell them apart.");
     private boolean wasDown;
     private Set<String> lastOnline = null;
     private int tick;
@@ -53,10 +57,23 @@ public class Friends extends Module {
     public String lastAlert;
 
     public Friends() {
-        super("Friends", "Middle-click a player to make them a friend (treated as a teammate).", Category.CLIENT);
+        super("Friends", "Middle-click a player to make them a friend (own colour, skipped by combat modules).", Category.CLIENT);
         INSTANCE = this;
+        settings.add(friendColor);
         settings.add(new ToggleButton("Join Alerts", joinAlerts, v -> joinAlerts = v).withDescription("Tells you when a friend joins or leaves the server you are on."));
         load();
+    }
+
+    /** Colour (ARGB) friends are drawn in. */
+    public static int color() {
+        Friends f = INSTANCE;
+        return f == null ? 0xFFFF6EC7 : 0xFF000000 | f.friendColor.getColor();
+    }
+
+    /** Whether combat modules should treat friends as teammates. */
+    public static boolean countsAsTeammate() {
+        Friends f = INSTANCE;
+        return f == null || f.asTeammate;
     }
 
     public static boolean isFriend(Entity e) {

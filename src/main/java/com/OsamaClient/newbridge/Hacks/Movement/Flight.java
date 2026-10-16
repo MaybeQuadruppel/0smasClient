@@ -23,7 +23,7 @@ public class Flight extends Module {
     private int offLeft = 1;
 
     public Flight() {
-        super("Flight", "FLYYYY! No Fall is recommended with this module.", Category.MOVEMENT);
+        super("Flight", "Lets you fly. Use NoFall together with it.", Category.MOVEMENT);
 
         List<String> modes = List.of("Vanilla", "Velocity");
         this.settings.add(new ModeButton(
@@ -226,4 +226,4 @@ public class Flight extends Module {
                 forward * cos + strafe * sin
         ).normalize();
     }
-}
+}

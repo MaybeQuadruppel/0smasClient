@@ -51,6 +51,11 @@ public class WindowScreen extends Screen {
     }
 
     @Override
+    public void onFilesDrop(java.util.List<java.nio.file.Path> paths) {
+        WindowManager.INSTANCE.filesDropped(paths);
+    }
+
+    @Override
     public void removed() {
         WindowManager.INSTANCE.onScreenRemoved(this);
     }

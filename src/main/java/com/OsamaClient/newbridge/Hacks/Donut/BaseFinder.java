@@ -98,7 +98,7 @@ public class BaseFinder extends Module {
     private final SmoothAim aim = new SmoothAim();
 
     public BaseFinder() {
-        super("BaseFinder", "Automatically searches for player bases and checks if they're already griefed", Category.MISC);
+        super("BaseFinder", "Searches for player bases and checks whether they are already griefed.", Category.WORLD);
         this.settings.add(scanRadius.withDescription("Radius around the player to scan for bases."));
         this.settings.add(targetY.withDescription("Y level the bot digs/travels to while searching, if nothing is found nearby."));
         this.settings.add(aimFov.withDescription("Yaw window within which the camera is allowed to turn."));

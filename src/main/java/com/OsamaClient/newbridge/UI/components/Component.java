@@ -16,6 +16,12 @@ public abstract class Component {
     protected int baseWidth;
     protected int baseHeight;
     protected String description = "";
+    /** Hidden behind "Advanced" in the GUI until the player opens it (see {@link Basics}). */
+    public boolean advanced;
+    /** When set and false the setting is hidden in the GUI because another setting makes it irrelevant (see {@link Deps}). */
+    public java.util.function.BooleanSupplier visibleIf;
+
+    public boolean isVisible() { return visibleIf == null || visibleIf.getAsBoolean(); }
 
     public Component(int x, int y, int width, int height) {
         this.x = x;

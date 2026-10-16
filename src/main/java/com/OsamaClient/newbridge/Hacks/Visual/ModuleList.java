@@ -65,6 +65,8 @@ public class ModuleList extends Module {
     private double  fontScale    = 1.0;
     /** Neu: Hintergrund-Box pro Zeile ein/ausschaltbar. */
     private boolean background   = true;
+    /** Hide client/utility modules (GUI, sanitizer, friends, HUD panels ...) so the list only shows "real" modules. */
+    public boolean hideClient    = true;
 
     private static float rainbowHue = 0f;
 
@@ -73,8 +75,8 @@ public class ModuleList extends Module {
     public ModuleList() {
         // Liegt in "Client" statt "Misc" - direkt neben dem ClickGui-Modul, wo auch dessen eigene
         // GUI-Einstellungen (Accent, Scale, Rainbow Accent, ...) liegen.
-        super("ArrayList", "Animated HUD list of active modules", Category.CLIENT);
-        this.enabled = true;
+        super("ArrayList", "Animated on-screen list of your enabled modules.", Category.CLIENT);
+        this.enabled = false;
         instance = this;
 
         this.settings.add(new ModeButton("Sort",
@@ -90,9 +92,17 @@ public class ModuleList extends Module {
                 val -> fontScale = val).withDescription("Adjusts the text size and scale of the HUD list."));
         this.settings.add(new ToggleButton("Background", true,
                 val -> background = val).withDescription("Draws a small backing box behind each entry."));
+        this.settings.add(new ToggleButton("Hide Client Modules", hideClient,
+                val -> hideClient = val).withDescription("Leave out always-on helpers (Client category, HUD panels like HudOverlay, Minimap, Waypoints)."));
     }
 
     // ── HUD draw - einmal pro Frame, siehe Klassenkommentar zur Aufruf-Stelle ──────────────────
+
+    /** Modules that are "infrastructure" rather than features you switch on and off. */
+    public static boolean hiddenByDefault(Module m) {
+        if (m.category == Module.Category.CLIENT) return true;
+        return java.util.Set.of("HudOverlay", "Minimap", "Waypoints", "TeammateList", "DamageIndicator", "SplitChat", "Nametags", "Breadcrumbs", "MusicOverlay").contains(m.name);
+    }
 
     public static void draw() {
         Minecraft mc = Minecraft.getInstance();
@@ -109,7 +119,7 @@ public class ModuleList extends Module {
         }
 
         renderer.begin();
-        ui.scale = Theme.scale() * (float) instance.fontScale;
+        ui.scale = Theme.scale() * (float) instance.fontScale; ui.scale *= com.OsamaClient.newbridge.Hacks.Visual.HudLayout.scale("modulelist");
         ui.alpha = 1f;
         ui.hoverBlocked = true; // reines HUD-Overlay, blockt/nimmt nie Maus-Hover entgegen
 
@@ -120,7 +130,8 @@ public class ModuleList extends Module {
 
         // ── Build sorted active-module list ───────────────────────────────────
         List<Module> active = ModuleManager.modules.stream()
-                .filter(m -> m.enabled && m != instance && !(m instanceof com.OsamaClient.newbridge.Hacks.Client.Profiles) && !(m instanceof com.OsamaClient.newbridge.Hacks.Client.macro.Macros))
+                .filter(m -> m.enabled && m != instance && !(m instanceof com.OsamaClient.newbridge.Hacks.Client.Profiles) && !(m instanceof com.OsamaClient.newbridge.Hacks.Client.macro.Macros)
+                        && !(instance.hideClient && hiddenByDefault(m)))
                 .sorted(instance.buildComparator())
                 .collect(Collectors.toList());
 
@@ -262,4 +273,4 @@ public class ModuleList extends Module {
         if (t < 0.5f) return ColorUtil.lerp(Theme.TEXT, 0xFF999999, t * 2f);
         return ColorUtil.lerp(0xFF999999, 0xFF000000, (t - 0.5f) * 2f);
     }
-}
+}

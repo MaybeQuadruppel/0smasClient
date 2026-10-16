@@ -14,7 +14,7 @@ public class XRay extends Module {
     private static final Set<Block> WHITELIST = new HashSet<>();
 
     public XRay() {
-        super("XRay", "Lets you see Ores & BlockEntities through walls", Category.VISUAL);
+        super("XRay", "Hides normal blocks so ores and block entities show through walls.", Category.WORLD);
         initWhitelist();
     }
 
@@ -83,4 +83,4 @@ public class XRay extends Module {
             mc.levelExtractor.allChanged(); // Aktualisiert für Minecraft 26.2+
         }
     }
-}
+}

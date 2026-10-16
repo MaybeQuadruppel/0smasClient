@@ -29,6 +29,8 @@ public class Scaffold extends Module {
     public boolean autoSneak = true;
     public float rotationSpeed = 180.0F;
     public int delay = 0;
+    /** false = Legit (silent rotations, sneak at edges), true = Rage (instant look, sprint, no sneak, places blocks ahead). */
+    public boolean rage = false;
 
     private static final double REACH = 4.0D;
     private static final double SNEAK_LOOKAHEAD = 0.3D;
@@ -46,8 +48,10 @@ public class Scaffold extends Module {
     private int ticksSincePlace = 1000;
 
     public Scaffold() {
-        super("Scaffold", "Legit silent bridging with working Tower & Movement Correction", Category.MISC);
+        super("Scaffold", "Places blocks under you while you walk, with silent rotations and Tower.", Category.MISC);
         INSTANCE = this;
+        this.settings.add(new ModeButton("Mode", java.util.List.of("Legit", "Rage"), 0, v -> rage = "Rage".equals(v))
+                .withDescription("Legit: smooth silent rotations, sneaks at the edge. Rage: instant aim, sprints, no sneaking and places up to 2 blocks ahead of you - fast but obvious."));
         this.settings.add(new ToggleButton("Allow Sprint", sprint, val -> sprint = val).withDescription("Allows sprinting while bridging."));
         this.settings.add(new ToggleButton("Tower", tower, val -> tower = val).withDescription("Places blocks underneath you while jumping straight up."));
         this.settings.add(new ToggleButton("Auto Sneak", autoSneak, val -> autoSneak = val).withDescription("Sneaks automatically at the edge."));
@@ -104,12 +108,13 @@ public class Scaffold extends Module {
         BlockPos underFeet = BlockPos.containing(player.getX(), player.getY() - 1.0, player.getZ());
         boolean edge = edgeNear(mc, player, moveDir, underFeet);
 
-        if (edge && (!sprint || autoSneak)) {
+        boolean sneakOn = autoSneak && !rage;
+        if (edge && !rage && (!sprint || autoSneak)) {
             player.setSprinting(false);
             mc.options.keySprint.setDown(false);
         }
 
-        if (autoSneak) {
+        if (sneakOn) {
             updateSneak(mc, player, edge);
         }
 
@@ -134,12 +139,19 @@ public class Scaffold extends Module {
         }
 
         // Normales Bridging an Kanten
-        boolean canPlaceNow = !autoSneak || !edge || sneakTicks >= 1;
+        boolean canPlaceNow = !sneakOn || !edge || sneakTicks >= 1;
         if (state == 0 && isFree(mc, underFeet) && !isTowering && cooldown == 0 && canPlaceNow) {
             state = tryPlace(mc, player, underFeet, moveDir);
         }
 
-        if (state == 0 && edge && moving && !isTowering) {
+        if (rage && state == 0 && moving && !isTowering && cooldown == 0) {
+            for (int k = 1; k <= 2 && state == 0; k++) {
+                BlockPos ahead = BlockPos.containing(player.getX() + moveDir.x * k, player.getY() - 1.0, player.getZ() + moveDir.z * k);
+                if (isFree(mc, ahead)) state = tryPlace(mc, player, ahead, moveDir);
+            }
+        }
+
+        if (!rage && state == 0 && edge && moving && !isTowering) {
             if (preAim(mc, player, moveDir, underFeet)) state = 1;
         }
 
@@ -337,6 +349,12 @@ public class Scaffold extends Module {
             vYaw = player.getYRot();
             vPitch = player.getXRot();
             spoofing = true;
+        }
+        if (rage) {
+            vYaw = targetYaw;
+            vPitch = Mth.clamp(targetPitch, -90.0F, 90.0F);
+            Tracker.applySpoof(player, vYaw, vPitch);
+            return;
         }
         float gcd = mouseGcd();
 

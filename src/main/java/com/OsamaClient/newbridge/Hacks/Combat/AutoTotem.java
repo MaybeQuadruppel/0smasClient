@@ -31,7 +31,7 @@ public class AutoTotem extends Module {
     private boolean wasInventoryOpen = false;
 
     public AutoTotem() {
-        super("AutoTotem", "Auto Equips a Totem after Pop", Category.COMBAT);
+        super("AutoTotem", "Puts a new totem in your offhand after one pops.", Category.COMBAT);
 
         // GUI Settings
         this.settings.add(new ToggleButton("Legit Mode", legitMode, val -> legitMode = val).withDescription("Requires you to hover your mouse over the totem to equip it legitimately."));
@@ -140,4 +140,4 @@ public class AutoTotem extends Module {
         }
         return -1;
     }
-}
+}

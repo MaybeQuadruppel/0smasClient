@@ -29,7 +29,7 @@ public class AutoArmor extends Module {
     public int swaps;
 
     public AutoArmor() {
-        super("AutoArmor", "Automatically equips your best armor", Category.PLAYER);
+        super("AutoArmor", "Equips your best armor automatically.", Category.PLAYER);
         INSTANCE = this;
         settings.add(new Slider("Delay", 0, 20, delay, 1, v -> delay = v).withDescription("Ticks between two armor swaps."));
         settings.add(new ModeButton("Priority", List.of("Protection", "Blast", "Fire", "Projectile"), 0, v -> priority = v)

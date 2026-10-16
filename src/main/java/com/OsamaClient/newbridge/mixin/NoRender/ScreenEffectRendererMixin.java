@@ -17,4 +17,14 @@ public class ScreenEffectRendererMixin {
             ci.cancel();
         }
     }
+
+    @Inject(method = "submitWater", at = @At("HEAD"), cancellable = true)
+    private static void onSubmitWater(CallbackInfo ci) {
+        if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.waterOverlay) ci.cancel();
+    }
+
+    @Inject(method = "renderItemActivationAnimation", at = @At("HEAD"), cancellable = true)
+    private void onItemActivation(CallbackInfo ci) {
+        if (NoRender.INSTANCE != null && NoRender.INSTANCE.enabled && NoRender.INSTANCE.totemAnimation) ci.cancel();
+    }
 }

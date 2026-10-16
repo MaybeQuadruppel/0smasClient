@@ -21,10 +21,14 @@ final class SearchBar {
     private float x, y;
     private boolean hovered;
     // hit rects of the chips / clear button: x, y, w, h
+    /** Tag suggestions above the bar while typing a #word: hit rects and the tag of each. */
+    private final float[][] tagRects = new float[10][4];
+    private final String[] tagNames = new String[10];
+    private int tagCount;
     private final float[] enabledRect = new float[4], favRect = new float[4], recentRect = new float[4], collapseRect = new float[4], clearRect = new float[4];
 
     SearchBar() {
-        field.maxLength = 32;
+        field.maxLength = 48;
     }
 
     /** Current filter, lower case ("" = no filter). */
@@ -107,7 +111,7 @@ final class SearchBar {
             ui.textRight(cnt, right, y, H, 5.5f, matches == 0 ? 0xFFFF7A7A : Theme.TEXT_DIM);
             right -= cw + 2f;
         }
-        field.draw(ui, x + 11f, y + 1.5f, Math.max(10f, right - (x + 11f)), H - 3f, Theme.FONT_SMALL, "Search modules…  (click or Ctrl+F)", false);
+        field.draw(ui, x + 11f, y + 1.5f, Math.max(10f, right - (x + 11f)), H - 3f, Theme.FONT_SMALL, "Search modules…  (try #sword)", false);
 
         float cx = x + W + CHIP_GAP;
         cx += chip(ui, "Enabled", cx, ClickGui.onlyEnabled, enabledRect) + CHIP_GAP;
@@ -122,14 +126,49 @@ final class SearchBar {
             gui.hint("Show only the modules you toggled recently");
         else if (ui.hovered(collapseRect[0], collapseRect[1], collapseRect[2], collapseRect[3]))
             gui.hint("Collapse or expand all panels");
-        else if (hovered) gui.hint("Search modules by name");
+        else if (hovered) gui.hint("Search by name, or by #tag: #sword #crystalpvp #ohc #undetectable #mobs ...");
+        drawTagStrip(ui);
     }
+
+    private void drawTagStrip(Ui ui) {
+        tagCount = 0;
+        if (!field.editing && !field.text.contains("#")) return;
+        java.util.List<String> sug = com.OsamaClient.newbridge.UI.components.Tags.suggestions(field.text);
+        if (sug.isEmpty()) return;
+        float cx = x, cy = y - H - 3f;
+        for (String t : sug) {
+            if (tagCount >= tagRects.length) break;
+            String label = "#" + t;
+            float w = ui.textWidth(label, Theme.FONT_SMALL) + 8f;
+            if (cx + w > x + W + 150f) break;
+            boolean hv = ui.hovered(cx, cy, w, H);
+            int col = t.equals("undetectable") ? 0xFF6EDC8C : t.equals("risky") ? 0xFFFF7A7A : Theme.accent();
+            ui.round(cx, cy, w, H, 2.5f, hv ? Theme.ROW_HOVER : Theme.PANEL_BG);
+            ui.outline(cx, cy, w, H, 2.5f, 1f, hv ? col : Theme.OUTLINE);
+            ui.textCentered(label, cx + w / 2f, cy, H, Theme.FONT_SMALL, col);
+            set(tagRects[tagCount], cx, cy, w, H);
+            tagNames[tagCount++] = t;
+            if (hv) ClickGui.INSTANCE.hint("#" + t + " (" + com.OsamaClient.newbridge.UI.components.Tags.count(t) + " modules): " + com.OsamaClient.newbridge.UI.components.Tags.INFO.get(t));
+            cx += w + CHIP_GAP;
+        }
+    }
+
+    /** Test helper: tag chips currently drawn. */
+    int tagChips() { return tagCount; }
+    String tagChip(int i) { return tagNames[i]; }
 
     /** @return true if the click hit the bar or one of its chips */
     boolean mouseClicked(int button) {
         ClickGui gui = ClickGui.INSTANCE;
         float mx = gui.mouseUnitsX(), my = gui.mouseUnitsY();
         if (button == Keys.MOUSE_BUTTON_LEFT) {
+            for (int i = 0; i < tagCount; i++) {
+                if (in(tagRects[i], mx, my)) {
+                    setText(com.OsamaClient.newbridge.UI.components.Tags.complete(field.text, tagNames[i]));
+                    if (!field.editing) field.begin(field.text);
+                    return true;
+                }
+            }
             if (in(enabledRect, mx, my)) { gui.toggleOnlyEnabled(); return true; }
             if (in(favRect, mx, my)) { gui.toggleOnlyFavorites(); return true; }
             if (in(recentRect, mx, my)) { gui.toggleOnlyRecent(); return true; }

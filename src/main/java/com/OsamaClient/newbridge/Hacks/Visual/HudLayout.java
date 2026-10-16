@@ -15,6 +15,9 @@ import java.util.Map;
 public final class HudLayout {
 
     public static final String PREFIX = "layout.";
+    /** Config keys for per-element scale (x = scale). Used for HudOverlay boxes and layout elements alike. */
+    public static final String SCALE_PREFIX = "scale.";
+    public static final float MIN_SCALE = 0.5f, MAX_SCALE = 2.5f;
 
     public static final class Elem {
         public String id, label;
@@ -25,6 +28,7 @@ public final class HudLayout {
 
     private static final Map<String, ConfigCodec.WidgetPos> custom = new HashMap<>();
     private static final Map<String, Elem> elems = new LinkedHashMap<>();
+    private static final Map<String, Float> scales = new HashMap<>();
     private static long frame;
     private static String dragging;
     private static float grabX, grabY;
@@ -41,10 +45,39 @@ public final class HudLayout {
 
     public static void reset(String id) { custom.remove(id); }
 
+    /** Extra size of an element (1 = normal), changed with the mouse wheel in the layout editor. */
+    public static float scale(String id) {
+        Float f = scales.get(id);
+        return f == null ? 1f : f;
+    }
+
+    public static void setScale(String id, float s) {
+        s = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.round(s * 20f) / 20f));
+        if (Math.abs(s - 1f) < 0.001f) scales.remove(id); else scales.put(id, s);
+    }
+
+    /** Wheel: 5 % per notch. Returns the new scale. */
+    public static float addScale(String id, double wheel) {
+        // several notches can arrive before the next frame: apply each of them
+        double steps = Math.abs(wheel) < 1 ? Math.signum(wheel) : Math.rint(wheel);
+        setScale(id, scale(id) + (float) steps * 0.05f);
+        return scale(id);
+    }
+
+    public static void resetScale(String id) { scales.remove(id); }
+
+    /** Topmost reported element under the point (fb px), or null. */
+    public static Elem elementAt(float mx, float my) {
+        Elem hit = null;
+        for (Elem e : visible()) if (mx >= e.x && mx <= e.x + e.w && my >= e.y && my <= e.y + e.h) hit = e;
+        return hit;
+    }
+
     /** Position for config saving (keys prefixed so they don't clash with HudOverlay boxes). */
     public static Map<String, ConfigCodec.WidgetPos> positions() {
         Map<String, ConfigCodec.WidgetPos> out = new LinkedHashMap<>();
         custom.forEach((id, p) -> out.put(PREFIX + id, p));
+        scales.forEach((id, f) -> out.put(SCALE_PREFIX + id, new ConfigCodec.WidgetPos(f, 0f)));
         return out;
     }
 
@@ -53,6 +86,7 @@ public final class HudLayout {
         Map<String, ConfigCodec.WidgetPos> rest = new HashMap<>();
         saved.forEach((id, p) -> {
             if (id.startsWith(PREFIX)) custom.put(id.substring(PREFIX.length()), p);
+            else if (id.startsWith(SCALE_PREFIX)) setScale(id.substring(SCALE_PREFIX.length()), p.x());
             else rest.put(id, p);
         });
         return rest;
@@ -76,6 +110,20 @@ public final class HudLayout {
         e.w = w;
         e.h = h;
         e.frame = frame;
+        keepOnScreen(e);
+    }
+
+    /** A moved / resized element that sticks out of the window gets pushed back in (takes effect next frame). */
+    private static void keepOnScreen(Elem e) {
+        var p = custom.get(e.id);
+        if (p == null || e.id.equals(dragging)) return;
+        var win = net.minecraft.client.Minecraft.getInstance().getWindow();
+        int fbW = win.getWidth(), fbH = win.getHeight();
+        if (fbW <= 0 || fbH <= 0 || e.w >= fbW || e.h >= fbH) return;
+        float dx = e.x < 0 ? -e.x : e.x + e.w > fbW ? fbW - (e.x + e.w) : 0f;
+        float dy = e.y < 0 ? -e.y : e.y + e.h > fbH ? fbH - (e.y + e.h) : 0f;
+        if (Math.abs(dx) < 0.5f && Math.abs(dy) < 0.5f) return;
+        custom.put(e.id, new ConfigCodec.WidgetPos(p.x() + dx / fbW, p.y() + dy / fbH));
     }
 
     /** Elements drawn in the current or previous frame. */
@@ -124,6 +172,7 @@ public final class HudLayout {
         for (Elem e : visible()) {
             if (mx >= e.x && mx <= e.x + e.w && my >= e.y && my <= e.y + e.h) {
                 custom.remove(e.id);
+                scales.remove(e.id);
                 return true;
             }
         }

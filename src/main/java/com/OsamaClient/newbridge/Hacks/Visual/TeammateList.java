@@ -1,5 +1,6 @@
 package com.OsamaClient.newbridge.Hacks.Visual;
 
+import com.OsamaClient.newbridge.UI.components.ModeButton;
 import com.OsamaClient.newbridge.UI.components.Module;
 import com.OsamaClient.newbridge.UI.components.Slider;
 import com.OsamaClient.newbridge.UI.components.ToggleButton;
@@ -46,15 +47,18 @@ public class TeammateList extends Module {
     public final ToggleButton background = new ToggleButton("Background", true, null)
             .withDescription("Draws a small backing box behind each entry");
 
+    public final ModeButton show = new ModeButton("Show", List.of("Teammates", "Friends", "Both"), 0, null)
+            .withDescription("Teammates: your real team. Friends: players from the Friends module (in their friend colour). Both: both lists in one box.");
     public final ToggleButton showFaces = new ToggleButton("Show Faces", true, null)
             .withDescription("Draws each teammate's skin face next to the name");
     public final ToggleButton showHealth = new ToggleButton("Show Health", true, null)
             .withDescription("Thin health bar under each teammate");
 
     public TeammateList() {
-        super("TeammateList", "HUD list of active teammates in the top left corner", Category.VISUAL);
+        super("TeammateList", "On-screen list of your teammates with faces, distance and health.", Category.VISUAL);
         this.enabled = false;
         instance = this;
+        settings.add(show);
         settings.add(showDistance);
         settings.add(textScale);
         settings.add(showFaces);
@@ -80,7 +84,7 @@ public class TeammateList extends Module {
         }
 
         renderer.begin();
-        ui.scale = Theme.scale() * (float) instance.textScale.getValue();
+        ui.scale = Theme.scale() * (float) instance.textScale.getValue(); ui.scale *= com.OsamaClient.newbridge.Hacks.Visual.HudLayout.scale("teammates");
         ui.alpha = 1f;
         ui.hoverBlocked = true;
 
@@ -88,7 +92,10 @@ public class TeammateList extends Module {
         List<Player> teammates = new ArrayList<>();
         for (Player player : mc.level.players()) {
             if (player == mc.player) continue;
-            if (TeamUtils.isTeammate(player)) teammates.add(player);
+            boolean team = TeamUtils.isTeamMember(player), friend = TeamUtils.isFriend(player);
+            String sh = instance.show.getMode();
+            if (("Teammates".equals(sh) || "Both".equals(sh)) && team && !friend) teammates.add(player);
+            else if (("Friends".equals(sh) || "Both".equals(sh)) && friend) teammates.add(player);
         }
         teammates.sort(Comparator.comparingDouble(p -> mc.player.distanceToSqr(p)));
 
@@ -103,6 +110,7 @@ public class TeammateList extends Module {
                 col = TeamUtils.teamColorOf(info.getTeam().getFormattedName(net.minecraft.network.chat.Component.literal(name)));
             String dist = instance.showDistance.enabled ? (int) mc.player.distanceTo(p) + "m" : "";
             float hp = Math.max(0f, Math.min(1f, p.getHealth() / Math.max(1f, p.getMaxHealth())));
+            if (TeamUtils.isFriend(p)) col = com.OsamaClient.newbridge.Hacks.Client.Friends.color() & 0xFFFFFF;
             entries.add(new Entry(name, name, col == null ? C_TEAM : (0xFF000000 | col), dist, hp, info == null ? null : info.getSkin()));
         }
         if (entries.isEmpty() && editing) {
@@ -131,7 +139,7 @@ public class TeammateList extends Module {
         float pad = 4f, headH = lineH + 4f;
 
         // Kartenbreite
-        float w = ui.textWidth("TEAM", textSize * 0.85f) + 30f;
+        float w = ui.textWidth("TEAM + FRIENDS", textSize * 0.85f) + 30f;
         for (Entry e : entries) {
             float rw = (faces ? face + 3f : 0f) + ui.textWidth(e.name(), textSize) + (e.dist().isEmpty() ? 0f : 8f + ui.textWidth(e.dist(), textSize));
             w = Math.max(w, rw);
@@ -155,7 +163,7 @@ public class TeammateList extends Module {
                 ui.alpha = Math.max(cardAlpha, editing ? 1f : 0f);
             }
             ui.rect(x0 + 2f, y0 + 2f, 1.5f, headH - 3f, Theme.accent());
-            ui.text("TEAM", x0 + pad + 2f, y0 + 2f, lineH, textSize * 0.85f, Theme.TEXT_DIM);
+            ui.text("Friends".equals(instance.show.getMode()) ? "FRIENDS" : "Both".equals(instance.show.getMode()) ? "TEAM + FRIENDS" : "TEAM", x0 + pad + 2f, y0 + 2f, lineH, textSize * 0.85f, Theme.TEXT_DIM);
             String cnt = String.valueOf(entries.size());
             ui.text(cnt, x0 + w - pad - ui.textWidth(cnt, textSize * 0.85f), y0 + 2f, lineH, textSize * 0.85f, Theme.accent());
         }
@@ -198,4 +206,4 @@ public class TeammateList extends Module {
         if (Math.abs(diff) < 0.001f) return target;
         return current + diff * Math.min(1f, speed);
     }
-}
+}

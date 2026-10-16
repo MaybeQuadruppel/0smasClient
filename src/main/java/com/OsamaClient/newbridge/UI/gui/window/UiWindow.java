@@ -54,6 +54,7 @@ public abstract class UiWindow {
         float g = Theme.glow();
         if (g > 0) ui.glow(wx, wy, ww, wh, r, 9f, Theme.accent(0.18f * g));
         ui.round(wx, wy, ww, wh, r, Theme.panelBg());
+        if (Theme.glass()) ui.gradientV(wx, wy, ww, wh * 0.45f, r, ColorUtil.alpha(0xFFFFFFFF, 0.13f), ColorUtil.alpha(0xFFFFFFFF, 0f));
         float hh = 16f;
         ui.text(title(), wx + 6f, wy, hh, Theme.FONT, Theme.TEXT);
         ui.gradientH(wx + 4f, wy + hh - 1f, ww * 0.5f, 1f / ui.scale, 0, Theme.accent(0.9f), Theme.accent(0.05f));
@@ -62,7 +63,8 @@ public abstract class UiWindow {
             WindowManager.INSTANCE.close();
             return;
         }
-        if (Theme.outline()) ui.outline(wx, wy, ww, wh, r, 1f, Theme.OUTLINE);
+        if (Theme.glass()) ui.outline(wx, wy, ww, wh, r, 1f, 0x55FFFFFF);
+        else if (Theme.outline()) ui.outline(wx, wy, ww, wh, r, 1f, Theme.OUTLINE);
 
         drawContent(wx + 6f, wy + hh + 4f, ww - 12f, wh - hh - 10f);
 
@@ -123,6 +125,12 @@ public abstract class UiWindow {
     }
 
     protected void consumeClick() { clickButton = -1; }
+
+    protected int clickMods() { return clickMods; }
+
+    protected double peekScroll() { return scrollQueued; }
+
+    protected void takeScroll() { scrollQueued = 0; }
 
     protected boolean shiftClick() { return (clickMods & Keys.MOD_SHIFT) != 0; }
 

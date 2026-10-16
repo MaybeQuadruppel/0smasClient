@@ -62,6 +62,7 @@ public class Fullbox extends Module {
     private boolean floor = true, top = true, head = true;
     private boolean targetSelf = false, center = true;
     private boolean silent = true, swapBack = true, swing = true;
+    public boolean ignoreFriends = true;
     private boolean ignoreTeammates = true, onlyOnGround = false, render = true;
     private int color = 0xFFA78BFA;
     public final EntityFilterPicker filter = new EntityFilterPicker("Targets");
@@ -100,8 +101,6 @@ public class Fullbox extends Module {
         settings.add(new ToggleButton("Swing", swing, v -> swing = v).withDescription("Swing the hand when placing."));
         settings.add(new ToggleButton("Only On Ground", onlyOnGround, v -> onlyOnGround = v)
                 .withDescription("Only trap targets that stand on the ground."));
-        settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, v -> ignoreTeammates = v)
-                .withDescription("Never trap teammates."));
         settings.add(new ToggleButton("Hold Key", false, v -> holdToActivate = v)
                 .withDescription("Only trap while the module key is held (set the key in the module's bind). Off = key toggles."));
         settings.add(new ToggleButton("Render", render, v -> render = v).withDescription("Shows the planned trap blocks."));
@@ -214,7 +213,7 @@ public class Fullbox extends Module {
 
     private boolean isValidTarget(Minecraft mc, Entity e) {
         if (e == mc.player || !e.isAlive()) return false;
-        if (ignoreTeammates && TeamUtils.isTeammate(e)) return false;
+        if (TeamUtils.ignored(e, ignoreTeammates, ignoreFriends)) return false;
         if (filter.isFilterEnabled("Players") && e instanceof Player) return true;
         if (filter.isFilterEnabled("Hostiles") && e instanceof Enemy) return true;
         if (filter.isFilterEnabled("Animals") && e instanceof Animal) return true;

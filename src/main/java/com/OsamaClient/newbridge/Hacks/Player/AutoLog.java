@@ -23,6 +23,7 @@ public class AutoLog extends Module {
     public double health = 4;          // Herzen (0 = aus)
     public double totems = 0;          // ausloggen, wenn Totems <= Wert (nur wenn "Totem Check" an)
     public double playerRange = 0;     // Blöcke (0 = aus)
+    public boolean ignoreFriends = true;
     public boolean totemCheck = false, ignoreTeammates = true, onlySurvival = true, disableAfter = true;
 
     /** Für Tests: nicht wirklich trennen, nur den Grund merken. */
@@ -43,8 +44,6 @@ public class AutoLog extends Module {
                 .withDescription("Log out when you have this many totems or fewer (with Totem Check)."));
         settings.add(new Slider("Player Range", 0, 128, playerRange, 1, v -> playerRange = v)
                 .withDescription("Log out when another player is this close. 0 = off."));
-        settings.add(new ToggleButton("Ignore Teammates", ignoreTeammates, v -> ignoreTeammates = v)
-                .withDescription("Teammates never trigger the player check."));
         settings.add(new ToggleButton("Only Survival", onlySurvival, v -> onlySurvival = v)
                 .withDescription("Never logs out in creative/spectator."));
         settings.add(new ToggleButton("Disable After", disableAfter, v -> disableAfter = v)
@@ -73,7 +72,7 @@ public class AutoLog extends Module {
         double nearest = Double.MAX_VALUE;
         if (playerRange > 0) {
             for (Player o : mc.level.players()) {
-                if (o == p || !o.isAlive() || (ignoreTeammates && TeamUtils.isTeammate(o))) continue;
+                if (o == p || !o.isAlive() || (TeamUtils.ignored(o, ignoreTeammates, ignoreFriends))) continue;
                 nearest = Math.min(nearest, p.distanceTo(o));
             }
         }

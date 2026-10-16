@@ -18,7 +18,7 @@ public class AutoCart extends Module {
     private int delayTicks = 0;
 
     public AutoCart() {
-        super("InstaCart", "Automatically places a TNT- Cart if you shoot a Flame-Bow", Category.COMBAT);
+        super("InstaCart", "Places a TNT minecart where your flame arrow lands.", Category.COMBAT);
         INSTANCE = this;
     }
 
@@ -113,4 +113,4 @@ public class AutoCart extends Module {
         }
         return -1;
     }
-}
+}
